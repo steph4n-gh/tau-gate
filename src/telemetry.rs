@@ -1,11 +1,9 @@
 use crate::error::{GateError, Result};
-use serde::Serialize;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
 /// Structured log for recorded supply chain anomalies.
-#[derive(Serialize)]
 pub struct AnomalyLog {
     /// Unix timestamp of the event.
     pub timestamp: String,
@@ -30,7 +28,26 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
     }
 
     let log_path = local_dir.join("tau-gate_anomalies.json");
-    let json = serde_json::to_string(log).map_err(|e| GateError::Telemetry(format!("Failed to serialize telemetry log: {}", e)))?;
+    
+    // Manual JSON serialization to move toward zero-dependency
+    let mut json = String::new();
+    json.push_str("{\n");
+    json.push_str(&format!("  \"timestamp\": \"{}\",\n", log.timestamp));
+    json.push_str(&format!("  \"tau\": {},\n", log.tau));
+    json.push_str(&format!("  \"anomaly_size\": {},\n", log.anomaly_size));
+    json.push_str(&format!("  \"total_nodes\": {},\n", log.total_nodes));
+    json.push_str("  \"isolated_nodes\": [\n");
+    for (i, node) in log.isolated_nodes.iter().enumerate() {
+        json.push_str(&format!("    \"{}\"", node.replace("\"", "\\\"")));
+        if i < log.isolated_nodes.len() - 1 {
+            json.push_str(",\n");
+        } else {
+            json.push('\n');
+        }
+    }
+    json.push_str("  ],\n");
+    json.push_str(&format!("  \"message\": \"{}\"\n", log.message.replace("\"", "\\\"")));
+    json.push_str("}");
 
     let mut file = OpenOptions::new()
         .create(true)
