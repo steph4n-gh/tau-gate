@@ -5,29 +5,24 @@ on:
     tags:
       - 'v*'
 
-# V2.0: Minimal workflow permissions
 permissions:
   contents: write
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   audit-and-release:
     runs-on: ubuntu-latest
     steps:
-      # V2.0: Hardened SHA Pinning for all Actions
-      - name: Checkout Code
-        # actions/checkout@v4.2.2
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          fetch-depth: 0
+      # V2.0: Absolute Zero CI - Use only pre-installed runner tools
+      - name: Manual Checkout
+        run: |
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} .
+          git checkout ${{ github.sha }}
 
-      - name: Setup Rust
-        # dtolnay/rust-toolchain@master
-        uses: dtolnay/rust-toolchain@321107a00c807f01c879d5f55583d58a51de5462
-        with:
-          toolchain: stable
+      - name: Setup Rust Environment
+        run: |
+          # Use pre-installed rustup to ensure correct toolchain
+          rustup toolchain install stable
+          rustup default stable
 
       - name: Dogfooding Audit
         run: |
@@ -35,19 +30,18 @@ jobs:
           cargo build --release
           
           echo "[Audit] Running active spectral bisection on own tree..."
-          # v2.0.0: Active Dogfooding. Fails build if our own tree is anomalous.
+          # Active Dogfooding: The zero-dependency binary audits itself.
           ./target/release/tau-gate
           
           echo "✅ Dogfooding Audit Passed. Project is secured by itself."
 
-      - name: Create Release
-        # softprops/action-gh-release@master
-        uses: softprops/action-gh-release@c95fe1489396fe8a210c1e842258a273e0247ad7
-        with:
-          files: target/release/tau-gate
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: contains(github.ref, '-pre')
-          generate_release_notes: true
+      - name: Manual Release via GH CLI
+        run: |
+          echo "[Release] Creating GitHub Release using native CLI..."
+          gh release create ${{ github.ref_name }} \
+            target/release/tau-gate \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes \
+            $( [[ "${{ github.ref_name }}" == *"-pre"* ]] && echo "--prerelease" )
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
