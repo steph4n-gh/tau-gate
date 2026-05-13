@@ -68,7 +68,7 @@ impl DepGraph {
             if details.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) {
                 execution_packages.insert(name.clone());
             }
-            if MiniParser::detect_obfuscation(&details.as_object().map(|o| format!("{:?}", o)).unwrap_or_default()) {
+            if MiniParser::detect_obfuscation(&name) {
                 suspicious_packages.insert(name);
             }
         }
@@ -219,7 +219,7 @@ impl DepGraph {
                     if let Ok(pkg_json) = MiniParser::parse_json(&content) {
                         let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
                         if has_scripts || pkg_json.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(id.to_string()); }
-                        if MiniParser::detect_obfuscation(&content) { suspicious_packages.insert(id.to_string()); }
+                        if MiniParser::detect_obfuscation(id) { suspicious_packages.insert(id.to_string()); }
                     }
                 }
             }
