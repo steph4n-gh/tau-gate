@@ -113,12 +113,25 @@ impl DepGraph {
             }
             if MiniParser::detect_obfuscation(id) { suspicious_packages.insert(id.clone()); }
         }
+
+        let mut dep_cache = HashMap::new();
+        for snap in meta.snapshots.values() {
+            for dep_name in &snap.dependencies {
+                if !dep_cache.contains_key(dep_name) {
+                    for snap_id in node_indices.keys() {
+                        if snap_id.contains(dep_name) {
+                            dep_cache.insert(dep_name.clone(), snap_id.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         for (id, snap) in &meta.snapshots {
             let source_idx = *node_indices.get(id).context("Source node not found in pnpm engine")?;
             for dep_name in &snap.dependencies {
-                let mut found = None;
-                for snap_id in node_indices.keys() { if snap_id.contains(dep_name) { found = Some(snap_id); break; } }
-                if let Some(target_id) = found {
+                if let Some(target_id) = dep_cache.get(dep_name) {
                     let target_idx = *node_indices.get(target_id).unwrap();
                     graph.add_edge(source_idx, target_idx);
                 }
