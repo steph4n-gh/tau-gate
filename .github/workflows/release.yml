@@ -1,0 +1,39 @@
+name: Release & Dogfood
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  audit-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Dogfooding Audit
+        run: |
+          # Build tau-gate from source
+          cargo build --release
+          
+          # Use the freshly built binary to audit its own dependencies!
+          # Since we added Cargo support, it will run cargo metadata and bisect the graph.
+          ./target/release/tau-gate --dry-run
+          
+          echo "✅ Dogfooding Audit Passed. Project is structurally sound."
+
+      - name: Build Final Binary
+        run: cargo build --release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/release/tau-gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

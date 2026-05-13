@@ -13,7 +13,7 @@ use std::fs;
 use std::process::{Command, exit};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V1.0.0 Build Metadata
+/// V1.1.0 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH"); 
 
@@ -29,7 +29,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v1.0.0");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v1.1.0");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -126,7 +126,22 @@ fn main() -> Result<()> {
 }
 
 fn execute_actual_install(engine: EngineType) {
-    let cmd = match engine { EngineType::Npm => "npm", EngineType::Pnpm => "pnpm", EngineType::Bun => "bun", EngineType::Yarn => "yarn" };
-    let status = Command::new(cmd).arg("install").status().expect("Native install failed");
+    let cmd = match engine {
+        EngineType::Npm => "npm",
+        EngineType::Pnpm => "pnpm",
+        EngineType::Bun => "bun",
+        EngineType::Yarn => "yarn",
+        EngineType::Cargo => "cargo",
+    };
+
+    let args = match engine {
+        EngineType::Cargo => vec!["build"],
+        _ => vec!["install"],
+    };
+
+    let status = Command::new(cmd)
+        .args(&args)
+        .status()
+        .expect(&format!("Failed to execute native {} installation", cmd));
     exit(status.code().unwrap_or(1));
 }

@@ -1,4 +1,4 @@
-# $\tau$-Gate (v1.0.0)
+# $\tau$-Gate (v1.1.0)
 **Zero-Trust Supply Chain Security powered by Spectral Graph Theory.**
 
 ---
@@ -13,7 +13,7 @@
 ## 🛡️ The Mission: Structural Zero-Trust
 Modern supply chain attacks (TanStack, XZ Utils) bypass traditional scanners because they don't use "known-bad" code. Instead, they use **Transitive Secrecy**.
 
-$\tau$-Gate is a mathematical proxy wrapper for your package manager (`npm`, `pnpm`, `Bun`, `Yarn`). It analyzes the **Shape of your Dependencies** before untrusted code can run.
+$\tau$-Gate is a mathematical proxy wrapper for your package manager (`npm`, `pnpm`, `Bun`, `Yarn`, `Cargo`). It analyzes the **Shape of your Dependencies** before untrusted code can run.
 
 ---
 
@@ -40,6 +40,22 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 
 ---
 
+## 🤝 How to Contribute & Extend
+$\tau$-Gate v1.1.0 introduces an **Extensible Architecture**. Adding support for a new language (like Python or Go) is now a simple 4-step process:
+1.  **Define the Engine:** Add your language to `EngineType` in `src/graph.rs`.
+2.  **Transitive Extraction:** Implement a `build_from_lang()` method using your language's metadata tool.
+3.  **Map Execution Sinks:** Identify your language's "install-time" scripts (e.g., `setup.py` or `build.rs`).
+4.  **Register:** Link it in the `DepGraph::build()` discovery loop.
+
+We welcome contributions for:
+*   🦀 **Native Rust (Cargo) support** (Included in v1.1.0 - Dogfooding enabled!)
+*   🐍 **Python (Pip/Poetry) support** (Roadmap)
+*   📈 **Mathematical optimizations** for the sparse iterative solver.
+
+Check out the [source code architecture](https://github.com/steph4n-gh/tau-gate/tree/main/src) to get started.
+
+---
+
 ## 📖 Resource Hub
 
 | Documentation | Description |
@@ -48,7 +64,18 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 | **[Governance & Policy](./docs/policy.md)** | Configuration guide and real-world attack scenarios. |
 | **[The Mathematics](./docs/whitepaper.md)** | In-depth technical whitepaper on Spectral Bisection. |
 | **[Empirical Validation](./docs/validation.md)** | Performance and accuracy data from real-world audits. |
+| **[Extensibility Guide](./docs/extensibility.md)** | How to add support for new package managers (Python, Go, etc.). |
 | **[Strategy Audit](./docs/marketing.md)** | Stakeholder talking points and competitive analysis. |
+
+---
+
+## 🌍 The Future: Multi-Language Roadmap (v3.0+)
+The underlying Spectral Graph Theory is **language-agnostic**. A dependency graph is a DAG whether it's written in JavaScript or Rust. 
+
+Future versions will introduce native support for:
+*   **Rust (Cargo):** Bridging packages with `build.rs` to the execution sink. (RELEASED in v1.1.0)
+*   **Python (Pip/Poetry):** Detecting `setup.py` anomalies.
+*   **Ruby (Gems):** Mapping native extensions (`extconf.rb`).
 
 ---
 

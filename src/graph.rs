@@ -14,6 +14,7 @@ pub enum EngineType {
     Pnpm,
     Bun,
     Yarn,
+    Cargo,
 }
 
 /// A directed graph representing the project's dependency topology.
@@ -27,7 +28,9 @@ pub struct DepGraph {
 impl DepGraph {
     /// Discovers the project type and builds the dependency graph using the appropriate engine.
     pub fn build() -> Result<(Self, EngineType)> {
-        if Path::new("pnpm-lock.yaml").exists() {
+        if Path::new("Cargo.toml").exists() {
+            Ok((Self::build_from_cargo()?, EngineType::Cargo))
+        } else if Path::new("pnpm-lock.yaml").exists() {
             Ok((Self::build_from_pnpm()?, EngineType::Pnpm))
         } else if Path::new("bun.lockb").exists() || Path::new("bun.lock").exists() {
             Ok((Self::build_from_bun()?, EngineType::Bun))
@@ -36,6 +39,70 @@ impl DepGraph {
         } else {
             Ok((Self::build_from_npm()?, EngineType::Npm))
         }
+    }
+
+    /// Builds the graph from Cargo (Rust).
+    fn build_from_cargo() -> Result<Self> {
+        let output = Command::new("cargo")
+            .args(&["metadata", "--format-version", "1"])
+            .output()
+            .context("Failed to execute cargo metadata. Is Cargo installed?")?;
+        
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        let root: JsonValue = serde_json::from_str(&stdout_str)
+            .context("Failed to parse Cargo metadata.")?;
+
+        let mut graph = DiGraph::new();
+        let mut node_indices = HashMap::new();
+        let mut execution_packages = HashSet::new();
+
+        // Pass 1: Nodes and Metadata
+        if let Some(packages) = root.get("packages").and_then(|p| p.as_array()) {
+            for pkg in packages {
+                if let Some(id) = pkg.get("id").and_then(|v| v.as_str()) {
+                    let name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+                    let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("?");
+                    let full_name = format!("{}@{}", name, version);
+                    node_indices.insert(id.to_string(), graph.add_node(full_name.clone()));
+
+                    // Check for build.rs (custom-build target)
+                    let mut has_build_script = false;
+                    if let Some(targets) = pkg.get("targets").and_then(|t| t.as_array()) {
+                        for target in targets {
+                            if let Some(kind) = target.get("kind").and_then(|k| k.as_array()) {
+                                if kind.iter().any(|k| k.as_str() == Some("custom-build")) {
+                                    has_build_script = true;
+                                }
+                            }
+                        }
+                    }
+                    if has_build_script {
+                        execution_packages.insert(full_name);
+                    }
+                }
+            }
+        }
+
+        // Pass 2: Edges from resolve tree
+        if let Some(nodes) = root.get("resolve").and_then(|r| r.get("nodes")).and_then(|n| n.as_array()) {
+            for node in nodes {
+                if let Some(id) = node.get("id").and_then(|v| v.as_str()) {
+                    if let Some(&source_idx) = node_indices.get(id) {
+                        if let Some(deps) = node.get("dependencies").and_then(|d| d.as_array()) {
+                            for dep_id in deps {
+                                if let Some(dep_id_str) = dep_id.as_str() {
+                                    if let Some(&target_idx) = node_indices.get(dep_id_str) {
+                                        graph.add_edge(source_idx, target_idx, ());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(Self { graph, execution_packages })
     }
 
     /// Builds the graph from npm's package-lock.json.
