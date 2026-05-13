@@ -32,7 +32,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v2.0.0");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v2.0.1");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -75,7 +75,7 @@ fn main() -> Result<()> {
 
     pb_finish_and_clear(); // Custom replacement for pb
 
-    println!("[\u{03C4}-Gate] \u{2705} Analysis Complete ({} ms)", elapsed);
+    println!("[\u{03C4}-Gate] \u{2705} Analyzed {} nodes in {} ms", node_count, elapsed);
     println!("[\u{03C4}-Gate] \u{1F517} Connectivity Score (\u{03BB}\u{2082}): {:.6}", partition_result.connectivity_score);
 
     let total_nodes = node_count as f64;
