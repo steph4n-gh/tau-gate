@@ -20,7 +20,7 @@ $\tau$-Gate is a mathematical proxy wrapper for your package manager (`npm`, `pn
 ## 🧠 Core Methodology
 
 ### Level 1: The Social Network (Intuitive)
-Trusted software forms a dense "Mainland." Attackers form tiny "Islands." If an isolated island requests system power (execution scripts), the math flags it and blocks it.
+Trusted software forms a dense "Mainland." Attackers form tiny "Islands." If an isolated island requests system power (execution scripts or build hooks), the math flags it and blocks it.
 
 ### Level 2: Spectral Bisection (Technical)
 We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the **Fiedler Vector** ($\lambda_2$) using a high-performance $O(E)$ sparse iterative solver. The tool identifies the **Maximum Spectral Gap** to mathematically prove structural isolation.
@@ -48,7 +48,7 @@ $\tau$-Gate v1.1.0 introduces an **Extensible Architecture**. Adding support for
 4.  **Register:** Link it in the `DepGraph::build()` discovery loop.
 
 We welcome contributions for:
-*   🦀 **Native Rust (Cargo) support** (Included in v1.1.0 - Dogfooding enabled!)
+*   🦀 **Native Rust (Cargo) support** (Included in v1.1.0!)
 *   🐍 **Python (Pip/Poetry) support** (Roadmap)
 *   📈 **Mathematical optimizations** for the sparse iterative solver.
 

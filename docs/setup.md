@@ -8,7 +8,7 @@ This document details how to install, run, and integrate $\tau$-Gate into your l
 
 ### 1. Requirements
 *   **Rust:** `cargo` 1.70+
-*   **Package Managers:** Ensure your preferred tool (`npm`, `pnpm`, `bun`, or `yarn`) is installed globally.
+*   **Package Managers:** Ensure your preferred tool (`npm`, `pnpm`, `bun`, `yarn`, or `cargo`) is installed globally.
 
 ### 2. Quick Install (Global Symlink)
 The provided `install.sh` script automates the build and links the binary to `/usr/local/bin`.
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1 
+      - uses: dtolnay/rust-toolchain@stable 
       
       - name: Install τ-Gate
         run: |
@@ -57,7 +57,7 @@ jobs:
           sudo ln -sf $(pwd)/target/release/tau-gate /usr/local/bin/tau-gate
 
       - name: Run Security Gate
-        # Replaces 'bun install'
+        # Replaces 'cargo build' or 'npm install'
         run: tau-gate
 ```
 

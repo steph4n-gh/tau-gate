@@ -32,7 +32,7 @@ whitelist = [
 *   **Verdict:** The `max_gap` algorithm snaps the graph at the single thread connecting your app to the fake package.
 
 ### 2. The "Sleeper Cell" (Transitive Bridge)
-*   **What happens:** A utility library 10 levels deep is hijacked and adds an install script.
+*   **What happens:** A utility library 10 levels deep is hijacked and adds an install script (Node.js) or a `build.rs` (Rust).
 *   **Math Signal:** **Extreme Connectivity Isolation ($\lambda_2 < 10^{-4}$)**.
 *   **Verdict:** The Fiedler Vector identifies that the entire project "snaps" at the structural bottleneck created by the deep dependency.
 
@@ -46,8 +46,8 @@ whitelist = [
 ## 🤝 How to Contribute
 
 We welcome contributions for:
-*   🦀 **Native extraction engines** for Rust, Python, and Go.
+*   🦀 **Native extraction engines** (Rust/Cargo released in v1.1.0!).
+*   🐍 **Python/Pip** or **Go/Modules** support.
 *   📈 **Mathematical optimizations** for the sparse iterative solver.
-*   ☁️ **Cloud integrations** (S3 centralized whitelists).
 
 See [GEMINI.md](../GEMINI.md) for the internal developer architecture guide.
