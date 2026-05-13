@@ -27,6 +27,13 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 
 ---
 
+## 🧪 Live Proof of Concept (Red Team Simulation)
+You can see $\tau$-Gate catch real supply chain attacks by running our automated proof script. This will scaffold three scenarios (Nominal, Typosquatter, and Bloated Trojan) and run the audit against them.
+
+```bash
+./prove-it.sh
+```
+
 ## 🚀 Quick Start
 
 1.  **Install Globally:**
