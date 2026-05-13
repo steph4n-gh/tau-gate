@@ -16,6 +16,12 @@ $\tau$-Gate v2.0 is a self-contained security primitive. To protect against "Aud
 
 ---
 
+## 🔄 Git & Workflow Protocol
+1.  **Pull Requests Mandatory:** Do not push code changes directly to the `main` branch. All code updates, features, and bug fixes must be developed on a separate branch and merged via a Pull Request.
+2.  **Documentation Exception:** Direct pushes to `main` are permissible *only* for minor documentation updates (e.g., `README.md`, `docs/*.md`).
+
+---
+
 ## 🏗️ Architectural Core
 
 The project is divided into three strict layers. Do not bleed logic across these boundaries.
