@@ -115,17 +115,22 @@ impl DepGraph {
         }
 
         let mut dep_cache = HashMap::new();
-        for snap in meta.snapshots.values() {
-            for dep_name in &snap.dependencies {
-                if !dep_cache.contains_key(dep_name) {
-                    for snap_id in node_indices.keys() {
-                        if snap_id.contains(dep_name) {
-                            dep_cache.insert(dep_name.clone(), snap_id.clone());
-                            break;
-                        }
-                    }
+        for snap_id in node_indices.keys() {
+            let stripped = if snap_id.starts_with('/') { &snap_id[1..] } else { snap_id.as_str() };
+            let name = if stripped.starts_with('@') {
+                if let Some(second_at) = stripped[1..].find('@') {
+                    &stripped[..second_at + 1]
+                } else {
+                    stripped
                 }
-            }
+            } else {
+                if let Some(first_at) = stripped.find('@') {
+                    &stripped[..first_at]
+                } else {
+                    stripped
+                }
+            };
+            dep_cache.insert(name.to_string(), snap_id.clone());
         }
 
         for (id, snap) in &meta.snapshots {
