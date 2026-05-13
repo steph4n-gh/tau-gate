@@ -1,4 +1,4 @@
-use crate::error::{GateContext, GateError, Result};
+use crate::error::{GateError, Result};
 use crate::parser::{ConfigValue, MiniParser};
 use std::fs;
 use std::path::Path;
