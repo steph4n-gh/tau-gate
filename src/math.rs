@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use crate::error::{GateError, Result};
 use petgraph::graph::DiGraph;
 
 /// Result of a graph bisection analysis.
@@ -16,7 +16,7 @@ pub struct PartitionResult {
 pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
     let n = graph.node_count();
     if n < 3 {
-        bail!("Graph is too small for meaningful structural analysis.");
+        return Err(GateError::Math("Graph is too small for meaningful structural analysis.".to_string()));
     }
 
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
@@ -73,9 +73,6 @@ pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
             max_diff = f64::max(max_diff, (v_next[i] - v[i]).abs());
         }
 
-        // V2.7: Calculate the Rayleigh Quotient to extract the Fiedler eigenvalue
-        // lambda_2 = (v' * L * v) / (v' * v)
-        // Since v is normalized, v' * v = 1.0
         let mut v_l_v = 0.0;
         for i in 0..n {
             let mut row_sum = degrees[i] * v_next[i];
@@ -119,5 +116,57 @@ pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
         Ok(PartitionResult { partition_b: side_large, tau, connectivity_score: fiedler_value })
     } else {
         Ok(PartitionResult { partition_b: side_small, tau, connectivity_score: fiedler_value })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use petgraph::graph::DiGraph;
+
+    #[test]
+    fn test_dumbbell_bisection() {
+        let mut graph = DiGraph::new();
+        let a0 = graph.add_node("A0".to_string());
+        let a1 = graph.add_node("A1".to_string());
+        let a2 = graph.add_node("A2".to_string());
+        graph.add_edge(a0, a1, ());
+        graph.add_edge(a1, a2, ());
+        graph.add_edge(a2, a0, ());
+        let b0 = graph.add_node("B0".to_string());
+        let b1 = graph.add_node("B1".to_string());
+        let b2 = graph.add_node("B2".to_string());
+        graph.add_edge(b0, b1, ());
+        graph.add_edge(b1, b2, ());
+        graph.add_edge(b2, b0, ());
+        graph.add_edge(a0, b0, ());
+        let result = analyze_graph(&graph).expect("Analysis failed");
+        assert_eq!(result.partition_b.len(), 3);
+    }
+
+    #[test]
+    fn test_anomaly_isolation() {
+        let mut graph = DiGraph::new();
+        let nodes: Vec<_> = (0..20).map(|i| graph.add_node(format!("M{}", i))).collect();
+        for i in 0..20 {
+            graph.add_edge(nodes[i], nodes[(i + 1) % 20], ());
+            graph.add_edge(nodes[i], nodes[(i + 5) % 20], ());
+        }
+        let island = graph.add_node("ISLAND".to_string());
+        graph.add_edge(nodes[0], island, ());
+        let result = analyze_graph(&graph).expect("Analysis failed");
+        assert_eq!(result.partition_b.len(), 1);
+        assert_eq!(result.partition_b[0], "ISLAND");
+    }
+
+    #[test]
+    fn test_no_edges_graceful() {
+        let mut graph = DiGraph::new();
+        graph.add_node("A".to_string());
+        graph.add_node("B".to_string());
+        graph.add_node("C".to_string());
+        
+        let result = analyze_graph(&graph).expect("Should handle no edges");
+        assert_eq!(result.partition_b.len(), 0);
     }
 }

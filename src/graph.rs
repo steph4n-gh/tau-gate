@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use crate::error::{GateContext, GateError, Result};
 use petgraph::graph::{DiGraph, NodeIndex};
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
@@ -50,7 +50,7 @@ impl DepGraph {
                 .status()
                 .context("Failed to execute npm.")?;
             if !status.success() {
-                bail!("Failed to generate package-lock.json.");
+                return Err(GateError::Graph("Failed to generate package-lock.json.".to_string()));
             }
         }
         let content = fs::read_to_string(lockfile_path)?;

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{GateError, Result};
 use serde::Serialize;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -26,19 +26,19 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
     let local_dir = Path::new("logs");
 
     if !local_dir.exists() {
-        fs::create_dir_all(local_dir).context("Failed to create logs directory")?;
+        fs::create_dir_all(local_dir).map_err(|e| GateError::Telemetry(format!("Failed to create logs directory: {}", e)))?;
     }
 
     let log_path = local_dir.join("tau-gate_anomalies.json");
-    let json = serde_json::to_string(log).context("Failed to serialize telemetry log")?;
+    let json = serde_json::to_string(log).map_err(|e| GateError::Telemetry(format!("Failed to serialize telemetry log: {}", e)))?;
 
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(log_path)
-        .context("Failed to open telemetry log file")?;
+        .map_err(|e| GateError::Telemetry(format!("Failed to open telemetry log file: {}", e)))?;
 
-    writeln!(file, "{}", json).context("Failed to write to telemetry log file")?;
+    writeln!(file, "{}", json).map_err(|e| GateError::Telemetry(format!("Failed to write to telemetry log file: {}", e)))?;
 
     Ok(())
 }

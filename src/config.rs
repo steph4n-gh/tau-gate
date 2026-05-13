@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{GateContext, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;

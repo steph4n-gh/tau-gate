@@ -1,13 +1,12 @@
 mod config;
+mod error;
 mod graph;
 mod math;
 mod telemetry;
 
-use anyhow::Result;
+use crate::error::Result;
 use config::SentinelConfig;
-use glob::Pattern;
 use graph::{DepGraph, EngineType};
-use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::fs;
 use std::process::{Command, exit};
@@ -18,6 +17,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH"); 
 
 fn main() -> Result<()> {
+    // 0. Parse CLI Arguments for Mode Selection
     let args: Vec<String> = env::args().collect();
     let dry_run = args.iter().any(|arg| arg == "--dry-run" || arg == "-d");
     let show_verify = args.iter().any(|arg| arg == "--verify" || arg == "-v");
@@ -35,17 +35,18 @@ fn main() -> Result<()> {
     }
     println!("--------------------------------------------------");
 
+    // 1. Initialize Configuration
     let config = SentinelConfig::load("tau-gate.toml").unwrap_or_default();
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(ProgressStyle::default_spinner().tick_chars("\u{25DC}\u{25DD}\u{25DE}\u{25DF}").template("{spinner:.blue} {msg}")?);
-    pb.set_message("Mapping topology and verifying connectivity...");
-    pb.enable_steady_tick(Duration::from_millis(100));
+
+    // V2.0 Phase 1: Replaced indicatif spinner with simple terminal feedback
+    println!("[\u{03C4}-Gate] \u{23F3}  Mapping topology and verifying connectivity...");
 
     let start_time = SystemTime::now();
+
+    // 2. The Extraction Phase
     let (dep_graph, engine) = match DepGraph::build() {
         Ok(res) => res,
         Err(e) => {
-            pb.finish_and_clear();
             eprintln!("[\u{03C4}-Gate] \u{274C} Lockfile Extraction Failed: {}", e);
             exit(1);
         }
@@ -54,23 +55,21 @@ fn main() -> Result<()> {
     let node_count = dep_graph.graph.node_count();
 
     if node_count < 3 {
-        pb.finish_and_clear();
         println!("[\u{03C4}-Gate] \u{2139}\u{FE0F} Graph too small for audit. Proceeding...");
         if dry_run { return Ok(()); }
         execute_actual_install(engine);
     }
 
+    // 3. The Math Phase
     let partition_result = match math::analyze_graph(&dep_graph.graph) {
         Ok(r) => r,
         Err(e) => {
-            pb.finish_and_clear();
             eprintln!("[\u{03C4}-Gate] \u{274C} Math Engine Error: {}", e);
             exit(1);
         }
     };
 
-    let elapsed = start_time.elapsed().unwrap().as_millis();
-    pb.finish_and_clear();
+    let elapsed = start_time.elapsed().unwrap_or(Duration::from_secs(0)).as_millis();
 
     println!("[\u{03C4}-Gate] \u{2705} Analysis Complete ({} ms)", elapsed);
     println!("[\u{03C4}-Gate] \u{1F517} Connectivity Score (\u{03BB}\u{2082}): {:.6}", partition_result.connectivity_score);
@@ -81,15 +80,12 @@ fn main() -> Result<()> {
 
     println!("[\u{03C4}-Gate] \u{1F4CA} Smallest Partition: {} nodes ({:.2}%)", partition_result.partition_b.len(), percentage);
 
-    // Identify if any quarantined nodes in Partition B have execution rights
+    // 4. The Tripwire Phase
     let mut execution_threats = Vec::new();
     for node in &partition_result.partition_b {
-        // V1.1.1 Hardening: Use fuzzy matching for node names to handle versioning quirks
         let mut is_threat = dep_graph.execution_packages.contains(node);
         if !is_threat {
-            // Check if the node name contains any of the known execution threats (handles @version noise)
             for threat in &dep_graph.execution_packages {
-                // If either string contains the other, it's a structural match
                 if node.contains(threat) || threat.contains(node) {
                     is_threat = true;
                     break;
@@ -100,8 +96,10 @@ fn main() -> Result<()> {
         if is_threat {
             let mut is_whitelisted = false;
             for pattern_str in &config.whitelist {
-                if let Ok(pattern) = Pattern::new(pattern_str) {
-                    if pattern.matches(node) { is_whitelisted = true; break; }
+                // V2.0 Phase 1: Replaced glob crate with simple pattern matching
+                if glob_match(pattern_str, node) {
+                    is_whitelisted = true;
+                    break;
                 }
             }
             if !is_whitelisted { execution_threats.push(node.clone()); }
@@ -141,6 +139,18 @@ fn main() -> Result<()> {
     println!("[\u{03C4}-Gate] \u{1F6A7} Topology nominal. Gate opened.");
     if !dry_run { execute_actual_install(engine); }
     Ok(())
+}
+
+/// Simple glob-like matching (v2.0 Phase 1)
+/// Supports prefix match (e.g. "@astrojs/*")
+fn glob_match(pattern: &str, text: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    if let Some(prefix) = pattern.strip_suffix("*") {
+        return text.starts_with(prefix);
+    }
+    pattern == text
 }
 
 fn execute_actual_install(engine: EngineType) {
