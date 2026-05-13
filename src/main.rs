@@ -81,9 +81,23 @@ fn main() -> Result<()> {
 
     println!("[\u{03C4}-Gate] \u{1F4CA} Smallest Partition: {} nodes ({:.2}%)", partition_result.partition_b.len(), percentage);
 
+    // Identify if any quarantined nodes in Partition B have execution rights
     let mut execution_threats = Vec::new();
     for node in &partition_result.partition_b {
-        if dep_graph.execution_packages.contains(node) {
+        // V1.1.1 Hardening: Use fuzzy matching for node names to handle versioning quirks
+        let mut is_threat = dep_graph.execution_packages.contains(node);
+        if !is_threat {
+            // Check if the node name contains any of the known execution threats (handles @version noise)
+            for threat in &dep_graph.execution_packages {
+                // If either string contains the other, it's a structural match
+                if node.contains(threat) || threat.contains(node) {
+                    is_threat = true;
+                    break;
+                }
+            }
+        }
+
+        if is_threat {
             let mut is_whitelisted = false;
             for pattern_str in &config.whitelist {
                 if let Ok(pattern) = Pattern::new(pattern_str) {
@@ -92,6 +106,10 @@ fn main() -> Result<()> {
             }
             if !is_whitelisted { execution_threats.push(node.clone()); }
         }
+    }
+
+    if dry_run && !execution_threats.is_empty() {
+        println!("[\u{03C4}-Gate] 🚩 Caught execution risk in isolation: {:?}", execution_threats);
     }
 
     let extreme_isolation = partition_result.connectivity_score < 1e-4 && !execution_threats.is_empty();
@@ -126,22 +144,8 @@ fn main() -> Result<()> {
 }
 
 fn execute_actual_install(engine: EngineType) {
-    let cmd = match engine {
-        EngineType::Npm => "npm",
-        EngineType::Pnpm => "pnpm",
-        EngineType::Bun => "bun",
-        EngineType::Yarn => "yarn",
-        EngineType::Cargo => "cargo",
-    };
-
-    let args = match engine {
-        EngineType::Cargo => vec!["build"],
-        _ => vec!["install"],
-    };
-
-    let status = Command::new(cmd)
-        .args(&args)
-        .status()
-        .expect(&format!("Failed to execute native {} installation", cmd));
+    let cmd = match engine { EngineType::Npm => "npm", EngineType::Pnpm => "pnpm", EngineType::Bun => "bun", EngineType::Yarn => "yarn", EngineType::Cargo => "cargo" };
+    let args = match engine { EngineType::Cargo => vec!["build"], _ => vec!["install"] };
+    let status = Command::new(cmd).args(&args).status().expect("Native install failed");
     exit(status.code().unwrap_or(1));
 }

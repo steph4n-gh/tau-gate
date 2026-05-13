@@ -8,7 +8,7 @@ This audit evaluates the v1.1.0 implementation against sophisticated threat acto
 
 ### 1. The Core Value
 *   **Structural Secrecy Detection:** $\tau$-Gate identifies the topological patterns used by zero-day supply chain attackers.
-*   **Zero-Day Logic:** It doesn't need to know *what* a payload does. It only needs to see that a package is **Isolated** and **Escalating Privileges**.
+*   **Zero-Day Detection:** It doesn't need to know *what* a payload does. It only needs to see that a package is **Isolated** and **Escalating Privileges**.
 *   **Multi-Engine Support:** v1.1.0 natively secures `npm`, `pnpm`, `Bun`, `Yarn Berry`, and **`Cargo` (Rust)** environments.
 
 ### 2. Limitations & Scoping

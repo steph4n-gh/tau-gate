@@ -1,6 +1,7 @@
 # Empirical Validation Report: Real-World Performance & Accuracy
 
-To prove the robustness of the $\tau$-Gate v1.1.0 mathematical engine and its multi-engine extraction logic, we performed end-to-end "Dry-Run" audits on representative high-profile projects from the 2026 developer ecosystem.
+To prove the robustness of the $\tau$-Gate v1.1.0 mathematical engine and its multi-engine extraction logic, we performed end-to-end "Dry-Run" audits on representative high-profile projects from the 2026 Node.js ecosystem.
+
 
 ## 🧪 Test Environment
 *   **Version:** $\tau$-Gate v1.1.0 (Hardened Edition)

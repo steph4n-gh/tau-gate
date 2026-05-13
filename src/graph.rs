@@ -41,70 +41,6 @@ impl DepGraph {
         }
     }
 
-    /// Builds the graph from Cargo (Rust).
-    fn build_from_cargo() -> Result<Self> {
-        let output = Command::new("cargo")
-            .args(&["metadata", "--format-version", "1"])
-            .output()
-            .context("Failed to execute cargo metadata. Is Cargo installed?")?;
-        
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        let root: JsonValue = serde_json::from_str(&stdout_str)
-            .context("Failed to parse Cargo metadata.")?;
-
-        let mut graph = DiGraph::new();
-        let mut node_indices = HashMap::new();
-        let mut execution_packages = HashSet::new();
-
-        // Pass 1: Nodes and Metadata
-        if let Some(packages) = root.get("packages").and_then(|p| p.as_array()) {
-            for pkg in packages {
-                if let Some(id) = pkg.get("id").and_then(|v| v.as_str()) {
-                    let name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or(id);
-                    let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("?");
-                    let full_name = format!("{}@{}", name, version);
-                    node_indices.insert(id.to_string(), graph.add_node(full_name.clone()));
-
-                    // Check for build.rs (custom-build target)
-                    let mut has_build_script = false;
-                    if let Some(targets) = pkg.get("targets").and_then(|t| t.as_array()) {
-                        for target in targets {
-                            if let Some(kind) = target.get("kind").and_then(|k| k.as_array()) {
-                                if kind.iter().any(|k| k.as_str() == Some("custom-build")) {
-                                    has_build_script = true;
-                                }
-                            }
-                        }
-                    }
-                    if has_build_script {
-                        execution_packages.insert(full_name);
-                    }
-                }
-            }
-        }
-
-        // Pass 2: Edges from resolve tree
-        if let Some(nodes) = root.get("resolve").and_then(|r| r.get("nodes")).and_then(|n| n.as_array()) {
-            for node in nodes {
-                if let Some(id) = node.get("id").and_then(|v| v.as_str()) {
-                    if let Some(&source_idx) = node_indices.get(id) {
-                        if let Some(deps) = node.get("dependencies").and_then(|d| d.as_array()) {
-                            for dep_id in deps {
-                                if let Some(dep_id_str) = dep_id.as_str() {
-                                    if let Some(&target_idx) = node_indices.get(dep_id_str) {
-                                        graph.add_edge(source_idx, target_idx, ());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(Self { graph, execution_packages })
-    }
-
     /// Builds the graph from npm's package-lock.json.
     fn build_from_npm() -> Result<Self> {
         let lockfile_path = "package-lock.json";
@@ -128,7 +64,6 @@ impl DepGraph {
         let mut node_indices = HashMap::new();
         let mut execution_packages = HashSet::new();
 
-        // Pass 1: Nodes and Metadata
         for (path, details) in packages {
             let name = if path.is_empty() {
                 "root".to_string()
@@ -147,7 +82,6 @@ impl DepGraph {
                 execution_packages.insert(name);
             }
         }
-        // Pass 2: Edges (NPM V2.6 Fix: Emulate Node's native module resolution)
         for (path, details) in packages {
             let source_name = if path.is_empty() {
                 "root".to_string()
@@ -163,7 +97,6 @@ impl DepGraph {
                     let mut current_search_path = path.clone();
                     let mut found_target = None;
 
-                    // Walk up the directory tree to find the hoisted package
                     loop {
                         let candidate = if current_search_path.is_empty() {
                             format!("node_modules/{}", dep_name)
@@ -176,11 +109,9 @@ impl DepGraph {
                             break;
                         }
 
-                        // Try to find the last node_modules segment to jump up
                         if let Some(last_idx) = current_search_path.rfind("/node_modules/") {
                             current_search_path = current_search_path[0..last_idx].to_string();
                         } else if !current_search_path.is_empty() && current_search_path != "root" {
-                            // Last jump to root
                             current_search_path = "".to_string();
                         } else {
                             break;
@@ -201,7 +132,6 @@ impl DepGraph {
         })
     }
 
-    /// Builds the graph from pnpm's pnpm-lock.yaml.
     fn build_from_pnpm() -> Result<Self> {
         let content = fs::read_to_string("pnpm-lock.yaml")?;
         let root: YamlValue = serde_yaml::from_str(&content)?;
@@ -222,7 +152,7 @@ impl DepGraph {
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false)
                     {
-                        execution_packages.insert(id_str);
+                        execution_packages.insert(id_str.clone());
                     }
                 }
 
@@ -247,7 +177,6 @@ impl DepGraph {
         })
     }
 
-    /// Builds the graph from Bun's environment.
     fn build_from_bun() -> Result<Self> {
         let output = Command::new("bun")
             .env("TERM", "dumb")
@@ -286,14 +215,11 @@ impl DepGraph {
             if line.trim().is_empty() || line.starts_with('/') {
                 continue;
             }
-
-            // V2.6 Fix: Bun UTF-8 depth calculation (byte index vs char position)
             let depth = if let Some(pos) = line.chars().position(|c| c == '─') {
                 pos / 4
             } else {
                 0
             };
-
             let package_info = line
                 .replace('├', "")
                 .replace('└', "")
@@ -336,7 +262,7 @@ impl DepGraph {
                                 .and_then(|v| v.as_bool())
                                 .unwrap_or(false)
                         {
-                            execution_packages.insert(package_info);
+                            execution_packages.insert(package_info.clone());
                         }
                     }
                 }
@@ -360,7 +286,6 @@ impl DepGraph {
     }
 
     fn build_from_yarn() -> Result<Self> {
-        // V2.6 Fix: Handle Yarn Berry v4 'yarn npm ls'
         let output = Command::new("yarn")
             .args(&["npm", "ls", "--all", "--json"])
             .output()
@@ -398,7 +323,6 @@ impl DepGraph {
                 graph.add_edge(p_idx, current_idx, ());
             }
 
-            // V2.6 Fix: The "Yarn Nuke" Bug. Use physical manifest check instead of heuristics.
             let package_name = if let Some(idx) = id.rfind('@') {
                 if idx > 0 {
                     &id[0..idx]
@@ -448,6 +372,67 @@ impl DepGraph {
         }
     }
 
+    fn build_from_cargo() -> Result<Self> {
+        let output = Command::new("cargo")
+            .args(&["metadata", "--format-version", "1"])
+            .output()
+            .context("Failed to execute cargo metadata. Is Cargo installed?")?;
+        
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        let root: JsonValue = serde_json::from_str(&stdout_str)
+            .context("Failed to parse Cargo metadata.")?;
+
+        let mut graph = DiGraph::new();
+        let mut node_indices = HashMap::new();
+        let mut execution_packages = HashSet::new();
+
+        if let Some(packages) = root.get("packages").and_then(|p| p.as_array()) {
+            for pkg in packages {
+                if let Some(id) = pkg.get("id").and_then(|v| v.as_str()) {
+                    let name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+                    let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("?");
+                    let full_name = format!("{}@{}", name, version);
+                    node_indices.insert(id.to_string(), graph.add_node(full_name.clone()));
+
+                    let mut has_build_script = false;
+                    if let Some(targets) = pkg.get("targets").and_then(|t| t.as_array()) {
+                        for target in targets {
+                            if let Some(kind) = target.get("kind").and_then(|k| k.as_array()) {
+                                if kind.iter().any(|k| k.as_str() == Some("custom-build")) {
+                                    has_build_script = true;
+                                }
+                            }
+                        }
+                    }
+                    if has_build_script {
+                        // FIX: Key must match the full_name used for the node!
+                        execution_packages.insert(full_name);
+                    }
+                }
+            }
+        }
+
+        if let Some(nodes) = root.get("resolve").and_then(|r| r.get("nodes")).and_then(|n| n.as_array()) {
+            for node in nodes {
+                if let Some(id) = node.get("id").and_then(|v| v.as_str()) {
+                    if let Some(&source_idx) = node_indices.get(id) {
+                        if let Some(deps) = node.get("dependencies").and_then(|d| d.as_array()) {
+                            for dep_id in deps {
+                                if let Some(dep_id_str) = dep_id.as_str() {
+                                    if let Some(&target_idx) = node_indices.get(dep_id_str) {
+                                        graph.add_edge(source_idx, target_idx, ());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(Self { graph, execution_packages })
+    }
+
     fn parse_bun_json_dependencies(
         val: &JsonValue,
         graph: &mut DiGraph<String, ()>,
@@ -466,7 +451,7 @@ impl DepGraph {
             }
             if let Some(scripts) = val.get("scripts").and_then(|s| s.as_object()) {
                 if scripts.contains_key("postinstall") || scripts.contains_key("prepare") {
-                    execution_packages.insert(full_name);
+                    execution_packages.insert(full_name.clone());
                 }
             }
             if let Some(dependencies) = val.get("dependencies").and_then(|d| d.as_array()) {
