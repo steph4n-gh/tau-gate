@@ -18,3 +18,4 @@ logs/
 .DS_Store
 .env
 *.log
+ecosystem_audit/

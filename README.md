@@ -63,6 +63,7 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 | **[The Mathematics](./docs/whitepaper.md)** | In-depth technical whitepaper on Spectral Bisection. |
 | **[Empirical Validation](./docs/validation.md)** | Performance and accuracy data from real-world audits. |
 | **[Strategy Audit](./docs/marketing.md)** | Stakeholder talking points and competitive analysis. |
+| **[v3.0 Roadmap](./docs/roadmap_v3.md)** | Future architecture: Network-Level Resolution Engine. |
 | **[Extensibility Guide](./docs/extensibility.md)** | How to add support for new package managers. |
 
 ---
