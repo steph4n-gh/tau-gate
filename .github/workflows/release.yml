@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   audit-and-release:
     runs-on: ubuntu-latest
@@ -19,21 +25,22 @@ jobs:
 
       - name: Dogfooding Audit
         run: |
-          # Build tau-gate from source
+          echo "[Audit] Building τ-Gate for self-audit..."
           cargo build --release
           
-          # Use the freshly built binary to audit its own dependencies!
-          # v1.1.0: Active Dogfooding enabled. If our own dependencies are compromised, the build fails here.
+          echo "[Audit] Running active spectral bisection on own tree..."
+          # v1.1.0: Active Dogfooding. Fails build if our own tree is anomalous.
           ./target/release/tau-gate
           
           echo "✅ Dogfooding Audit Passed. Project is secured by itself."
 
-      - name: Build Final Binary
-        run: cargo build --release
-
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: target/release/tau-gate
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: contains(github.ref, '-pre')
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
