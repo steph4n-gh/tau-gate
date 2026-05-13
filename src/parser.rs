@@ -192,7 +192,11 @@ impl JsonLexer {
                             it.next();
                         } else { break; }
                     }
-                    if !s.is_empty() { tokens.push(s); }
+                    if !s.is_empty() { 
+                        tokens.push(s); 
+                    } else {
+                        it.next();
+                    }
                 }
             }
         }
