@@ -8,7 +8,7 @@
 set -e
 
 # Number of top repos to audit
-LIMIT=50
+LIMIT=5
 WORKSPACE="ecosystem_audit"
 
 echo "[τ-Gate] 🌐 Initializing Mass Ecosystem Audit..."
@@ -17,7 +17,7 @@ cd "$WORKSPACE"
 
 # 1. Fetch Top Repos using GitHub CLI
 echo "[τ-Gate] 📥 Fetching top $LIMIT JS/TS repositories from GitHub..."
-REPOS=$(gh search repos --language javascript --language typescript --sort stars --limit $LIMIT --json full_name -q '.[].full_name')
+REPOS=$(gh search repos --language javascript --language typescript --sort stars --limit $LIMIT --json fullName -q '.[].fullName')
 
 # 2. Iterate and Audit
 for REPO in $REPOS; do
