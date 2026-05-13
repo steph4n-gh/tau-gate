@@ -42,3 +42,21 @@ impl DiGraph {
         &self.edges
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_digraph_basic() {
+        let mut g = DiGraph::new();
+        let a = g.add_node("A".to_string());
+        let b = g.add_node("B".to_string());
+        g.add_edge(a, b);
+        
+        assert_eq!(g.node_count(), 2);
+        assert_eq!(g._edge_count(), 1);
+        assert_eq!(g.node_weight(a), Some(&"A".to_string()));
+        assert_eq!(g.edges()[0], (a, b));
+    }
+}

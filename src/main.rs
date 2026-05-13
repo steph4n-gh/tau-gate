@@ -3,17 +3,19 @@ mod error;
 mod graph;
 mod graph_impl;
 mod math;
+mod parser;
 mod telemetry;
 
 use crate::error::Result;
-use config::SentinelConfig;
+use config::{EnforcementMode, SentinelConfig};
 use graph::{DepGraph, EngineType};
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::process::{Command, exit};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V1.1.0 Build Metadata
+/// V2.0.0 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH"); 
 
@@ -30,7 +32,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v1.1.0");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v2.0.0");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -39,7 +41,6 @@ fn main() -> Result<()> {
     // 1. Initialize Configuration
     let config = SentinelConfig::load("tau-gate.toml").unwrap_or_default();
 
-    // V2.0 Phase 1: Replaced indicatif spinner with simple terminal feedback
     println!("[\u{03C4}-Gate] \u{23F3}  Mapping topology and verifying connectivity...");
 
     let start_time = SystemTime::now();
@@ -72,6 +73,8 @@ fn main() -> Result<()> {
 
     let elapsed = start_time.elapsed().unwrap_or(Duration::from_secs(0)).as_millis();
 
+    pb_finish_and_clear(); // Custom replacement for pb
+
     println!("[\u{03C4}-Gate] \u{2705} Analysis Complete ({} ms)", elapsed);
     println!("[\u{03C4}-Gate] \u{1F517} Connectivity Score (\u{03BB}\u{2082}): {:.6}", partition_result.connectivity_score);
 
@@ -83,43 +86,42 @@ fn main() -> Result<()> {
 
     // 4. The Tripwire Phase
     let mut execution_threats = Vec::new();
-    for node in &partition_result.partition_b {
-        let mut is_threat = dep_graph.execution_packages.contains(node);
-        if !is_threat {
-            for threat in &dep_graph.execution_packages {
-                if node.contains(threat) || threat.contains(node) {
-                    is_threat = true;
-                    break;
-                }
-            }
-        }
+    let mut entropy_threats = Vec::new();
 
-        if is_threat {
+    for node in &partition_result.partition_b {
+        let is_exec = check_threat_match(node, &dep_graph.execution_packages);
+        let is_entropy = check_threat_match(node, &dep_graph.suspicious_packages);
+
+        if is_exec || is_entropy {
             let mut is_whitelisted = false;
             for pattern_str in &config.whitelist {
-                // V2.0 Phase 1: Replaced glob crate with simple pattern matching
                 if glob_match(pattern_str, node) {
                     is_whitelisted = true;
                     break;
                 }
             }
-            if !is_whitelisted { execution_threats.push(node.clone()); }
+            if !is_whitelisted { 
+                if is_exec { execution_threats.push(node.clone()); }
+                if is_entropy { entropy_threats.push(node.clone()); }
+            }
         }
     }
 
-    if dry_run && !execution_threats.is_empty() {
-        println!("[\u{03C4}-Gate] 🚩 Caught execution risk in isolation: {:?}", execution_threats);
-    }
+    // 5. The Gate Phase (Enforcement)
+    let extreme_isolation = partition_result.connectivity_score < 1e-4 && (!execution_threats.is_empty() || !entropy_threats.is_empty());
 
-    let extreme_isolation = partition_result.connectivity_score < 1e-4 && !execution_threats.is_empty();
-
-    if (!execution_threats.is_empty() && percentage < config.threshold_percentage) || extreme_isolation {
+    if (!execution_threats.is_empty() || !entropy_threats.is_empty()) && (percentage < config.threshold_percentage || extreme_isolation) {
         eprintln!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  CRITICAL TOPOLOGICAL ANOMALY!");
-        if extreme_isolation && percentage >= config.threshold_percentage {
-            eprintln!("WARNING: Detected a 'Bloated Trojan' attack (Extreme isolation in a large partition).");
+        
+        if !execution_threats.is_empty() {
+            eprintln!("Quarantined execution-privileged nodes:");
+            for node in &execution_threats { eprintln!("  \u{2192} {}", node); }
         }
-        eprintln!("Quarantined execution-privileged nodes:");
-        for node in &execution_threats { eprintln!("  \u{2192} {}", node); }
+
+        if !entropy_threats.is_empty() {
+            eprintln!("Quarantined high-entropy (obfuscated) nodes:");
+            for node in &entropy_threats { eprintln!("  \u{26A0} {}", node); }
+        }
 
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().to_string();
         let log = telemetry::AnomalyLog {
@@ -133,8 +135,13 @@ fn main() -> Result<()> {
         let _ = telemetry::log_anomaly(&log);
 
         if let EngineType::Npm = engine { let _ = fs::remove_file("package-lock.json"); }
-        eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
-        exit(1);
+
+        if config.mode == EnforcementMode::Enforcement {
+            eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
+            exit(1);
+        } else {
+            println!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  ADVISORY MODE: Anomaly detected but proceeding as per policy.");
+        }
     }
 
     println!("[\u{03C4}-Gate] \u{1F6A7} Topology nominal. Gate opened.");
@@ -142,16 +149,42 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Simple glob-like matching (v2.0 Phase 1)
-/// Supports prefix match (e.g. "@astrojs/*")
+fn pb_finish_and_clear() {
+    // No-op for now as we removed indicatif
+}
+
+fn check_threat_match(node: &str, threats: &HashSet<String>) -> bool {
+    if threats.contains(node) { return true; }
+    for threat in threats {
+        if node.contains(threat) || threat.contains(node) { return true; }
+    }
+    false
+}
+
 fn glob_match(pattern: &str, text: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-    if let Some(prefix) = pattern.strip_suffix("*") {
-        return text.starts_with(prefix);
-    }
+    if pattern == "*" { return true; }
+    if let Some(prefix) = pattern.strip_suffix("*") { return text.starts_with(prefix); }
     pattern == text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_glob_match() {
+        assert!(glob_match("*", "anything"));
+        assert!(glob_match("@astrojs/*", "@astrojs/compiler"));
+        assert!(!glob_match("@astrojs/*", "lodash"));
+    }
+
+    #[test]
+    fn test_threat_match() {
+        let mut threats = HashSet::new();
+        threats.insert("malicious".to_string());
+        assert!(check_threat_match("node_modules/malicious@1.0.0", &threats));
+    }
 }
 
 fn execute_actual_install(engine: EngineType) {

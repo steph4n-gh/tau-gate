@@ -53,21 +53,3 @@ impl From<std::io::Error> for GateError {
         GateError::IO(err.to_string())
     }
 }
-
-impl From<serde_json::Error> for GateError {
-    fn from(err: serde_json::Error) -> Self {
-        GateError::Generic(format!("JSON Error: {}", err))
-    }
-}
-
-impl From<serde_yaml::Error> for GateError {
-    fn from(err: serde_yaml::Error) -> Self {
-        GateError::Generic(format!("YAML Error: {}", err))
-    }
-}
-
-impl From<toml::de::Error> for GateError {
-    fn from(err: toml::de::Error) -> Self {
-        GateError::Config(format!("TOML Error: {}", err))
-    }
-}
