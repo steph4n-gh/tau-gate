@@ -40,7 +40,7 @@ Best for security-conscious teams who require byte-for-byte identical binaries t
 
 ### 1. Requirements
 *   **Rustup:** Ensure you have `rustup` installed.
-*   **Toolchain:** The reproduction engine will automatically ensure you are using the pinned **Rust 1.80.0** version.
+*   **Toolchain:** The reproduction engine will automatically ensure you are using the pinned **Rust 1.85.0** version.
 
 ### 2. Run Reproduction
 ```bash

@@ -7,7 +7,7 @@ To prove the robustness of the $\tau$-Gate v2.0.0 mathematical engine and its be
 *   **Total Dependencies:** **0** (Standard Library only)
 *   **Mode:** Passive Audit (`--dry-run`)
 *   **OS:** macOS / Linux (Ubuntu)
-*   **Runtimes:** npm 10.x, pnpm 9.x, Bun 1.3.x, Cargo (Rust) 1.80+
+*   **Runtimes:** npm 10.x, pnpm 9.x, Bun 1.3.x, Cargo (Rust) 1.85+
 
 ---
 

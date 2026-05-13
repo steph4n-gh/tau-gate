@@ -8,7 +8,7 @@ set -e
 echo "[τ-Gate] Initializing Reproducible Build..."
 
 # 1. Verify Rust version from toolchain file
-REQUIRED_RUST="1.80.0"
+REQUIRED_RUST="1.85.0"
 CURRENT_RUST=$(rustc --version | awk '{print $2}')
 
 if [ "$CURRENT_RUST" != "$REQUIRED_RUST" ]; then
