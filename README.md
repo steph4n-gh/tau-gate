@@ -1,5 +1,5 @@
 # $\tau$-Gate (v2.0.0)
-**Geometric Zero-Trust: Supply Chain Security with Absolute Integrity.**
+**Geometric Zero-Trust: Absolute Integrity in Code and Deployment.**
 
 ---
 
@@ -10,25 +10,22 @@
 
 ---
 
-## 🛡️ v2.0.0: The "Absolute Zero" Release
-$\tau$-Gate v2.0 represents a new standard in security engineering: **Absolute Zero Dependencies.** 
+## 🛡️ v2.0.0: The "Absolute Zero" Standard
+$\tau$-Gate v2.0 represents the ultimate evolution in security engineering. We have physically eliminated the "Auditor's Paradox"—where a security tool is vulnerable to its own supply chain.
 
-Most security tools are built on hundreds of third-party packages, making them vulnerable to the very supply chain attacks they try to block. $\tau$-Gate v2.0 has been surgically refactored to rely **exclusively on the Rust Standard Library.**
-
-### Why v2.0 earns your trust:
-*   **Zero Dependencies:** 0 external crates. No `serde`, no `petgraph`, no `anyhow`. The attack surface of the auditor is zero.
-*   **Reproducible Builds:** Byte-for-byte identical binary generation using `reproduce.sh`. You can prove the binary matches the source code.
-*   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in package metadata, catching "Sleeper Cells" that try to look structurally normal.
-*   **Signed Integrity:** Every release is cryptographically signed and verified against build-time Git hashes.
+### Why v2.0 is the Gold Standard:
+*   **Absolute Zero Dependencies:** 0 external Rust crates. The entire math core and all parsers rely **100% on the Rust Standard Library.**
+*   **Zero-Action CI/CD:** Our release pipeline has eliminated all 3rd-party GitHub Actions. We use only native system tools (`git`, `rustup`, `gh`), achieving a zero-dependency infrastructure.
+*   **Reproducible Builds:** Byte-for-byte identical binary generation using `reproduce.sh`. Formal proof that your binary matches our source code.
+*   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in metadata, catching "Sleeper Cells" that try to look structurally normal.
 
 ---
 
 ## 🚩 The Problem: Structural Attacks
-Modern supply chain attacks (like **TanStack Query** or **XZ Utils**) bypass traditional scanners because they don't use "known-bad" code. Instead, they use **Transitive Secrecy**. 
-They hide deep in your dependency tree, establishing structural bottlenecks to execute malicious code.
+Modern supply chain attacks (TanStack Query, XZ Utils) bypass traditional scanners because they hide in **Transitive Secrecy**. They establish structural bottlenecks deep in your tree to execute malicious code.
 
 ## 🛡️ The Solution: $\tau$-Gate
-$\tau$-Gate is a mathematical proxy wrapper for your package manager. It analyzes the **Shape of your Dependencies** before untrusted code can run.
+$\tau$-Gate analyzes the **Shape of your Dependencies** before untrusted code can run.
 
 ### 🧠 Core Methodology
 
@@ -36,7 +33,7 @@ $\tau$-Gate is a mathematical proxy wrapper for your package manager. It analyze
 Trusted software forms a dense "Mainland." Attackers form tiny "Islands." If an isolated island requests system power (execution scripts or build hooks), the math flags it and blocks it.
 
 #### **Level 2: Spectral Bisection (Technical)**
-We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the **Fiedler Vector** ($\lambda_2$) using a high-performance $O(E)$ sparse iterative solver. The tool identifies the **Maximum Spectral Gap** to mathematically identify structural isolation.
+We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the **Fiedler Vector** ($\lambda_2$) using a high-performance $O(E)$ sparse iterative solver. We identify the **Maximum Spectral Gap** to mathematically identify structural isolation.
 
 ---
 
@@ -57,7 +54,7 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 
 | Documentation | Description |
 | :--- | :--- |
-| **[Setup & Integration](./docs/setup.md)** | Detailed installation, CI/CD configs, and CLI flags. |
+| **[Setup & Integration](./docs/setup.md)** | Installation, CLI flags, and Zero-Action CI/CD. |
 | **[Governance & Policy](./docs/policy.md)** | Configuration guide, Advisory Mode, and attack scenarios. |
 | **[The Mathematics](./docs/whitepaper.md)** | In-depth technical whitepaper on Spectral Bisection. |
 | **[Empirical Validation](./docs/validation.md)** | Performance and accuracy data from real-world audits. |

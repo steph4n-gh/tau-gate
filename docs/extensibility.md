@@ -1,8 +1,6 @@
-# Extensibility Guide: Adding New Package Managers
+# Extensibility Guide: Adding New Package Managers (v2.0.0)
 
-$\tau$-Gate v1.1.0 was designed with an extensible architecture. We want to support every major ecosystem, from Go to Python to Ruby. 
-
-Adding a new language engine is a standardized 4-step process.
+$\tau$-Gate v2.0.0 was designed with a modular, **Absolute Zero** architecture. We welcome contributions that add support for new ecosystems while maintaining our 0-dependency standard.
 
 ---
 
@@ -26,21 +24,29 @@ if Path::new("your-lang.lock").exists() {
 ```
 
 ### 3. Implement the Extraction Logic
-Create a `build_from_your_lang()` method. This is where you convert your ecosystem's metadata into a directed graph.
-*   **Recommendation:** Use your language's native CLI (e.g., `cargo metadata`, `go mod graph`) to get the transitive tree.
-*   **Safety:** Always implement a physical manifest fallback (scanning `node_modules` or equivalent) if CLI output is noisy.
+Create a `build_from_your_lang()` method. 
+*   **Standard Library Only:** You must implement the extraction using only `std`. 
+*   **Physical Verification:** Do not rely purely on CLI output; implement a structural fallback to scan for real manifests on disk.
+*   **MiniParser Integration:** Use the native `MiniParser` in `src/parser.rs` for extracting metadata.
 
 ### 4. Map the Execution Sink
-Identify what "Install-time execution" looks like in your language (e.g., `setup.py`, `build.rs`, `extconf.rb`). Add these packages to the `execution_packages` HashSet during extraction.
+Identify the "Install-time execution" vector (e.g. `setup.py`, `build.rs`). Add these packages to the `execution_packages` HashSet during extraction.
 
 ---
 
-## 📈 Pro-Tips for High-Integrity Engines
-*   **Transitive Closure:** Your engine must return the *entire* dependency tree, not just top-level packages.
-*   **Algebraic Stability:** The math layer relies on an accurate map. Ensure all dependency edges are correctly captured.
-*   **Recursive Resolution:** If your language supports nested dependency trees (like npm), emulate the native resolution algorithm to avoid "false isolation."
+## 📈 High-Integrity Standards
+*   **Transitive Closure:** Engines must return the *entire* transitive dependency tree.
+*   **Algebraic Stability:** Ensure all dependency edges are correctly captured for the spectral solver.
+*   **Recursive Resolution:** Emulate native resolution algorithms to avoid false structural isolation.
 
 ---
 
-## 🤝 Need Help?
-Open a [GitHub Issue](https://github.com/steph4n-gh/tau-gate/issues) or submit a Pull Request! We are excited to see $\tau$-Gate protecting new ecosystems.
+## 🤝 Community Engines
+$\tau$-Gate currently natively supports:
+*   🦀 **Rust (Cargo)**
+*   📦 **npm**
+*   ⚡ **pnpm**
+*   🥟 **Bun**
+*   🧶 **Yarn Berry**
+
+**Join the mission to secure every ecosystem.** Submit a PR on [GitHub](https://github.com/steph4n-gh/tau-gate).

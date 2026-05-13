@@ -1,4 +1,4 @@
-# Governance & Security Policy
+# Governance & Security Policy (v2.0.0)
 
 This document explains how to configure $\tau$-Gate and translates its mathematical signals into real-world security scenarios.
 
@@ -6,20 +6,18 @@ This document explains how to configure $\tau$-Gate and translates its mathemati
 
 ## ⚙️ Configuration (`tau-gate.toml`)
 
-The `tau-gate.toml` file in your project root acts as your **Topological Security Policy**.
+### Operational Modes
+V2.0.0 introduces **Advisory Mode**, allowing teams to baseline projects without blocking development.
 
 ```toml
+# "enforcement" (Kill build - Default) or "advisory" (Warn only)
+mode = "enforcement"
+
 # Threshold: The size limit (%) of a quarantined island. (Default: 15.0)
-# If an isolated cluster is smaller than this, the gate triggers.
 threshold_percentage = 15.0
 
 # Whitelist: Trust entire scopes using Glob patterns.
-# Use this to allow legitimate but isolated packages (e.g. CLI tools).
-whitelist = [
-  "@astrojs/*",
-  "@types/*",
-  "vite"
-]
+whitelist = ["@astrojs/*", "@types/*", "vite"]
 ```
 
 ---
@@ -27,27 +25,27 @@ whitelist = [
 ## 🚫 Real-World Attack Scenarios
 
 ### 1. The "Typosquatter" (Isolated Island)
-*   **What happens:** You install `asttro` instead of `astro`.
-*   **Math Signal:** **Small Partition < 15%**.
-*   **Verdict:** The `max_gap` algorithm snaps the graph at the single thread connecting your app to the fake package.
+*   **What happens:** A developer accidentally installs a tiny, unknown package that immediately tries to run an exfiltration script.
+*   **Signal:** **Small Partition < 15%**.
 
-### 2. The "Sleeper Cell" (Transitive Bridge)
-*   **What happens:** A utility library 10 levels deep is hijacked and adds an install script (Node.js) or a `build.rs` (Rust).
-*   **Math Signal:** **Extreme Connectivity Isolation ($\lambda_2 < 10^{-4}$)**.
-*   **Verdict:** The Fiedler Vector identifies that the entire project "snaps" at the structural bottleneck created by the deep dependency.
+### 2. The "Sleeper Cell" (Deep Transitive Bridge)
+*   **What happens:** A utility library 10 levels deep is hijacked to add a `postinstall` or `build.rs` backdoor.
+*   **Signal:** **Connectivity Isolation ($\lambda_2 < 10^{-4}$)**.
 
 ### 3. The "Trojan Horse" (The Bloated Trojan)
-*   **What happens:** An attacker adds 500 safe dependencies to their malicious package to look "big."
-*   **Math Signal:** **Zero Connectivity Score**.
-*   **Verdict:** While the partition size might exceed 15%, the **Algebraic Connectivity** remains near zero, triggering the "Bloated Trojan" alarm.
+*   **What happens:** An attacker adds 500 safe dependencies to their malicious package to look "big" and bypass the 15% rule.
+*   **Signal:** **Zero Connectivity Score**. Despite the size, the math identifies the entire cluster is connected to your project by only one thread.
+
+### 4. Obfuscated Payloads (Entropy Alarm)
+*   **What happens:** An attacker hides a large, encrypted payload in their manifest metadata.
+*   **Signal:** **Entropy Engine Trigger**. The `MiniParser` identifies high-entropy strings and bridges them to the quarantine.
 
 ---
 
 ## 🤝 How to Contribute
 
-We welcome contributions for:
-*   🦀 **Native extraction engines** (Rust/Cargo released in v1.1.0!).
-*   🐍 **Python/Pip** or **Go/Modules** support.
-*   📈 **Mathematical optimizations** for the sparse iterative solver.
+$\tau$-Gate v2.0.0 is built on an **Absolute Zero** foundation. We welcome contributions that maintain our zero-dependency standard for:
+*   🦀 **Native extraction engines** for Python, Go, and Ruby.
+*   📈 **Mathematical optimizations** for the standard-library-only solver.
 
-See [GEMINI.md](../GEMINI.md) for the internal developer architecture guide.
+See [GEMINI.md](../GEMINI.md) for architectural constraints.

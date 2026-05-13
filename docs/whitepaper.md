@@ -12,50 +12,43 @@ Traditional supply chain security relies on "Known-Bad" databases (CVEs). This p
 We define a directed graph $G = (V, E)$ representing the project's transitive dependencies.
 *   $V$ is the set of packages (nodes).
 *   $E$ represents dependency relationships.
-*   "Execution Risks" are tracked in a metadata set $S \subset V$. In Node.js, these are `postinstall` scripts; in Rust, these are `build.rs` (custom-build) targets.
+*   **Execution Risks** are identified via post-extraction manifest verification (lifecycle scripts in Node.js, `build.rs` in Rust).
 
 ### 1.2 The Graph Laplacian ($L$)
 To analyze connectivity, we convert $G$ into a symmetrized Laplacian matrix:
 $$L = D - W$$
-Where:
-*   $W$ is the Symmetrized Adjacency Matrix ($w_{ij} = 1$ if a dependency edge exists).
-*   $D$ is the Degree Matrix (a diagonal matrix where $d_{ii}$ is the number of edges connected to node $i$).
+Where $W$ is the Symmetrized Adjacency Matrix and $D$ is the Degree Matrix.
 
 ### 1.3 The Sparse Iterative Solver
-We solve for the **Fiedler Vector** ($\mathbf{v}_2$)—the eigenvector corresponding to the second-smallest eigenvalue $\lambda_2$. We use a shifted sparse iteration on the operator $M = I - \alpha L$. 
+We solve for the **Fiedler Vector** ($\mathbf{v}_2$) using a shifted sparse iteration on the operator $M = I - \alpha L$. 
 
-**v2.0.0 Refinement:** The shift parameter $\alpha$ is bounded by $1 / (2 \cdot d_{max} + 1.1)$. This respects the Gershgorin Circle Theorem, ensuring all shifted eigenvalues are strictly within $[0, 1]$, guaranteeing convergence to $\lambda_2$ after mean-orthogonalization.
+**v2.0.0 Hardening:** The shift parameter $\alpha$ is bounded by $1 / (2 \cdot d_{max} + 1.1)$ to ensure convergence across all topologies.
 
 ---
 
 ## 2. Structural Analysis Scenarios
 
 ### Scenario A: Standard Dependency Web
-*   **Structure:** High algebraic connectivity.
-*   **Math Result:** The Fiedler Vector values are distributed smoothly. The **Maximum Spectral Gap** identifies standard architectural boundaries.
-*   **Verdict:** NOMINAL.
+Trusted software creates a dense "continent" with high algebraic connectivity ($\lambda_2$).
 
-### Scenario B: Malicious Structural Isolation
-*   **Structure:** An isolated package (`evil-lib`) with no sub-dependencies, connected only to the root.
-*   **Math Result:** $\lambda_2$ approaches $0$. The Fiedler Vector shows a massive numerical "cliff" between the island and the project core.
-*   **The Cut:** $\tau$-Gate identifies the gap and bisects.
-*   **Verdict:** ANOMALY. The package is mathematically isolated. If it requests escalation (scripts or build hooks), the gate slams shut.
+### Scenario B: Structural Isolation (The Island)
+An isolated malicious package results in $\lambda_2 \approx 0$. The **Maximum Spectral Gap** algorithm identifies the numerical "cliff" between the island and the core mainland.
 
-### Scenario C: The "Bloated Trojan"
-*   **Structure:** Attacker adds many fake dependencies to an isolated malicious node to bypass size thresholds.
-*   **Math Result:** While the partition size might exceed 15%, the **Connectivity Score ($\lambda_2$)** remains extremely low ($< 10^{-4}$).
-*   **Verdict:** ANOMALY. The tool identifies extreme isolation (Structural Bottleneck) regardless of cluster size.
+### Scenario C: The Bloated Trojan (Evasion Resistance)
+If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ remains extremely low. v2.0.0 uses this **Algebraic Connectivity Score** as an absolute trigger for isolation detection, even if the partition is large.
 
 ---
 
-## 3. Implementation Integrity: Absolute Zero
+## 3. The Absolute Zero implementation
 
-In v2.0.0, the implementation itself is part of the security proof. By achieving **Zero Dependencies**, $\tau$-Gate eliminates the "Auditor's Paradox"—where the security tool itself is vulnerable to the attacks it monitors. The entire mathematical core and extraction logic are implemented using 100% Rust Standard Library code.
+In v2.0.0, $\tau$-Gate achieves **Absolute Zero Dependencies**. Every line of code, from the $O(E)$ sparse solver to the native lockfile parsers, is implemented using the **Rust Standard Library**. 
+
+This eliminates the "Auditor's Paradox"—ensuring the tool cannot be compromised by the same supply chain attacks it is designed to audit.
 
 ---
 
-## 4. Conclusion: Topological Evidence
+## 4. Conclusion
 
-$\tau$-Gate implements **Spectral Bisection** to audit software supply chains. By calculating $\lambda_2$, we provide a measurable upper bound on the **Conductance** of the graph (Cheeger's Inequality).
+$\tau$-Gate implements **Spectral Bisection** to audit software supply chains. By calculating $\lambda_2$ and the Maximum Spectral Gap, we provide a measurable, provable upper bound on the **Conductance** of a project's execution paths.
 
-The tool operates on the principle that for an attacker to remain stealthy, they must remain isolated. $\tau$-Gate makes this isolation mathematically visible across Node.js and Rust ecosystems.
+**The math is the judge. The topology is the evidence.**
