@@ -9,7 +9,7 @@ mod telemetry;
 use crate::error::Result;
 use config::{EnforcementMode, SentinelConfig};
 use graph::{DepGraph, EngineType};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::process::{Command, exit};
@@ -153,7 +153,7 @@ fn pb_finish_and_clear() {
     // No-op for now as we removed indicatif
 }
 
-fn check_threat_match(node: &str, threats: &HashSet<String>) -> bool {
+fn check_threat_match(node: &str, threats: &BTreeSet<String>) -> bool {
     if threats.contains(node) { return true; }
     for threat in threats {
         if node.contains(threat) || threat.contains(node) { return true; }
@@ -170,7 +170,7 @@ fn glob_match(pattern: &str, text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     #[test]
     fn test_glob_match() {
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_threat_match() {
-        let mut threats = HashSet::new();
+        let mut threats = BTreeSet::new();
         threats.insert("malicious".to_string());
         assert!(check_threat_match("node_modules/malicious@1.0.0", &threats));
     }

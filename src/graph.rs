@@ -1,7 +1,7 @@
 use crate::error::{GateContext, GateError, Result};
 use crate::graph_impl::DiGraph;
 use crate::parser::{JsonNode, MiniParser};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -20,9 +20,9 @@ pub enum EngineType {
 pub struct DepGraph {
     pub graph: DiGraph,
     /// V2.6 Hardening: Track packages with execution scripts separately.
-    pub execution_packages: HashSet<String>,
+    pub execution_packages: BTreeSet<String>,
     /// V2.7 Hardening: Track packages with high-entropy metadata.
-    pub suspicious_packages: HashSet<String>,
+    pub suspicious_packages: BTreeSet<String>,
 }
 
 impl DepGraph {
@@ -57,9 +57,9 @@ impl DepGraph {
         let packages = root.get("packages").and_then(|p| p.as_object()).context("Invalid npm lockfile format")?;
 
         let mut graph = DiGraph::new();
-        let mut node_indices = HashMap::new();
-        let mut execution_packages = HashSet::new();
-        let mut suspicious_packages = HashSet::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
 
         for (path, details) in packages {
             let name = if path.is_empty() { "root".to_string() } else { path.clone() };
@@ -101,9 +101,9 @@ impl DepGraph {
     fn parse_pnpm_lockfile(content: &str) -> Result<Self> {
         let meta = MiniParser::parse_pnpm_yaml(content)?;
         let mut graph = DiGraph::new();
-        let mut node_indices = HashMap::new();
-        let mut execution_packages = HashSet::new();
-        let mut suspicious_packages = HashSet::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
 
         for id in meta.snapshots.keys() {
             let idx = graph.add_node(id.clone());
@@ -114,7 +114,7 @@ impl DepGraph {
             if MiniParser::detect_obfuscation(id) { suspicious_packages.insert(id.clone()); }
         }
 
-        let mut dep_cache = HashMap::new();
+        let mut dep_cache = BTreeMap::new();
         for snap_id in node_indices.keys() {
             let stripped = if snap_id.starts_with('/') { &snap_id[1..] } else { snap_id.as_str() };
             let name = if stripped.starts_with('@') {
@@ -155,9 +155,9 @@ impl DepGraph {
         if let Some(json_start) = stdout.find('{') {
             if let Ok(root) = MiniParser::parse_json(&stdout[json_start..]) {
                 let mut graph = DiGraph::new();
-                let mut node_indices = HashMap::new();
-                let mut execution_packages = HashSet::new();
-                let mut suspicious_packages = HashSet::new();
+                let mut node_indices = BTreeMap::new();
+                let mut execution_packages = BTreeSet::new();
+                let mut suspicious_packages = BTreeSet::new();
                 Self::parse_bun_json_dependencies(&root, &mut graph, &mut node_indices, None, &mut execution_packages, &mut suspicious_packages);
                 return Ok(Self { graph, execution_packages, suspicious_packages });
             }
@@ -167,9 +167,9 @@ impl DepGraph {
 
     fn build_from_bun_tree_with_recovery(tree_output: &str) -> Result<Self> {
         let mut graph = DiGraph::new();
-        let mut node_indices = HashMap::new();
-        let mut execution_packages = HashSet::new();
-        let mut suspicious_packages = HashSet::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
         let mut stack: Vec<(usize, usize)> = Vec::new();
         for line in tree_output.lines() {
             if line.trim().is_empty() || line.starts_with('/') { continue; }
@@ -205,14 +205,14 @@ impl DepGraph {
     fn parse_yarn_output(stdout: &str) -> Result<Self> {
         let root = MiniParser::parse_json(stdout)?;
         let mut graph = DiGraph::new();
-        let mut node_indices = HashMap::new();
-        let mut execution_packages = HashSet::new();
-        let mut suspicious_packages = HashSet::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
         Self::parse_yarn_json_recursive(&root, &mut graph, &mut node_indices, None, &mut execution_packages, &mut suspicious_packages);
         Ok(Self { graph, execution_packages, suspicious_packages })
     }
 
-    fn parse_yarn_json_recursive(val: &JsonNode, graph: &mut DiGraph, node_indices: &mut HashMap<String, usize>, parent_idx: Option<usize>, execution_packages: &mut HashSet<String>, suspicious_packages: &mut HashSet<String>) {
+    fn parse_yarn_json_recursive(val: &JsonNode, graph: &mut DiGraph, node_indices: &mut BTreeMap<String, usize>, parent_idx: Option<usize>, execution_packages: &mut BTreeSet<String>, suspicious_packages: &mut BTreeSet<String>) {
         if let Some(id) = val.get("value").and_then(|v| v.as_str()) {
             let current_idx = *node_indices.entry(id.to_string()).or_insert_with(|| graph.add_node(id.to_string()));
             if let Some(p_idx) = parent_idx { graph.add_edge(p_idx, current_idx); }
@@ -243,9 +243,9 @@ impl DepGraph {
     fn parse_cargo_metadata(stdout: &str) -> Result<Self> {
         let root = MiniParser::parse_json(stdout).context("Failed to parse Cargo metadata.")?;
         let mut graph = DiGraph::new();
-        let mut node_indices = HashMap::new();
-        let mut execution_packages = HashSet::new();
-        let mut suspicious_packages = HashSet::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
 
         if let Some(packages) = root.get("packages").and_then(|p| p.as_array()) {
             for pkg in packages {
@@ -286,7 +286,7 @@ impl DepGraph {
         Ok(Self { graph, execution_packages, suspicious_packages })
     }
 
-    fn parse_bun_json_dependencies(val: &JsonNode, graph: &mut DiGraph, node_indices: &mut HashMap<String, usize>, parent_idx: Option<usize>, execution_packages: &mut HashSet<String>, suspicious_packages: &mut HashSet<String>) {
+    fn parse_bun_json_dependencies(val: &JsonNode, graph: &mut DiGraph, node_indices: &mut BTreeMap<String, usize>, parent_idx: Option<usize>, execution_packages: &mut BTreeSet<String>, suspicious_packages: &mut BTreeSet<String>) {
         if let Some(name) = val.get("name").and_then(|v| v.as_str()) {
             let version = val.get("version").and_then(|v| v.as_str()).unwrap_or("?");
             let full_name = format!("{}({})", name, version);

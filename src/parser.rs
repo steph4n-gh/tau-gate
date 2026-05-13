@@ -1,5 +1,5 @@
 use crate::error::{GateError, Result};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// A minimal, zero-dependency parser for Tau-Gate.
 /// Specifically designed to handle configuration (TOML-like), JSON, and basic YAML metadata extraction.
@@ -7,8 +7,8 @@ pub struct MiniParser;
 
 impl MiniParser {
     /// Parses a TOML-like string into a simple key-value map.
-    pub fn parse_config(content: &str) -> Result<HashMap<String, ConfigValue>> {
-        let mut map = HashMap::new();
+    pub fn parse_config(content: &str) -> Result<BTreeMap<String, ConfigValue>> {
+        let mut map = BTreeMap::new();
         for line in content.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') { continue; }
@@ -44,22 +44,33 @@ impl MiniParser {
     pub fn detect_obfuscation(content: &str) -> bool {
         let mut max_continuous = 0;
         let mut current = 0;
+        let mut distinct_chars = std::collections::BTreeSet::new();
+        let mut max_distinct = 0;
+
         for c in content.chars() {
             if c.is_alphanumeric() || c == '/' || c == '+' || c == '=' {
                 current += 1;
+                distinct_chars.insert(c);
             } else {
-                if current > max_continuous { max_continuous = current; }
+                if current > max_continuous {
+                    max_continuous = current;
+                    max_distinct = distinct_chars.len();
+                }
                 current = 0;
+                distinct_chars.clear();
             }
         }
-        if current > max_continuous { max_continuous = current; }
-        max_continuous > 128
+        if current > max_continuous {
+            max_continuous = current;
+            max_distinct = distinct_chars.len();
+        }
+        max_continuous > 128 && max_distinct > 16
     }
 
     /// A minimal YAML extractor for pnpm-lock.yaml.
     pub fn parse_pnpm_yaml(yaml: &str) -> Result<PnpmMetadata> {
-        let mut snapshots = HashMap::new();
-        let mut packages = HashMap::new();
+        let mut snapshots = BTreeMap::new();
+        let mut packages = BTreeMap::new();
         let mut current_section = "";
         let mut current_pkg_id = String::new();
 
@@ -105,8 +116,8 @@ impl MiniParser {
 }
 
 pub struct PnpmMetadata {
-    pub snapshots: HashMap<String, PnpmSnapshot>,
-    pub packages: HashMap<String, PnpmPackage>,
+    pub snapshots: BTreeMap<String, PnpmSnapshot>,
+    pub packages: BTreeMap<String, PnpmPackage>,
 }
 
 pub struct PnpmSnapshot {
@@ -126,7 +137,7 @@ pub enum ConfigValue {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum JsonNode {
-    Object(HashMap<String, JsonNode>),
+    Object(BTreeMap<String, JsonNode>),
     Array(Vec<JsonNode>),
     String(String),
     Number(f64),
@@ -144,7 +155,7 @@ impl JsonNode {
     pub fn as_bool(&self) -> Option<bool> {
         match self { JsonNode::Bool(b) => Some(*b), _ => None }
     }
-    pub fn as_object(&self) -> Option<&HashMap<String, JsonNode>> {
+    pub fn as_object(&self) -> Option<&BTreeMap<String, JsonNode>> {
         match self { JsonNode::Object(m) => Some(m), _ => None }
     }
     pub fn as_array(&self) -> Option<&Vec<JsonNode>> {
@@ -207,7 +218,7 @@ impl JsonParser {
         }
     }
     fn parse_object(tokens: &mut Vec<String>) -> Result<JsonNode> {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         while let Some(peek) = tokens.last() {
             if peek == "}" { tokens.pop(); return Ok(JsonNode::Object(map)); }
             let key_raw = tokens.pop().unwrap();
