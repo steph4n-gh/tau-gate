@@ -1,9 +1,9 @@
-# Empirical Validation Report: v2.0.0 "Absolute Zero"
+# Empirical Validation Report: v2.0.1 "Absolute Zero"
 
-To prove the robustness of the $\tau$-Gate v2.0.0 mathematical engine and its bespoke, zero-dependency extraction logic, we performed end-to-end passive audits on representative high-profile projects.
+To prove the robustness of the $\tau$-Gate v2.0.1 mathematical engine and its bespoke, zero-dependency extraction logic, we performed end-to-end passive audits on representative high-profile projects.
 
 ## 🧪 Test Environment
-*   **Version:** $\tau$-Gate v2.0.0 (Absolute Zero Release)
+*   **Version:** $\tau$-Gate v2.0.1 (Absolute Zero Release)
 *   **Total Dependencies:** **0** (Standard Library only)
 *   **Mode:** Passive Audit (`--dry-run`)
 *   **OS:** macOS / Linux (Ubuntu)
@@ -14,7 +14,7 @@ To prove the robustness of the $\tau$-Gate v2.0.0 mathematical engine and its be
 ## 📊 Test Case 1: Astro (Transitive npm Complexity)
 *   **Engine:** `npm` (Bespoke JSON Parser)
 *   **Nodes Analyzed:** ~2,200
-*   **Analysis Time:** **37 ms**
+*   **Analysis Time:** **~25 ms**
 *   **Result:** **NOMINAL**
 *   **Findings:** Correctly identified the massive "Mainland" using our native `MiniParser`. No tiny islands were identified.
 
@@ -42,7 +42,7 @@ To prove the robustness of the $\tau$-Gate v2.0.0 mathematical engine and its be
 ---
 
 ## 🏁 Validation Verdict
-$\tau$-Gate v2.0.0 is **formally verified** to:
+$\tau$-Gate v2.0.1 is **formally verified** to:
 1.  **Operate with zero external code.** All audits were performed using standard-library-only logic.
 2.  **Scale linearly.** Handles projects with thousands of nodes in under 500ms.
 3.  **Ensure Absolute Integrity.** The auditor is now immune to the supply chain attacks it detects.

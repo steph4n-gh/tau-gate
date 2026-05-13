@@ -1,4 +1,4 @@
-# Whitepaper: The Spectral Bisection of Supply Chains (v2.0.0)
+# Whitepaper: The Spectral Bisection of Supply Chains (v2.0.1)
 **Mathematical Foundations of the $\tau$-Gate Security Model**
 
 ## Abstract
@@ -22,7 +22,7 @@ Where $W$ is the Symmetrized Adjacency Matrix and $D$ is the Degree Matrix.
 ### 1.3 The Sparse Iterative Solver
 We solve for the **Fiedler Vector** ($\mathbf{v}_2$) using a shifted sparse iteration on the operator $M = I - \alpha L$. 
 
-**v2.0.0 Hardening:** The shift parameter $\alpha$ is bounded by $1 / (2 \cdot d_{max} + 1.1)$ to ensure convergence across all topologies.
+**v2.0.1 Hardening:** The shift parameter $\alpha$ is bounded by $1 / (2 \cdot d_{max} + 1.1)$ to ensure convergence across all topologies.
 
 ---
 
@@ -35,13 +35,15 @@ Trusted software creates a dense "continent" with high algebraic connectivity ($
 An isolated malicious package results in $\lambda_2 \approx 0$. The **Maximum Spectral Gap** algorithm identifies the numerical "cliff" between the island and the core mainland.
 
 ### Scenario C: The Bloated Trojan (Evasion Resistance)
-If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ remains extremely low. v2.0.0 uses this **Algebraic Connectivity Score** as an absolute trigger for isolation detection, even if the partition is large.
+If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ remains extremely low. v2.0.1 uses this **Algebraic Connectivity Score** as an absolute trigger for isolation detection, even if the partition is large.
 
 ---
 
 ## 3. Implementation Integrity: Self-Contained Architecture
 
-In v2.0.0, $\tau$-Gate achieves **Architectural Self-Sufficiency**. Every line of code, from the $O(E)$ sparse solver to the native lockfile parsers, is implemented using the **Rust Standard Library**. 
+In v2.0.1, $\tau$-Gate achieves **Architectural Self-Sufficiency**. Every line of code, from the $O(E)$ sparse solver to the native lockfile parsers, is implemented using the **Rust Standard Library**. 
+
+To ensure absolute mathematical determinism across all executions, the engine strictly utilizes `BTreeMap` and `BTreeSet` over Hash-based collections. This guarantees a consistent alphabetical topological sorting of the adjacency matrix, resulting in byte-for-byte identical Fiedler Vector calculations.
 
 This eliminates the "Auditor's Paradox"—ensuring the tool cannot be compromised by the same supply chain attacks it is designed to audit.
 

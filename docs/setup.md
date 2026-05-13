@@ -1,4 +1,4 @@
-# Installation & Operation Guide (v2.0.0)
+# Installation & Operation Guide (v2.0.1)
 
 This document provides exhaustive instructions for installing $\tau$-Gate across different use cases.
 

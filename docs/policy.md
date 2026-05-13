@@ -1,4 +1,4 @@
-# Governance & Security Policy (v2.0.0)
+# Governance & Security Policy (v2.0.1)
 
 This document explains how to configure $\tau$-Gate and translates its mathematical signals into real-world security scenarios.
 
@@ -38,13 +38,13 @@ whitelist = ["@astrojs/*", "@types/*", "vite"]
 
 ### 4. Obfuscated Payloads (Entropy Alarm)
 *   **What happens:** An attacker hides a large, encrypted payload in their manifest metadata.
-*   **Signal:** **Entropy Engine Trigger**. The `MiniParser` identifies high-entropy strings and bridges them to the quarantine.
+*   **Signal:** **Entropy Engine Trigger**. The `MiniParser` identifies high-entropy strings (>128 continuous characters with >16 distinct characters) and bridges them to the quarantine.
 
 ---
 
 ## 🤝 How to Contribute
 
-$\tau$-Gate v2.0.0 is built on an **Absolute Zero** foundation. We welcome contributions that maintain our zero-dependency standard for:
+$\tau$-Gate v2.0.1 is built on an **Absolute Zero** foundation. We welcome contributions that maintain our zero-dependency standard for:
 *   🦀 **Native extraction engines** for Python, Go, and Ruby.
 *   📈 **Mathematical optimizations** for the standard-library-only solver.
 

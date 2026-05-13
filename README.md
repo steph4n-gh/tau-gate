@@ -1,4 +1,4 @@
-# $\tau$-Gate (v2.0.0)
+# $\tau$-Gate (v2.0.1)
 **Geometric Zero-Trust: Integrity in Code and Deployment.**
 
 [![Security Audit](https://github.com/steph4n-gh/tau-gate/actions/workflows/release.yml/badge.svg)](https://github.com/steph4n-gh/tau-gate/actions)
@@ -14,14 +14,14 @@
 
 ---
 
-## 🛡️ v2.0.0: Architectural Self-Sufficiency
+## 🛡️ v2.0.1: Architectural Self-Sufficiency
 $\tau$-Gate v2.0 implements a self-contained security model designed to address the "Auditor's Paradox"—the risk that a security tool itself is compromised by its own dependencies.
 
 ### Technical Integrity Features:
 *   **Zero External Dependencies:** Every line of code, from the $O(E)$ sparse solver to the lockfile extractors, is implemented using the **Rust Standard Library.** This eliminates transitive supply chain risk in the auditor itself.
 *   **Minimal-Action CI/CD:** The release pipeline utilizes native system utilities (`git`, `rustup`, `gh`) instead of 3rd-party GitHub Actions, reducing the infrastructure attack surface.
 *   **Formal Reproducibility:** Byte-for-byte identical binary generation using `reproduce.sh`. Verification proof that your binary matches our source code.
-*   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in metadata, catching "Sleeper Cells" that try to look structurally normal.
+*   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in metadata by looking for long continuous strings (>128 chars) with high character variance (>16 distinct chars), catching "Sleeper Cells" while preventing false positives on mock packages.
 
 ---
 

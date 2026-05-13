@@ -1,4 +1,4 @@
-# Gemini CLI: Developer Guide for $\tau$-Gate (v2.0.0)
+# Gemini CLI: Developer Guide for $\tau$-Gate (v2.0.1)
 
 This guide establishes the architectural standards for the **Absolute Zero** security primitive. Maintain these patterns to ensure mathematical stability and zero-dependency integrity.
 
