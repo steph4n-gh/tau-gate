@@ -36,6 +36,7 @@ impl MiniParser {
     /// A basic JSON value representation for custom parsing.
     pub fn parse_json(json: &str) -> Result<JsonNode> {
         let mut tokens = JsonLexer::tokenize(json);
+        tokens.reverse();
         JsonParser::parse(&mut tokens)
     }
 
@@ -192,7 +193,7 @@ struct JsonParser;
 impl JsonParser {
     fn parse(tokens: &mut Vec<String>) -> Result<JsonNode> {
         if tokens.is_empty() { return Err(GateError::Generic("Empty JSON".to_string())); }
-        let token = tokens.remove(0);
+        let token = tokens.pop().unwrap();
         match token.as_str() {
             "{" => Self::parse_object(tokens),
             "[" => Self::parse_array(tokens),
@@ -207,25 +208,25 @@ impl JsonParser {
     }
     fn parse_object(tokens: &mut Vec<String>) -> Result<JsonNode> {
         let mut map = HashMap::new();
-        while !tokens.is_empty() {
-            if tokens[0] == "}" { tokens.remove(0); return Ok(JsonNode::Object(map)); }
-            let key_raw = tokens.remove(0);
+        while let Some(peek) = tokens.last() {
+            if peek == "}" { tokens.pop(); return Ok(JsonNode::Object(map)); }
+            let key_raw = tokens.pop().unwrap();
             let key = if key_raw.starts_with('"') { key_raw[1..key_raw.len()-1].to_string() } else { key_raw };
-            if tokens.is_empty() || tokens.remove(0) != ":" { return Err(GateError::Generic("Expected ':' in JSON object".to_string())); }
+            if tokens.is_empty() || tokens.pop().unwrap() != ":" { return Err(GateError::Generic("Expected ':' in JSON object".to_string())); }
             let val = Self::parse(tokens)?;
             map.insert(key, val);
             if tokens.is_empty() { break; }
-            if tokens[0] == "," { tokens.remove(0); }
+            if tokens.last().unwrap() == "," { tokens.pop(); }
         }
         Err(GateError::Generic("Unclosed JSON object".to_string()))
     }
     fn parse_array(tokens: &mut Vec<String>) -> Result<JsonNode> {
         let mut arr = Vec::new();
-        while !tokens.is_empty() {
-            if tokens[0] == "]" { tokens.remove(0); return Ok(JsonNode::Array(arr)); }
+        while let Some(peek) = tokens.last() {
+            if peek == "]" { tokens.pop(); return Ok(JsonNode::Array(arr)); }
             arr.push(Self::parse(tokens)?);
             if tokens.is_empty() { break; }
-            if tokens[0] == "," { tokens.remove(0); }
+            if tokens.last().unwrap() == "," { tokens.pop(); }
         }
         Err(GateError::Generic("Unclosed JSON array".to_string()))
     }
