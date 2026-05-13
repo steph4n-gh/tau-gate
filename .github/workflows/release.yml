@@ -5,6 +5,7 @@ on:
     tags:
       - 'v*'
 
+# V2.7: Minimal workflow permissions
 permissions:
   contents: write
 
@@ -15,13 +16,18 @@ jobs:
   audit-and-release:
     runs-on: ubuntu-latest
     steps:
+      # V2.7: Hardened SHA Pinning for all Actions
       - name: Checkout Code
-        uses: actions/checkout@v4
+        # actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
         with:
           fetch-depth: 0
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        # dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@71d3df8f9b90875e5108f9216196a6669966d5f7
+        with:
+          toolchain: stable
 
       - name: Dogfooding Audit
         run: |
@@ -35,7 +41,8 @@ jobs:
           echo "✅ Dogfooding Audit Passed. Project is secured by itself."
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        # softprops/action-gh-release@v2.0.8
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8ad5bc06adad52
         with:
           files: target/release/tau-gate
           name: Release ${{ github.ref_name }}
