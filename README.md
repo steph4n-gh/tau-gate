@@ -1,5 +1,5 @@
-# $\tau$-Gate (v1.1.0)
-**Zero-Trust Supply Chain Security powered by Spectral Graph Theory.**
+# $\tau$-Gate (v2.0.0)
+**Geometric Zero-Trust: Supply Chain Security with Absolute Integrity.**
 
 ---
 
@@ -10,29 +10,35 @@
 
 ---
 
-## 🛡️ The Mission: Structural Zero-Trust
-Modern supply chain attacks (TanStack, XZ Utils) bypass traditional scanners because they don't use "known-bad" code. Instead, they use **Transitive Secrecy**.
+## 🛡️ v2.0.0: The "Absolute Zero" Release
+$\tau$-Gate v2.0 represents a new standard in security engineering: **Absolute Zero Dependencies.** 
 
-$\tau$-Gate is a mathematical proxy wrapper for your package manager (`npm`, `pnpm`, `Bun`, `Yarn`, `Cargo`). It analyzes the **Shape of your Dependencies** before untrusted code can run.
+Most security tools are built on hundreds of third-party packages, making them vulnerable to the very supply chain attacks they try to block. $\tau$-Gate v2.0 has been surgically refactored to rely **exclusively on the Rust Standard Library.**
+
+### Why v2.0 earns your trust:
+*   **Zero Dependencies:** 0 external crates. No `serde`, no `petgraph`, no `anyhow`. The attack surface of the auditor is zero.
+*   **Reproducible Builds:** Byte-for-byte identical binary generation using `reproduce.sh`. You can prove the binary matches the source code.
+*   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in package metadata, catching "Sleeper Cells" that try to look structurally normal.
+*   **Signed Integrity:** Every release is cryptographically signed and verified against build-time Git hashes.
 
 ---
 
-## 🧠 Core Methodology
+## 🚩 The Problem: Structural Attacks
+Modern supply chain attacks (like **TanStack Query** or **XZ Utils**) bypass traditional scanners because they don't use "known-bad" code. Instead, they use **Transitive Secrecy**. 
+They hide deep in your dependency tree, establishing structural bottlenecks to execute malicious code.
 
-### Level 1: The Social Network (Intuitive)
+## 🛡️ The Solution: $\tau$-Gate
+$\tau$-Gate is a mathematical proxy wrapper for your package manager. It analyzes the **Shape of your Dependencies** before untrusted code can run.
+
+### 🧠 Core Methodology
+
+#### **Level 1: The Social Network (Intuitive)**
 Trusted software forms a dense "Mainland." Attackers form tiny "Islands." If an isolated island requests system power (execution scripts or build hooks), the math flags it and blocks it.
 
-### Level 2: Spectral Bisection (Technical)
-We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the **Fiedler Vector** ($\lambda_2$) using a high-performance $O(E)$ sparse iterative solver. The tool identifies the **Maximum Spectral Gap** to mathematically prove structural isolation.
+#### **Level 2: Spectral Bisection (Technical)**
+We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the **Fiedler Vector** ($\lambda_2$) using a high-performance $O(E)$ sparse iterative solver. The tool identifies the **Maximum Spectral Gap** to mathematically identify structural isolation.
 
 ---
-
-## 🧪 Live Proof of Concept (Red Team Simulation)
-You can see $\tau$-Gate catch real supply chain attacks by running our automated proof script. This will scaffold three scenarios (Nominal, Typosquatter, and Bloated Trojan) and run the audit against them.
-
-```bash
-./prove-it.sh
-```
 
 ## 🚀 Quick Start
 
@@ -47,48 +53,22 @@ You can see $\tau$-Gate catch real supply chain attacks by running our automated
 
 ---
 
-## 🤝 How to Contribute & Extend
-$\tau$-Gate v1.1.0 introduces an **Extensible Architecture**. Adding support for a new language (like Python or Go) is now a simple 4-step process:
-1.  **Define the Engine:** Add your language to `EngineType` in `src/graph.rs`.
-2.  **Transitive Extraction:** Implement a `build_from_lang()` method using your language's metadata tool.
-3.  **Map Execution Sinks:** Identify your language's "install-time" scripts (e.g., `setup.py` or `build.rs`).
-4.  **Register:** Link it in the `DepGraph::build()` discovery loop.
-
-We welcome contributions for:
-*   🦀 **Native Rust (Cargo) support** (Included in v1.1.0!)
-*   🐍 **Python (Pip/Poetry) support** (Roadmap)
-*   📈 **Mathematical optimizations** for the sparse iterative solver.
-
-Check out the [source code architecture](https://github.com/steph4n-gh/tau-gate/tree/main/src) to get started.
-
----
-
 ## 📖 Resource Hub
 
 | Documentation | Description |
 | :--- | :--- |
 | **[Setup & Integration](./docs/setup.md)** | Detailed installation, CI/CD configs, and CLI flags. |
-| **[Governance & Policy](./docs/policy.md)** | Configuration guide and real-world attack scenarios. |
+| **[Governance & Policy](./docs/policy.md)** | Configuration guide, Advisory Mode, and attack scenarios. |
 | **[The Mathematics](./docs/whitepaper.md)** | In-depth technical whitepaper on Spectral Bisection. |
 | **[Empirical Validation](./docs/validation.md)** | Performance and accuracy data from real-world audits. |
-| **[Extensibility Guide](./docs/extensibility.md)** | How to add support for new package managers (Python, Go, etc.). |
 | **[Strategy Audit](./docs/marketing.md)** | Stakeholder talking points and competitive analysis. |
-
----
-
-## 🌍 The Future: Multi-Language Roadmap (v3.0+)
-The underlying Spectral Graph Theory is **language-agnostic**. A dependency graph is a DAG whether it's written in JavaScript or Rust. 
-
-Future versions will introduce native support for:
-*   **Rust (Cargo):** Bridging packages with `build.rs` to the execution sink. (RELEASED in v1.1.0)
-*   **Python (Pip/Poetry):** Detecting `setup.py` anomalies.
-*   **Ruby (Gems):** Mapping native extensions (`extconf.rb`).
+| **[Extensibility Guide](./docs/extensibility.md)** | How to add support for new package managers. |
 
 ---
 
 ## ⚖️ License: Free for People, Not for Profit
 $\tau$-Gate is licensed under the **Polyform Non-Commercial License 1.0.0**.
 
-*   **Individuals & Researchers:** 100% Free.
+*   **Individuals & Researchers:** 100% Free. Use it, hack it, share it.
 *   **Organizations:** 100% Free for **internal use** to protect your own pipelines.
 *   **Commercial Use:** You may **not** sell $\tau$-Gate or build a commercial product/service based on this source code.

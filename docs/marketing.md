@@ -1,53 +1,51 @@
-# $\tau$-Gate: Strategy & Truth Audit (v1.1.0)
+# $\tau$-Gate: Strategy & Truth Audit (v2.0.0)
 
 This document provides a technical audit and high-signal discussion points for the $\tau$-Gate security model.
 
 ## 🛡️ The Technical Truth Audit
 
-This audit evaluates the v1.1.0 implementation against sophisticated threat actors.
+This audit evaluates the v2.0.0 implementation against sophisticated threat actors.
 
-### 1. The Core Value
+### 1. Uncompromising Integrity (Absolute Zero)
+*   **Zero Dependencies:** v2.0.0 is built with 0 external crates. This eliminates the risk of a "Vampire Attack" on $\tau$-Gate's own code.
+*   **Formal Reproducibility:** Every build is byte-for-byte identical. Users can verify that the binary on their machine was built from the public source code.
+*   **Entropy engine:** Detects obfuscated payloads hidden in package metadata, bridging them to a "Suspicion Sink."
+
+### 2. Core Security Pillars
 *   **Structural Secrecy Detection:** $\tau$-Gate identifies the topological patterns used by zero-day supply chain attackers.
-*   **Zero-Day Detection:** It doesn't need to know *what* a payload does. It only needs to see that a package is **Isolated** and **Escalating Privileges**.
-*   **Multi-Engine Support:** v1.1.0 natively secures `npm`, `pnpm`, `Bun`, `Yarn Berry`, and **`Cargo` (Rust)** environments.
+*   **Privilege Escalation Block:** It identifies packages that are **Isolated** and **Escalating Privileges** (via scripts or build hooks).
+*   **Transitive Translucency:** Natively secures `npm`, `pnpm`, `Bun`, `Yarn Berry`, and `Cargo` (Rust) environments.
 
-### 2. Limitations & Scoping
-*   **Source-Blindness:** It does not audit source code logic. It identifies the "neighborhood" of the dependencies.
-*   **The "Loud" Attack Strategy:** A sophisticated attacker could attempt to "bloat" their graph with trusted dependencies to bypass size thresholds. v1.1.0 mitigates this via **Connectivity Score ($\lambda_2$)** monitoring, though this remains an area for continued research.
-*   **Verification:** While v1.1.0 includes build-hash verification, absolute binary integrity requires external signing infrastructure.
-
-### 3. Corporate Integration Path
-To move from a CLI tool to a standard internal utility:
-*   **Remote Policies:** Centralized management of `tau-gate.toml`.
-*   **Signed Artifacts:** Cryptographic signing of binaries.
-*   **SIEM Ingestion:** Automated drain of structured logs to centralized security platforms.
+### 3. Known Limitations
+*   **Mainland Hijacking:** If an attacker compromises a massive framework (e.g. `react`), they share the core's connectivity.
+*   **Runtime Logic:** $\tau$-Gate audits the **Installation Pipeline**. It does not scan code logic or monitor runtime behavior.
 
 ---
 
 ## 📢 Discussion Guide
 
 ### 🎯 The Elevator Pitch
-"$\tau$-Gate is a mathematical audit tool for your software supply chain. Instead of matching against a list of known viruses, it uses Graph Theory to identify the 'hidden tunnels' built by attackers to bypass security. It identifies zero-day threats like TanStack, XZ Utils, and Rust `build.rs` backdoors before they can execute."
+"$\tau$-Gate is a mathematical audit tool for your software supply chain. Instead of matching against a list of known viruses, it uses Graph Theory to identify the 'hidden tunnels' built by attackers to bypass security. With its **Absolute Zero** architecture, it is the first security tool that is truly immune to its own supply chain."
 
 ### 👦 Stakeholder Q&A
-*   **Q: Why not just use existing scanners?**
-    *   **A:** Standard scanners look for "known criminals." $\tau$-Gate identifies "suspicious behavior" (isolation and privilege escalation), catching attackers before they are reported.
-*   **Q: Impact on development velocity?**
-    *   **A:** Negligible. The sparse solver processes thousands of nodes in milliseconds. It stays silent until it identifies a structural threat.
-*   **Q: Is it safe for internal use?**
-    *   **A:** Yes. It is 100% offline and licensed specifically for free internal corporate protection.
+*   **Q: How is this different from Snyk or npm audit?**
+    *   **A:** Scanners look for "known criminals." $\tau$-Gate identifies "suspicious behavior" (isolation and privilege escalation), catching attackers before they are even reported.
+*   **Q: Does it slow down our developers?**
+    *   **A:** No. The bespoke $O(E)$ sparse solver processes thousands of nodes in milliseconds. It is a silent gate.
+*   **Q: Can it be trusted?**
+    *   **A:** v2.0.0 has zero dependencies and is formally reproducible. You don't have to "trust" us; you can audit the standard library code and verify the build yourself.
 
 ### 💻 Engineer Q&A
 *   **Q: How is bisection solved?**
-    *   **A:** We use **Spectral Graph Partitioning**. We solve for the **Fiedler Vector** using a **Shifted Power Iteration** solver. 
-*   **Q: What is the complexity?**
-    *   **A:** The sparse solver is **$O(E)$ (linear to edges)**. It scales to massive monorepos without the memory overhead of dense matrices.
-*   **Q: How do you handle multiple languages?**
-    *   **A:** v1.1.0 introduces an extensible architecture. It natively supports Node.js engines and a new **Cargo (Rust)** engine that maps `build.rs` execution sinks.
+    *   **A:** We solve for the **Fiedler Vector** of the Graph Laplacian using a **Shifted Power Iteration** solver. 
+*   **Q: How do you handle multiple ecosystems?**
+    *   **A:** v2.0.0 uses an extensible extraction layer. It currently supports Node.js (transitive) and Rust/Cargo (build.rs) environments.
+*   **Q: How do you handle obfuscation?**
+    *   **A:** The engine includes an **Entropy Scanner** that identifies high-entropy strings in package manifests, bridging them to a structural sink for analysis.
 
 ---
 
 ## ⚖️ Strategy: Why "Source-Available"?
-We use the **Polyform Non-Commercial 1.0.0** license to protect the project's intellectual integrity:
-1.  **Prevent Commercial Re-packaging:** We stop third-party vendors from selling this research as a closed-source product.
-2.  **Encourage Internal Adoption:** We keep the tool free for every organization to use and improve internally.
+We use the **Polyform Non-Commercial License 1.0.0**:
+1.  **Protect the Research:** Prevent third-party vendors from selling this public research as a closed-source product.
+2.  **Encourage Adoption:** Keep the tool free for every organization to use and improve internally.
