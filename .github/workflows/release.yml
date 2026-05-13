@@ -5,7 +5,7 @@ on:
     tags:
       - 'v*'
 
-# V2.7: Minimal workflow permissions
+# V2.0: Minimal workflow permissions
 permissions:
   contents: write
 
@@ -16,16 +16,16 @@ jobs:
   audit-and-release:
     runs-on: ubuntu-latest
     steps:
-      # V2.7: Hardened SHA Pinning for all Actions
+      # V2.0: Hardened SHA Pinning for all Actions
       - name: Checkout Code
-        # actions/checkout@v4.1.7
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+        # actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Setup Rust
-        # dtolnay/rust-toolchain@stable
-        uses: dtolnay/rust-toolchain@71d3df8f9b90875e5108f9216196a6669966d5f7
+        # dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@e97e2d8c103f57f044c693c79b74447c88e1d199
         with:
           toolchain: stable
 
@@ -35,14 +35,14 @@ jobs:
           cargo build --release
           
           echo "[Audit] Running active spectral bisection on own tree..."
-          # v1.1.0: Active Dogfooding. Fails build if our own tree is anomalous.
+          # v2.0.0: Active Dogfooding. Fails build if our own tree is anomalous.
           ./target/release/tau-gate
           
           echo "✅ Dogfooding Audit Passed. Project is secured by itself."
 
       - name: Create Release
-        # softprops/action-gh-release@v2.0.8
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8ad5bc06adad52
+        # softprops/action-gh-release@v2.6.2
+        uses: softprops/action-gh-release@3bb12730750646edd6202f5551a95399d7c344c6
         with:
           files: target/release/tau-gate
           name: Release ${{ github.ref_name }}
