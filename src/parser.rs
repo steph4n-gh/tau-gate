@@ -2,6 +2,7 @@ use crate::error::{GateError, Result};
 use std::collections::HashMap;
 
 /// A minimal, zero-dependency parser for Tau-Gate.
+/// Specifically designed to handle configuration (TOML-like), JSON, and basic YAML metadata extraction.
 pub struct MiniParser;
 
 impl MiniParser {
@@ -32,6 +33,7 @@ impl MiniParser {
         Ok(map)
     }
 
+    /// A basic JSON value representation for custom parsing.
     pub fn parse_json(json: &str) -> Result<JsonNode> {
         let mut tokens = JsonLexer::tokenize(json);
         JsonParser::parse(&mut tokens)
@@ -39,7 +41,6 @@ impl MiniParser {
 
     /// V2.0 Hardening: Detects high-entropy strings (potential obfuscation) in manifests.
     pub fn detect_obfuscation(content: &str) -> bool {
-        // Look for long, continuous base64/hex characters without spaces
         let mut max_continuous = 0;
         let mut current = 0;
         for c in content.chars() {
@@ -51,11 +52,10 @@ impl MiniParser {
             }
         }
         if current > max_continuous { max_continuous = current; }
-        
-        // Threshold: If we see a single string of 128+ continuous characters, flag it.
         max_continuous > 128
     }
 
+    /// A minimal YAML extractor for pnpm-lock.yaml.
     pub fn parse_pnpm_yaml(yaml: &str) -> Result<PnpmMetadata> {
         let mut snapshots = HashMap::new();
         let mut packages = HashMap::new();
@@ -64,33 +64,35 @@ impl MiniParser {
 
         for line in yaml.lines() {
             let indent = line.chars().take_while(|c| c.is_whitespace()).count();
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') { continue; }
+            let line_trimmed = line.trim();
+            if line_trimmed.is_empty() || line_trimmed.starts_with('#') { continue; }
 
-            if line.starts_with("snapshots:") { current_section = "snapshots"; continue; }
-            if line.starts_with("packages:") { current_section = "packages"; continue; }
+            if line_trimmed.starts_with("snapshots:") { current_section = "snapshots"; continue; }
+            if line_trimmed.starts_with("packages:") { current_section = "packages"; continue; }
 
-            if indent == 2 && line.ends_with(':') {
-                current_pkg_id = line[..line.len()-1].trim_matches(|c| c == '"' || c == '\'').to_string();
+            if indent == 2 && line_trimmed.contains(':') {
+                let id = if let Some((id, _)) = line_trimmed.split_once(':') { id } else { line_trimmed };
+                current_pkg_id = id.trim().trim_matches(|c| c == '"' || c == '\'').to_string();
                 if current_section == "snapshots" {
                     snapshots.insert(current_pkg_id.clone(), PnpmSnapshot { dependencies: Vec::new() });
                 } else if current_section == "packages" {
                     packages.insert(current_pkg_id.clone(), PnpmPackage { has_install_script: false });
                 }
+                if line_trimmed.contains("hasInstallScript: true") {
+                    if let Some(pkg) = packages.get_mut(&current_pkg_id) { pkg.has_install_script = true; }
+                }
                 continue;
             }
 
-            if indent == 4 && line.starts_with("hasInstallScript:") {
-                let has = line.contains("true");
+            if indent == 4 && line_trimmed.starts_with("hasInstallScript:") {
+                let has = line_trimmed.contains("true");
                 if current_section == "packages" {
-                    if let Some(pkg) = packages.get_mut(&current_pkg_id) {
-                        pkg.has_install_script = has;
-                    }
+                    if let Some(pkg) = packages.get_mut(&current_pkg_id) { pkg.has_install_script = has; }
                 }
             }
 
             if indent == 6 && current_section == "snapshots" {
-                if let Some((name, _ver)) = line.split_once(':') {
+                if let Some((name, _ver)) = line_trimmed.split_once(':') {
                     if let Some(snap) = snapshots.get_mut(&current_pkg_id) {
                         snap.dependencies.push(name.trim().trim_matches(|c| c == '"' || c == '\'').to_string());
                     }
@@ -135,19 +137,15 @@ impl JsonNode {
     pub fn get(&self, key: &str) -> Option<&JsonNode> {
         match self { JsonNode::Object(m) => m.get(key), _ => None }
     }
-    
     pub fn as_str(&self) -> Option<&str> {
         match self { JsonNode::String(s) => Some(s), _ => None }
     }
-    
     pub fn as_bool(&self) -> Option<bool> {
         match self { JsonNode::Bool(b) => Some(*b), _ => None }
     }
-
     pub fn as_object(&self) -> Option<&HashMap<String, JsonNode>> {
         match self { JsonNode::Object(m) => Some(m), _ => None }
     }
-
     pub fn as_array(&self) -> Option<&Vec<JsonNode>> {
         match self { JsonNode::Array(a) => Some(a), _ => None }
     }
@@ -169,11 +167,7 @@ impl JsonLexer {
                     let mut s = String::new();
                     while let Some(nc) = it.next() {
                         if nc == '"' { break; }
-                        if nc == '\\' {
-                            if let Some(esc) = it.next() { s.push(esc); }
-                        } else {
-                            s.push(nc);
-                        }
+                        if nc == '\\' { if let Some(esc) = it.next() { s.push(esc); } } else { s.push(nc); }
                     }
                     tokens.push(format!("\"{}\"", s));
                 }
@@ -184,9 +178,7 @@ impl JsonLexer {
                         if nc.is_alphanumeric() || nc == '.' || nc == '-' || nc == '_' {
                             s.push(nc);
                             it.next();
-                        } else {
-                            break;
-                        }
+                        } else { break; }
                     }
                     if !s.is_empty() { tokens.push(s); }
                 }
@@ -209,15 +201,10 @@ impl JsonParser {
             "false" => Ok(JsonNode::Bool(false)),
             "null" => Ok(JsonNode::Null),
             s => {
-                if let Ok(n) = s.parse::<f64>() {
-                    Ok(JsonNode::Number(n))
-                } else {
-                    Err(GateError::Generic(format!("Invalid JSON token: {}", s)))
-                }
+                if let Ok(n) = s.parse::<f64>() { Ok(JsonNode::Number(n)) } else { Err(GateError::Generic(format!("Invalid JSON token: {}", s))) }
             }
         }
     }
-
     fn parse_object(tokens: &mut Vec<String>) -> Result<JsonNode> {
         let mut map = HashMap::new();
         while !tokens.is_empty() {
@@ -232,7 +219,6 @@ impl JsonParser {
         }
         Err(GateError::Generic("Unclosed JSON object".to_string()))
     }
-
     fn parse_array(tokens: &mut Vec<String>) -> Result<JsonNode> {
         let mut arr = Vec::new();
         while !tokens.is_empty() {
@@ -242,5 +228,38 @@ impl JsonParser {
             if tokens[0] == "," { tokens.remove(0); }
         }
         Err(GateError::Generic("Unclosed JSON array".to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_mini_parser_config() {
+        let toml = "threshold_percentage = 15.0\nwhitelist = [\"@astrojs/*\", 'vite']";
+        let map = MiniParser::parse_config(toml).unwrap();
+        assert_eq!(map.get("threshold_percentage"), Some(&ConfigValue::Float(15.0)));
+    }
+    #[test]
+    fn test_mini_parser_json_basic() {
+        let json = r#"{"name": "test", "version": "1.0", "active": true, "deps": ["a", "b"]}"#;
+        let node = MiniParser::parse_json(json).unwrap();
+        assert_eq!(node.get("name").unwrap().as_str(), Some("test"));
+    }
+    #[test]
+    fn test_pnpm_yaml_extractor() {
+        let yaml = r#"
+packages:
+  /lodash@4.17.21:
+    hasInstallScript: true
+snapshots:
+  /lodash@4.17.21:
+    dependencies:
+      zod: 3.22.0
+  /zod@3.22.0: {}
+"#;
+        let meta = MiniParser::parse_pnpm_yaml(yaml).unwrap();
+        assert!(meta.packages.get("/lodash@4.17.21").unwrap().has_install_script);
+        assert!(meta.snapshots.contains_key("/zod@3.22.0"));
     }
 }

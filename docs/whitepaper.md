@@ -39,9 +39,9 @@ If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ rem
 
 ---
 
-## 3. The Absolute Zero implementation
+## 3. Implementation Integrity: Self-Contained Architecture
 
-In v2.0.0, $\tau$-Gate achieves **Absolute Zero Dependencies**. Every line of code, from the $O(E)$ sparse solver to the native lockfile parsers, is implemented using the **Rust Standard Library**. 
+In v2.0.0, $\tau$-Gate achieves **Architectural Self-Sufficiency**. Every line of code, from the $O(E)$ sparse solver to the native lockfile parsers, is implemented using the **Rust Standard Library**. 
 
 This eliminates the "Auditor's Paradox"—ensuring the tool cannot be compromised by the same supply chain attacks it is designed to audit.
 

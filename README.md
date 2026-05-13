@@ -1,5 +1,5 @@
 # $\tau$-Gate (v2.0.0)
-**Geometric Zero-Trust: Absolute Integrity in Code and Deployment.**
+**Geometric Zero-Trust: Integrity in Code and Deployment.**
 
 ---
 
@@ -10,13 +10,13 @@
 
 ---
 
-## 🛡️ v2.0.0: The "Absolute Zero" Standard
-$\tau$-Gate v2.0 represents the ultimate evolution in security engineering. We have physically eliminated the "Auditor's Paradox"—where a security tool is vulnerable to its own supply chain.
+## 🛡️ v2.0.0: Architectural Self-Sufficiency
+$\tau$-Gate v2.0 implements a self-contained security model designed to address the "Auditor's Paradox"—the risk that a security tool itself is compromised by its own dependencies.
 
-### Why v2.0 is the Gold Standard:
-*   **Absolute Zero Dependencies:** 0 external Rust crates. The entire math core and all parsers rely **100% on the Rust Standard Library.**
-*   **Zero-Action CI/CD:** Our release pipeline has eliminated all 3rd-party GitHub Actions. We use only native system tools (`git`, `rustup`, `gh`), achieving a zero-dependency infrastructure.
-*   **Reproducible Builds:** Byte-for-byte identical binary generation using `reproduce.sh`. Formal proof that your binary matches our source code.
+### Technical Integrity Features:
+*   **Zero External Dependencies:** Every line of code, from the $O(E)$ sparse solver to the lockfile extractors, is implemented using the **Rust Standard Library.** This eliminates transitive supply chain risk in the auditor itself.
+*   **Minimal-Action CI/CD:** The release pipeline utilizes native system utilities (`git`, `rustup`, `gh`) instead of 3rd-party GitHub Actions, reducing the infrastructure attack surface.
+*   **Formal Reproducibility:** Byte-for-byte identical binary generation using `reproduce.sh`. Verification proof that your binary matches our source code.
 *   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in metadata, catching "Sleeper Cells" that try to look structurally normal.
 
 ---
@@ -41,7 +41,7 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 
 1.  **Install Globally:**
     ```bash
-    curl -L https://github.com/steph4n-gh/tau-gate/releases/latest/download/install.sh | bash
+    curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
     ```
 2.  **Audit Your Project:**
     ```bash

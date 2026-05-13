@@ -48,7 +48,12 @@ impl DepGraph {
             if !status.success() { return Err(GateError::Graph("Failed to generate package-lock.json.".to_string())); }
         }
         let content = fs::read_to_string(lockfile_path)?;
-        let root = MiniParser::parse_json(&content)?;
+        Self::parse_npm_lockfile(&content)
+    }
+
+    /// Internal logic for npm parsing to allow unit testing without disk IO
+    fn parse_npm_lockfile(content: &str) -> Result<Self> {
+        let root = MiniParser::parse_json(content)?;
         let packages = root.get("packages").and_then(|p| p.as_object()).context("Invalid npm lockfile format")?;
 
         let mut graph = DiGraph::new();
@@ -63,7 +68,6 @@ impl DepGraph {
             if details.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) {
                 execution_packages.insert(name.clone());
             }
-            // Entropy Scan
             if MiniParser::detect_obfuscation(&details.as_object().map(|o| format!("{:?}", o)).unwrap_or_default()) {
                 suspicious_packages.insert(name);
             }
@@ -91,7 +95,11 @@ impl DepGraph {
 
     fn build_from_pnpm() -> Result<Self> {
         let content = fs::read_to_string("pnpm-lock.yaml")?;
-        let meta = MiniParser::parse_pnpm_yaml(&content)?;
+        Self::parse_pnpm_lockfile(&content)
+    }
+
+    fn parse_pnpm_lockfile(content: &str) -> Result<Self> {
+        let meta = MiniParser::parse_pnpm_yaml(content)?;
         let mut graph = DiGraph::new();
         let mut node_indices = HashMap::new();
         let mut execution_packages = HashSet::new();
@@ -122,8 +130,12 @@ impl DepGraph {
     fn build_from_bun() -> Result<Self> {
         let output = Command::new("bun").env("TERM", "dumb").args(&["pm", "ls", "--all", "--json"]).output()?;
         let stdout_str = String::from_utf8_lossy(&output.stdout);
-        if let Some(json_start) = stdout_str.find('{') {
-            if let Ok(root) = MiniParser::parse_json(&stdout_str[json_start..]) {
+        Self::parse_bun_output(&stdout_str)
+    }
+
+    fn parse_bun_output(stdout: &str) -> Result<Self> {
+        if let Some(json_start) = stdout.find('{') {
+            if let Ok(root) = MiniParser::parse_json(&stdout[json_start..]) {
                 let mut graph = DiGraph::new();
                 let mut node_indices = HashMap::new();
                 let mut execution_packages = HashSet::new();
@@ -132,7 +144,7 @@ impl DepGraph {
                 return Ok(Self { graph, execution_packages, suspicious_packages });
             }
         }
-        Self::build_from_bun_tree_with_recovery(&stdout_str)
+        Self::build_from_bun_tree_with_recovery(stdout)
     }
 
     fn build_from_bun_tree_with_recovery(tree_output: &str) -> Result<Self> {
@@ -169,7 +181,11 @@ impl DepGraph {
     fn build_from_yarn() -> Result<Self> {
         let output = Command::new("yarn").args(&["npm", "ls", "--all", "--json"]).output().context("Failed to execute 'yarn npm ls'.")?;
         let stdout_str = String::from_utf8_lossy(&output.stdout);
-        let root = MiniParser::parse_json(&stdout_str)?;
+        Self::parse_yarn_output(&stdout_str)
+    }
+
+    fn parse_yarn_output(stdout: &str) -> Result<Self> {
+        let root = MiniParser::parse_json(stdout)?;
         let mut graph = DiGraph::new();
         let mut node_indices = HashMap::new();
         let mut execution_packages = HashSet::new();
@@ -203,7 +219,11 @@ impl DepGraph {
     fn build_from_cargo() -> Result<Self> {
         let output = Command::new("cargo").args(&["metadata", "--format-version", "1"]).output().context("Failed to execute cargo metadata.")?;
         let stdout_str = String::from_utf8_lossy(&output.stdout);
-        let root = MiniParser::parse_json(&stdout_str).context("Failed to parse Cargo metadata.")?;
+        Self::parse_cargo_metadata(&stdout_str)
+    }
+
+    fn parse_cargo_metadata(stdout: &str) -> Result<Self> {
+        let root = MiniParser::parse_json(stdout).context("Failed to parse Cargo metadata.")?;
         let mut graph = DiGraph::new();
         let mut node_indices = HashMap::new();
         let mut execution_packages = HashSet::new();
@@ -276,4 +296,71 @@ fn find_package_json(package_name: &str) -> Option<PathBuf> {
         if let Some(parent) = current_dir.parent() { current_dir = parent.to_path_buf(); } else { break; }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_npm_extraction() {
+        let content = r#"{
+            "packages": {
+                "": { "dependencies": { "a": "1.0.0" } },
+                "node_modules/a": { "version": "1.0.0", "hasInstallScript": true }
+            }
+        }"#;
+        let dg = DepGraph::parse_npm_lockfile(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 2);
+        assert!(dg.execution_packages.contains("node_modules/a"));
+    }
+
+    #[test]
+    fn test_pnpm_extraction() {
+        let content = r#"
+packages:
+  /a@1.0.0:
+    hasInstallScript: true
+snapshots:
+  /a@1.0.0:
+    dependencies:
+      b: 1.0.0
+  /b@1.0.0: {}
+"#;
+        let dg = DepGraph::parse_pnpm_lockfile(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 2);
+        assert!(dg.execution_packages.contains("/a@1.0.0"));
+    }
+
+    #[test]
+    fn test_cargo_extraction() {
+        let content = r#"{
+            "packages": [
+                { "id": "a", "name": "a", "version": "1.0.0", "targets": [{ "kind": ["custom-build"] }] }
+            ],
+            "resolve": {
+                "nodes": [
+                    { "id": "a", "dependencies": [] }
+                ]
+            }
+        }"#;
+        let dg = DepGraph::parse_cargo_metadata(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 1);
+        assert!(dg.execution_packages.contains("a@1.0.0"));
+    }
+
+    #[test]
+    fn test_bun_json_extraction() {
+        let content = r#"{"name": "test", "version": "1.0.0", "scripts": {"postinstall": "echo"}, "dependencies": []}"#;
+        let dg = DepGraph::parse_bun_output(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 1);
+        assert!(dg.execution_packages.contains("test(1.0.0)"));
+    }
+
+    #[test]
+    fn test_yarn_json_extraction() {
+        let content = r#"{"value": "root@1.0.0", "children": {"a@1.0.0": {"value": "a@1.0.0", "children": {}}}}"#;
+        let dg = DepGraph::parse_yarn_output(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 2);
+    }
 }
