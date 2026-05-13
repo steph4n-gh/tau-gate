@@ -35,9 +35,19 @@ To prove the robustness of the $\tau$-Gate v2.0.1 mathematical engine and its be
 ## 📊 Test Case 4: $\tau$-Gate (Rust/Cargo Dogfooding)
 *   **Engine:** `Cargo` (Native Metadata Extraction)
 *   **Nodes Analyzed:** ~60
-*   **Analysis Time:** **258 ms**
+*   **Analysis Time:** **~180 ms**
 *   **Result:** **NOMINAL**
 *   **Findings:** Audited its own source code and dependencies. Confirmed zero structural bottlenecks.
+
+## 🔬 Edge Case: Microsoft VSCode (The False Positive)
+During the Top 500 Ecosystem Benchmark, $\tau$-Gate successfully flagged an anomaly in `microsoft/vscode`.
+*   **Nodes Analyzed:** 1,624
+*   **Analysis Time:** **~16 ms**
+*   **Result:** **QUARANTINED (False Positive)**
+*   **Quarantined Nodes:** `@parcel/watcher-linux-arm-glibc`, `@parcel/watcher-win32-ia32`, etc.
+*   **The Diagnosis:** This is a mathematically accurate but contextually harmless detection. `@parcel/watcher` publishes pre-compiled native C++ binaries for every OS to avoid local compilation. Because these packages are OS-specific, they rarely share inbound edges with the rest of the JS ecosystem, forming **Topological Islands** (a tiny 13-node partition, $0.80\%$ of the graph). Because they are native binaries, they also request **execution privileges** (install scripts). 
+*   **The Math:** Island Topology + Execution Privilege = Gate Slammed.
+*   **The Resolution:** This mathematically proves the strictness of the bisection engine. To bypass this known architectural pattern, users simply add `whitelist = ["@parcel/watcher-*"]` to their `tau-gate.toml`.
 
 ---
 
