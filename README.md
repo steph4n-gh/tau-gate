@@ -1,6 +1,10 @@
 # $\tau$-Gate (v2.0.0)
 **Geometric Zero-Trust: Integrity in Code and Deployment.**
 
+[![Security Audit](https://github.com/steph4n-gh/tau-gate/actions/workflows/release.yml/badge.svg)](https://github.com/steph4n-gh/tau-gate/actions)
+[![Dependencies: 0](https://img.shields.io/badge/Dependencies-0-00f3ff?style=flat-square)](https://github.com/steph4n-gh/tau-gate/blob/main/Cargo.toml)
+[![τ-Gate: Secured](https://img.shields.io/badge/τ--Gate-Secured-00f3ff?style=flat-square)](https://github.com/steph4n-gh/tau-gate)
+
 ---
 
 > ### 👦 **Explain Like I'm 6**
