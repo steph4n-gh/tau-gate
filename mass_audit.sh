@@ -48,7 +48,7 @@ for REPO in $REPOS; do
 
     # Run the audit and capture the exit code
     set +e
-    tau-gate -d > tau-gate.log 2>&1
+    ../../target/release/tau-gate -d > tau-gate.log 2>&1
     EXIT_CODE=$?
     set -e
     
@@ -77,3 +77,4 @@ echo "Anomalies/Failed: $FAIL" >> "$SUMMARY_FILE"
 
 echo "--------------------------------------------------"
 echo "[τ-Gate] 🏁 Mass Audit Complete. Summary saved to ecosystem_audit/$SUMMARY_FILE."
+mplete. Summary saved to ecosystem_audit/$SUMMARY_FILE."
