@@ -1,70 +1,76 @@
 # Installation & Operation Guide (v2.0.0)
 
-This document details how to install, run, and integrate $\tau$-Gate into your local environment and zero-trust CI/CD pipelines.
+This document provides exhaustive instructions for installing $\tau$-Gate across different use cases.
 
 ---
 
-## 💻 Local Installation
-
-### 1. Requirements
-*   **Rust:** `cargo` 1.80+ (Pinned in `rust-toolchain.toml`)
-*   **Package Managers:** Native support for `npm`, `pnpm`, `bun`, `yarn`, and `cargo`.
-
-### 2. Reproducible Build
-To ensure your local binary matches the official source code, use our reproduction engine:
+## ⚡ Option 1: The "One-Click" Install
+Best for users who want to get started immediately without managing source code. This script clones, builds, and installs the binary to `/usr/local/bin`.
 
 ```bash
+curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
+```
+
+---
+
+## 🛠️ Option 2: The "Developer" Install (Manual)
+Best for contributors or users who want to audit the source code before building.
+
+### 1. Download the Source
+```bash
+git clone https://github.com/steph4n-gh/tau-gate.git
+cd tau-gate
+```
+
+### 2. Build & Link
+You can build the binary and create a global link manually:
+
+```bash
+# Build the optimized release
+cargo build --release
+
+# Link globally (MacOS/Linux)
+sudo ln -sf $(pwd)/target/release/tau-gate /usr/local/bin/tau-gate
+```
+
+---
+
+## 🛡️ Option 3: High-Integrity Reproduction
+Best for security-conscious teams who require byte-for-byte identical binaries that match the public source.
+
+### 1. Requirements
+*   **Rustup:** Ensure you have `rustup` installed.
+*   **Toolchain:** The reproduction engine will automatically ensure you are using the pinned **Rust 1.80.0** version.
+
+### 2. Run Reproduction
+```bash
+# This builds the binary using strict deterministic flags
 ./reproduce.sh
 ```
 
-### 3. Quick Global Link
-```bash
-./install.sh
-```
-
 ---
 
-## 🛠️ Usage & CLI Flags
+## 📖 CLI Usage Reference
+
+Just run `tau-gate` in your project root. It will automatically detect your lockfile and apply the audit.
 
 | Flag | Description |
 | :--- | :--- |
-| `--dry-run`, `-d` | **Passive Audit:** Runs bisection math without triggering a physical install. |
-| `--verify`, `-v` | **Integrity Check:** Displays binary version and Git commit build hash. |
+| `--dry-run`, `-d` | **Passive Audit:** Runs the math and identifies threats without triggering a physical install. |
+| `--verify`, `-v` | **Integrity Check:** Displays the version and Git build hash of the binary. |
 | `--help`, `-h` | Displays the help menu. |
 
 ---
 
-## 🚀 Zero-Action CI/CD Integration
+## 🚀 CI/CD Integration
 
-To maintain the "Absolute Zero" standard, we recommend integrating $\tau$-Gate into GitHub Actions using **only native system tools**. This eliminates the risk of 3rd-party action hijacking.
-
-### Example Workflow (`.github/workflows/security.yml`)
+We recommend integrating $\tau$-Gate using native system tools to maintain the zero-dependency security model.
 
 ```yaml
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Native Checkout
-        run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} .
-          git checkout ${{ github.sha }}
+# GitHub Actions Example
+- name: Native τ-Gate Install
+  run: curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
 
-      - name: Run τ-Gate Audit
-        run: |
-          # Use pre-built release binary or build from source
-          cargo build --release
-          ./target/release/tau-gate
+- name: Security Gate
+  run: tau-gate
 ```
-
----
-
-## 🧹 Telemetry & Logs
-
-When the gate identifies an anomaly, it writes a structured JSON log to:
-`./logs/tau-gate_anomalies.json`
-
-This file is designed for SIEM ingestion and includes:
-*   **Connectivity Score ($\lambda_2$):** Direct measure of structural isolation.
-*   **Bisection Threshold ($\tau$):** The point where the project was bisected.
-*   **Quarantined Nodes:** List of packages identified as structural outliers.
