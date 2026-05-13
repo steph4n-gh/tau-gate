@@ -1,5 +1,5 @@
 use crate::error::{GateError, Result};
-use petgraph::graph::DiGraph;
+use crate::graph_impl::DiGraph;
 
 /// Result of a graph bisection analysis.
 pub struct PartitionResult {
@@ -13,18 +13,22 @@ pub struct PartitionResult {
 }
 
 /// Computes the Fiedler Vector and bisects the graph using an O(E) Sparse Iterative Solver.
-pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
+///
+/// V2.6 Hardening: 
+/// 1. Corrected alpha bound (2 * max_degree) for mathematical convergence.
+/// 2. Removed null epsilon-fuzzing logic.
+/// 3. Replaced median cut with Maximum Spectral Gap cut to isolate anomalies.
+pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let n = graph.node_count();
     if n < 3 {
         return Err(GateError::Math("Graph is too small for meaningful structural analysis.".to_string()));
     }
 
+    // 1. Build Symmetrized Sparse Adjacency List
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
     let mut degrees = vec![0.0; n];
 
-    for edge in graph.raw_edges() {
-        let u = edge.source().index();
-        let v = edge.target().index();
+    for &(u, v) in graph.edges() {
         if u != v {
             adj[u].push(v);
             adj[v].push(u); 
@@ -42,6 +46,7 @@ pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
         });
     }
 
+    // 2. Power Iteration on Shifted Laplacian: M = I - alpha * L
     let alpha = 1.0 / (2.0 * max_degree + 1.1);
     let mut v = vec![0.0; n];
 
@@ -108,7 +113,7 @@ pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
     let mut side_large = Vec::new();
 
     for (i, val) in indexed_fiedler.iter().enumerate() {
-        let node_name = graph.node_weight(petgraph::graph::NodeIndex::new(val.0)).unwrap().clone();
+        let node_name = graph.node_weight(val.0).unwrap().clone();
         if i <= cut_idx { side_small.push(node_name); } else { side_large.push(node_name); }
     }
 
@@ -122,24 +127,28 @@ pub fn analyze_graph(graph: &DiGraph<String, ()>) -> Result<PartitionResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use petgraph::graph::DiGraph;
+    use crate::graph_impl::DiGraph;
 
     #[test]
     fn test_dumbbell_bisection() {
         let mut graph = DiGraph::new();
+        
         let a0 = graph.add_node("A0".to_string());
         let a1 = graph.add_node("A1".to_string());
         let a2 = graph.add_node("A2".to_string());
-        graph.add_edge(a0, a1, ());
-        graph.add_edge(a1, a2, ());
-        graph.add_edge(a2, a0, ());
+        graph.add_edge(a0, a1);
+        graph.add_edge(a1, a2);
+        graph.add_edge(a2, a0);
+
         let b0 = graph.add_node("B0".to_string());
         let b1 = graph.add_node("B1".to_string());
         let b2 = graph.add_node("B2".to_string());
-        graph.add_edge(b0, b1, ());
-        graph.add_edge(b1, b2, ());
-        graph.add_edge(b2, b0, ());
-        graph.add_edge(a0, b0, ());
+        graph.add_edge(b0, b1);
+        graph.add_edge(b1, b2);
+        graph.add_edge(b2, b0);
+
+        graph.add_edge(a0, b0);
+
         let result = analyze_graph(&graph).expect("Analysis failed");
         assert_eq!(result.partition_b.len(), 3);
     }
@@ -147,14 +156,18 @@ mod tests {
     #[test]
     fn test_anomaly_isolation() {
         let mut graph = DiGraph::new();
+        
         let nodes: Vec<_> = (0..20).map(|i| graph.add_node(format!("M{}", i))).collect();
         for i in 0..20 {
-            graph.add_edge(nodes[i], nodes[(i + 1) % 20], ());
-            graph.add_edge(nodes[i], nodes[(i + 5) % 20], ());
+            graph.add_edge(nodes[i], nodes[(i + 1) % 20]);
+            graph.add_edge(nodes[i], nodes[(i + 5) % 20]);
         }
+
         let island = graph.add_node("ISLAND".to_string());
-        graph.add_edge(nodes[0], island, ());
+        graph.add_edge(nodes[0], island);
+
         let result = analyze_graph(&graph).expect("Analysis failed");
+        
         assert_eq!(result.partition_b.len(), 1);
         assert_eq!(result.partition_b[0], "ISLAND");
     }

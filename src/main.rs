@@ -1,6 +1,7 @@
 mod config;
 mod error;
 mod graph;
+mod graph_impl;
 mod math;
 mod telemetry;
 

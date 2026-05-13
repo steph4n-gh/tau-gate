@@ -1,5 +1,5 @@
 use crate::error::{GateContext, GateError, Result};
-use petgraph::graph::{DiGraph, NodeIndex};
+use crate::graph_impl::DiGraph;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
 use std::collections::{HashMap, HashSet};
@@ -19,7 +19,7 @@ pub enum EngineType {
 
 /// A directed graph representing the project's dependency topology.
 pub struct DepGraph {
-    pub graph: DiGraph<String, ()>,
+    pub graph: DiGraph,
     /// V2.6 Hardening: Track packages with execution scripts separately
     /// to avoid the "Sink Wormhole" flaw in the Graph Laplacian.
     pub execution_packages: HashSet<String>,
@@ -64,6 +64,7 @@ impl DepGraph {
         let mut node_indices = HashMap::new();
         let mut execution_packages = HashSet::new();
 
+        // Pass 1: Nodes and Metadata
         for (path, details) in packages {
             let name = if path.is_empty() {
                 "root".to_string()
@@ -82,6 +83,7 @@ impl DepGraph {
                 execution_packages.insert(name);
             }
         }
+        // Pass 2: Edges
         for (path, details) in packages {
             let source_name = if path.is_empty() {
                 "root".to_string()
@@ -120,7 +122,7 @@ impl DepGraph {
 
                     if let Some(target_name) = found_target {
                         if let Some(target_idx) = node_indices.get(&target_name) {
-                            graph.add_edge(source_idx, *target_idx, ());
+                            graph.add_edge(source_idx, *target_idx);
                         }
                     }
                 }
@@ -166,7 +168,7 @@ impl DepGraph {
                         let target_idx = *node_indices
                             .entry(target_name.clone())
                             .or_insert_with(|| graph.add_node(target_name));
-                        graph.add_edge(idx, target_idx, ());
+                        graph.add_edge(idx, target_idx);
                     }
                 }
             }
@@ -209,7 +211,7 @@ impl DepGraph {
         let mut graph = DiGraph::new();
         let mut node_indices = HashMap::new();
         let mut execution_packages = HashSet::new();
-        let mut stack: Vec<(usize, NodeIndex)> = Vec::new();
+        let mut stack: Vec<(usize, usize)> = Vec::new();
 
         for line in tree_output.lines() {
             if line.trim().is_empty() || line.starts_with('/') {
@@ -275,7 +277,7 @@ impl DepGraph {
                 }
             }
             if let Some((_, parent_idx)) = stack.last() {
-                graph.add_edge(*parent_idx, current_idx, ());
+                graph.add_edge(*parent_idx, current_idx);
             }
             stack.push((depth, current_idx));
         }
@@ -310,9 +312,9 @@ impl DepGraph {
 
     fn parse_yarn_json_recursive(
         val: &JsonValue,
-        graph: &mut DiGraph<String, ()>,
-        node_indices: &mut HashMap<String, NodeIndex>,
-        parent_idx: Option<NodeIndex>,
+        graph: &mut DiGraph,
+        node_indices: &mut HashMap<String, usize>,
+        parent_idx: Option<usize>,
         execution_packages: &mut HashSet<String>,
     ) {
         if let Some(id) = val.get("value").and_then(|v| v.as_str()) {
@@ -320,7 +322,7 @@ impl DepGraph {
                 .entry(id.to_string())
                 .or_insert_with(|| graph.add_node(id.to_string()));
             if let Some(p_idx) = parent_idx {
-                graph.add_edge(p_idx, current_idx, ());
+                graph.add_edge(p_idx, current_idx);
             }
 
             let package_name = if let Some(idx) = id.rfind('@') {
@@ -405,7 +407,6 @@ impl DepGraph {
                         }
                     }
                     if has_build_script {
-                        // FIX: Key must match the full_name used for the node!
                         execution_packages.insert(full_name);
                     }
                 }
@@ -420,7 +421,7 @@ impl DepGraph {
                             for dep_id in deps {
                                 if let Some(dep_id_str) = dep_id.as_str() {
                                     if let Some(&target_idx) = node_indices.get(dep_id_str) {
-                                        graph.add_edge(source_idx, target_idx, ());
+                                        graph.add_edge(source_idx, target_idx);
                                     }
                                 }
                             }
@@ -435,9 +436,9 @@ impl DepGraph {
 
     fn parse_bun_json_dependencies(
         val: &JsonValue,
-        graph: &mut DiGraph<String, ()>,
-        node_indices: &mut HashMap<String, NodeIndex>,
-        parent_idx: Option<NodeIndex>,
+        graph: &mut DiGraph,
+        node_indices: &mut HashMap<String, usize>,
+        parent_idx: Option<usize>,
         execution_packages: &mut HashSet<String>,
     ) {
         if let Some(name) = val.get("name").and_then(|v| v.as_str()) {
@@ -447,7 +448,7 @@ impl DepGraph {
                 .entry(full_name.clone())
                 .or_insert_with(|| graph.add_node(full_name.clone()));
             if let Some(p_idx) = parent_idx {
-                graph.add_edge(p_idx, current_idx, ());
+                graph.add_edge(p_idx, current_idx);
             }
             if let Some(scripts) = val.get("scripts").and_then(|s| s.as_object()) {
                 if scripts.contains_key("postinstall") || scripts.contains_key("prepare") {
