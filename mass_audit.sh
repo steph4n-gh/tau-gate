@@ -77,4 +77,3 @@ echo "Anomalies/Failed: $FAIL" >> "$SUMMARY_FILE"
 
 echo "--------------------------------------------------"
 echo "[τ-Gate] 🏁 Mass Audit Complete. Summary saved to ecosystem_audit/$SUMMARY_FILE."
-mplete. Summary saved to ecosystem_audit/$SUMMARY_FILE."

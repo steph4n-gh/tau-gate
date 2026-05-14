@@ -24,6 +24,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let dry_run = args.iter().any(|arg| arg == "--dry-run" || arg == "-d");
     let show_verify = args.iter().any(|arg| arg == "--verify" || arg == "-v");
+    let use_network = args.iter().any(|arg| arg == "--network" || arg == "-n");
 
     if show_verify {
         println!("[\u{03C4}-Gate] \u{1F512}  Integrity Verification");
@@ -46,7 +47,7 @@ fn main() -> Result<()> {
     let start_time = SystemTime::now();
 
     // 2. The Extraction Phase
-    let (dep_graph, engine) = match DepGraph::build() {
+    let (dep_graph, engine) = match DepGraph::build(use_network) {
         Ok(res) => res,
         Err(e) => {
             eprintln!("[\u{03C4}-Gate] \u{274C} Lockfile Extraction Failed: {}", e);
@@ -188,8 +189,14 @@ mod tests {
 }
 
 fn execute_actual_install(engine: EngineType) {
-    let cmd = match engine { EngineType::Npm => "npm", EngineType::Pnpm => "pnpm", EngineType::Bun => "bun", EngineType::Yarn => "yarn", EngineType::Cargo => "cargo" };
+    let cmd = match engine { EngineType::Npm => "npm", EngineType::Pnpm => "pnpm", EngineType::Bun => "bun", EngineType::Yarn => "yarn", EngineType::Cargo => "cargo", EngineType::Network => {
+        println!("[\u{03C4}-Gate] \u{1F6A7} Network audit completed. Bypassing installation due to lack of lockfile context.");
+        exit(0);
+    }};
     let args = match engine { EngineType::Cargo => vec!["build"], _ => vec!["install"] };
     let status = Command::new(cmd).args(&args).status().expect("Native install failed");
     exit(status.code().unwrap_or(1));
 }
+
+mod network;
+mod semver;

@@ -14,6 +14,7 @@ pub enum EngineType {
     Bun,
     Yarn,
     Cargo,
+    Network,
 }
 
 /// A directed graph representing the project's dependency topology.
@@ -27,7 +28,11 @@ pub struct DepGraph {
 
 impl DepGraph {
     /// Discovers the project type and builds the dependency graph using the appropriate engine.
-    pub fn build() -> Result<(Self, EngineType)> {
+    pub fn build(use_network: bool) -> Result<(Self, EngineType)> {
+        if use_network && Path::new("package.json").exists() {
+            return Ok((Self::build_from_network()?, EngineType::Network));
+        }
+
         if Path::new("Cargo.toml").exists() {
             Ok((Self::build_from_cargo()?, EngineType::Cargo))
         } else if Path::new("pnpm-lock.yaml").exists() {
@@ -232,6 +237,82 @@ impl DepGraph {
                 for (_, child) in children { Self::parse_yarn_json_recursive(child, graph, node_indices, Some(current_idx), execution_packages, suspicious_packages); }
             }
         }
+    }
+
+    pub fn build_from_network() -> Result<Self> {
+        let manifest_content = fs::read_to_string("package.json").context("Missing package.json for Network Engine")?;
+        let root_json = MiniParser::parse_json(&manifest_content)?;
+        
+        let mut graph = DiGraph::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
+        
+        let root_idx = graph.add_node("root".to_string());
+        node_indices.insert("root".to_string(), root_idx);
+
+        let mut queue = Vec::new();
+        let mut visited = BTreeSet::new();
+
+        if let Some(deps) = root_json.get("dependencies").and_then(|d| d.as_object()) {
+            for (dep_name, dep_version_node) in deps {
+                if let Some(req) = dep_version_node.as_str() {
+                    queue.push((root_idx, dep_name.clone(), req.to_string()));
+                }
+            }
+        }
+        if let Some(dev_deps) = root_json.get("devDependencies").and_then(|d| d.as_object()) {
+            for (dep_name, dep_version_node) in dev_deps {
+                if let Some(req) = dep_version_node.as_str() {
+                    queue.push((root_idx, dep_name.clone(), req.to_string()));
+                }
+            }
+        }
+        
+        let mut request_count = 0;
+        let max_requests = 200; // Hard limit to prevent infinite loops during testing/MVP
+
+        while let Some((parent_idx, pkg_name, req)) = queue.pop() {
+            if request_count >= max_requests {
+                println!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Network traversal limit reached ({} requests). Graph may be incomplete.", max_requests);
+                break;
+            }
+
+            let cache_key = format!("{}@{}", pkg_name, req);
+            if visited.contains(&cache_key) { continue; }
+            visited.insert(cache_key.clone());
+
+            let meta_json_str = match crate::network::fetch_npm_metadata(&pkg_name) {
+                Ok(s) => s,
+                Err(e) => { eprintln!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Failed to fetch metadata for {}: {}", pkg_name, e); continue; }
+            };
+            request_count += 1;
+
+            if let Ok(meta_json) = MiniParser::parse_json(&meta_json_str) {
+                if let Some(versions_obj) = meta_json.get("versions").and_then(|v| v.as_object()) {
+                    let available: Vec<String> = versions_obj.keys().cloned().collect();
+                    if let Some(best_version) = crate::semver::Semver::resolve(&req, &available) {
+                        let full_name = format!("{}@{}", pkg_name, best_version);
+                        
+                        let current_idx = *node_indices.entry(full_name.clone()).or_insert_with(|| graph.add_node(full_name.clone()));
+                        graph.add_edge(parent_idx, current_idx);
+                        if crate::parser::MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
+
+                        if let Some(pkg_data) = versions_obj.get(best_version) {
+                            let has_scripts = pkg_data.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                            if has_scripts || pkg_data.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(full_name.clone()); }
+                            
+                            if let Some(deps) = pkg_data.get("dependencies").and_then(|d| d.as_object()) {
+                                for (dep_name, dep_version_node) in deps {
+                                    if let Some(dep_req) = dep_version_node.as_str() { queue.push((current_idx, dep_name.clone(), dep_req.to_string())); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(Self { graph, execution_packages, suspicious_packages })
     }
 
     fn build_from_cargo() -> Result<Self> {
