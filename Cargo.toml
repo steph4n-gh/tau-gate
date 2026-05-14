@@ -2,3 +2,10 @@
 name = "tau-gate"
 version = "1.1.0"
 edition = "2021"
+
+[lib]
+name = "tau_gate"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+# No external crates allowed as per GEMINI.md
