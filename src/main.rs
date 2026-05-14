@@ -200,11 +200,11 @@ mod tests {
 }
 
 fn execute_actual_install(engine: EngineType) {
-    let cmd = match engine { EngineType::Npm => "npm", EngineType::Pnpm => "pnpm", EngineType::Bun => "bun", EngineType::Yarn => "yarn", EngineType::Cargo => "cargo", EngineType::Network => {
+    let cmd = match engine { EngineType::Npm => "npm", EngineType::Pnpm => "pnpm", EngineType::Bun => "bun", EngineType::Yarn => "yarn", EngineType::Cargo => "cargo", EngineType::Go => "go", EngineType::Network => {
         println!("[\u{03C4}-Gate] \u{1F6A7} Network audit completed. Bypassing installation due to lack of lockfile context.");
         exit(0);
     }};
-    let args = match engine { EngineType::Cargo => vec!["build"], _ => vec!["install"] };
+    let args = match engine { EngineType::Cargo => vec!["build"], EngineType::Go => vec!["mod", "download"], _ => vec!["install"] };
     let status = Command::new(cmd).args(&args).status().expect("Native install failed");
     exit(status.code().unwrap_or(1));
 }

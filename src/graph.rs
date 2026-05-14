@@ -15,6 +15,7 @@ pub enum EngineType {
     Yarn,
     Cargo,
     Network,
+    Go,
 }
 
 /// A directed graph representing the project's dependency topology.
@@ -35,6 +36,8 @@ impl DepGraph {
 
         if Path::new("Cargo.toml").exists() {
             Ok((Self::build_from_cargo()?, EngineType::Cargo))
+        } else if Path::new("go.mod").exists() {
+            Ok((Self::build_from_go()?, EngineType::Go))
         } else if Path::new("pnpm-lock.yaml").exists() {
             Ok((Self::build_from_pnpm()?, EngineType::Pnpm))
         } else if Path::new("bun.lockb").exists() || Path::new("bun.lock").exists() {
@@ -332,6 +335,44 @@ impl DepGraph {
         Ok(Self { graph, execution_packages, suspicious_packages })
     }
 
+    fn build_from_go() -> Result<Self> {
+        let output = Command::new("go").args(&["mod", "graph"]).output().context("Failed to execute go mod graph.")?;
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        Self::parse_go_mod_graph(&stdout_str)
+    }
+
+    fn parse_go_mod_graph(stdout: &str) -> Result<Self> {
+        let mut graph = DiGraph::new();
+        let mut node_indices = BTreeMap::new();
+        let execution_packages = BTreeSet::new(); // Go doesn't have standard pre/postinstall hooks
+        let mut suspicious_packages = BTreeSet::new();
+
+        for line in stdout.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() == 2 {
+                let from = parts[0];
+                let to = parts[1];
+
+                let from_idx = *node_indices.entry(from.to_string()).or_insert_with(|| {
+                    if MiniParser::detect_obfuscation(from) { suspicious_packages.insert(from.to_string()); }
+                    graph.add_node(from.to_string())
+                });
+
+                let to_idx = *node_indices.entry(to.to_string()).or_insert_with(|| {
+                    if MiniParser::detect_obfuscation(to) { suspicious_packages.insert(to.to_string()); }
+                    graph.add_node(to.to_string())
+                });
+
+                graph.add_edge(from_idx, to_idx);
+            }
+        }
+        
+        // Go mod graph doesn't explicitly add a root if there are no dependencies, but if there are, 
+        // the root module name is listed without an @version usually.
+
+        Ok(Self { graph, execution_packages, suspicious_packages })
+    }
+
     fn build_from_cargo() -> Result<Self> {
         let output = Command::new("cargo").args(&["metadata", "--format-version", "1"]).output().context("Failed to execute cargo metadata.")?;
         let stdout_str = String::from_utf8_lossy(&output.stdout);
@@ -478,5 +519,13 @@ snapshots:
         let content = r#"{"value": "root@1.0.0", "children": {"a@1.0.0": {"value": "a@1.0.0", "children": {}}}}"#;
         let dg = DepGraph::parse_yarn_output(content).unwrap();
         assert_eq!(dg.graph.node_count(), 2);
+    }
+
+    #[test]
+    fn test_go_mod_graph_extraction() {
+        let content = "my/module github.com/some/dep@v1.0.0\ngithub.com/some/dep@v1.0.0 github.com/other/dep@v2.0.0";
+        let dg = DepGraph::parse_go_mod_graph(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 3);
+        assert_eq!(dg.execution_packages.len(), 0);
     }
 }
