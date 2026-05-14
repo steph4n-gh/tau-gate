@@ -33,7 +33,7 @@ If $\tau$-Gate halts your build, you do **not** need to get rid of the package (
 
 Because $\tau$-Gate is a Zero-Trust firewall, it defaults to blocking *everything* that looks structurally suspicious. To bypass the firewall for trusted tools, you must explicitly declare them in your local policy file.
 
-### The Whitelist Solution
+### The Whitelist Solution & Version Pinning
 
 Create or update the `tau-gate.toml` file in the root of your project:
 
@@ -42,14 +42,16 @@ Create or update the `tau-gate.toml` file in the root of your project:
 threshold_percentage = 5.0 # The max size (%) of an allowed execution island
 mode = "Enforcement"       # "Enforcement" blocks, "Advisory" warns
 
-# Explicitly trust known native binaries to bypass the math engine
+# Explicitly trust known native binaries to bypass the math engine.
+# ALWAYS PIN TO A SPECIFIC VERSION to prevent "Whitelist Rot"
 whitelist = [
-    "fsevents",
-    "@parcel/watcher-*",
-    "esbuild"
+    "fsevents@2.3.2",
+    "@parcel/watcher@2.0.4",
+    "esbuild@0.19.2"
 ]
 ```
 
-By adding the package to the `whitelist`, you are telling $\tau$-Gate: *"I acknowledge that this package is topologically isolated and has execution privileges, but I trust the vendor."* 
+By adding the package to the `whitelist`, you are telling $\tau$-Gate: *"I acknowledge that this package is topologically isolated and has execution privileges, but I trust the vendor."* $\tau$-Gate will then ignore that specific node during the bisection math.
 
-$\tau$-Gate will then ignore that specific node during the bisection math and allow your installation to proceed safely.
+#### ⚠️ Whitelist Rot Warning
+If you add a package to the whitelist without pinning it to a specific version (e.g., `esbuild` or `fsevents-*`), $\tau$-Gate will emit a **WHITELIST ROT WARNING**. Unpinned whitelists are highly dangerous: if the trusted package is hijacked and compromised in a future version update, it will automatically bypass your firewall because it matches the unpinned wildcard. **Always pin your whitelist.**

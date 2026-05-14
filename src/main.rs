@@ -98,6 +98,17 @@ fn main() -> Result<()> {
             for pattern_str in &config.whitelist {
                 if glob_match(pattern_str, node) {
                     is_whitelisted = true;
+                    
+                    let is_scoped = pattern_str.starts_with('@');
+                    let has_version_pin = if is_scoped {
+                        pattern_str[1..].contains('@')
+                    } else {
+                        pattern_str.contains('@')
+                    };
+                    
+                    if !has_version_pin {
+                        println!("[\u{03C4}-Gate] \u{26A0}\u{FE0F}  WHITELIST ROT WARNING: '{}' is unpinned. Any future compromised version will automatically bypass security. Please pin to a specific version.", pattern_str);
+                    }
                     break;
                 }
             }
