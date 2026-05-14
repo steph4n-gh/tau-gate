@@ -383,7 +383,10 @@ impl DepGraph {
     }
 
     fn build_from_cargo() -> Result<Self> {
-        let output = Command::new("cargo").args(&["metadata", "--format-version", "1"]).output().context("Failed to execute cargo metadata.")?;
+        let home = std::env::var("HOME").unwrap_or_default();
+        let safe_path = format!("/usr/bin:/bin:/usr/local/bin:{}/.cargo/bin", home);
+        
+        let output = Command::new("cargo").env_clear().env("HOME", &home).env("PATH", safe_path).args(&["metadata", "--format-version", "1"]).output().context("Failed to execute cargo metadata.")?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::error::GateError::Graph(format!("cargo metadata failed: {}", stderr)));
