@@ -269,35 +269,59 @@ impl DepGraph {
             }
         }
 
-        while let Some((parent_idx, pkg_name, req)) = queue.pop() {
-            let cache_key = format!("{}@{}", pkg_name, req);
-            if visited.contains(&cache_key) {
-                continue;
+        while !queue.is_empty() {
+            let mut batch = Vec::new();
+            let chunk_size = 50; // Parallel network requests
+            while let Some((parent_idx, pkg_name, req)) = queue.pop() {
+                let cache_key = format!("{}@{}", pkg_name, req);
+                if !visited.contains(&cache_key) {
+                    visited.insert(cache_key);
+                    batch.push((parent_idx, pkg_name, req));
+                    if batch.len() >= chunk_size { break; }
+                }
             }
-            visited.insert(cache_key.clone());
 
-            let meta_json_str = match crate::network::fetch_npm_metadata(&pkg_name) {
-                Ok(s) => s,
-                Err(e) => { eprintln!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Failed to fetch metadata for {}: {}", pkg_name, e); continue; }
-            };
+            if batch.is_empty() { break; }
 
-            if let Ok(meta_json) = MiniParser::parse_json(&meta_json_str) {
-                if let Some(versions_obj) = meta_json.get("versions").and_then(|v| v.as_object()) {
-                    let available: Vec<String> = versions_obj.keys().cloned().collect();
-                    if let Some(best_version) = crate::semver::Semver::resolve(&req, &available) {
-                        let full_name = format!("{}@{}", pkg_name, best_version);
-                        
-                        let current_idx = *node_indices.entry(full_name.clone()).or_insert_with(|| graph.add_node(full_name.clone()));
-                        graph.add_edge(parent_idx, current_idx);
-                        if crate::parser::MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
+            let mut results = Vec::new();
+            std::thread::scope(|s| {
+                let mut handles = Vec::new();
+                for (parent_idx, pkg_name, req) in batch {
+                    let handle = s.spawn(move || {
+                        let meta_json_str = crate::network::fetch_npm_metadata(&pkg_name);
+                        (parent_idx, pkg_name, req, meta_json_str)
+                    });
+                    handles.push(handle);
+                }
+                for handle in handles {
+                    results.push(handle.join().unwrap());
+                }
+            });
 
-                        if let Some(pkg_data) = versions_obj.get(best_version) {
-                            let has_scripts = pkg_data.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
-                            if has_scripts || pkg_data.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(full_name.clone()); }
+            for (parent_idx, pkg_name, req, meta_res) in results {
+                let meta_json_str = match meta_res {
+                    Ok(s) => s,
+                    Err(e) => { eprintln!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Failed to fetch metadata for {}: {}", pkg_name, e); continue; }
+                };
+
+                if let Ok(meta_json) = MiniParser::parse_json(&meta_json_str) {
+                    if let Some(versions_obj) = meta_json.get("versions").and_then(|v| v.as_object()) {
+                        let available: Vec<String> = versions_obj.keys().cloned().collect();
+                        if let Some(best_version) = crate::semver::Semver::resolve(&req, &available) {
+                            let full_name = format!("{}@{}", pkg_name, best_version);
                             
-                            if let Some(deps) = pkg_data.get("dependencies").and_then(|d| d.as_object()) {
-                                for (dep_name, dep_version_node) in deps {
-                                    if let Some(dep_req) = dep_version_node.as_str() { queue.push((current_idx, dep_name.clone(), dep_req.to_string())); }
+                            let current_idx = *node_indices.entry(full_name.clone()).or_insert_with(|| graph.add_node(full_name.clone()));
+                            graph.add_edge(parent_idx, current_idx);
+                            if crate::parser::MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
+
+                            if let Some(pkg_data) = versions_obj.get(best_version) {
+                                let has_scripts = pkg_data.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                                if has_scripts || pkg_data.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(full_name.clone()); }
+                                
+                                if let Some(deps) = pkg_data.get("dependencies").and_then(|d| d.as_object()) {
+                                    for (dep_name, dep_version_node) in deps {
+                                        if let Some(dep_req) = dep_version_node.as_str() { queue.push((current_idx, dep_name.clone(), dep_req.to_string())); }
+                                    }
                                 }
                             }
                         }
