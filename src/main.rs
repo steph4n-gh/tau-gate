@@ -5,6 +5,9 @@ mod graph_impl;
 mod math;
 mod parser;
 mod telemetry;
+mod network;
+mod semver;
+mod daemon;
 
 use crate::error::Result;
 use config::{EnforcementMode, SentinelConfig};
@@ -20,8 +23,11 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH"); 
 
 fn main() -> Result<()> {
-    // 0. Parse CLI Arguments for Mode Selection
     let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && args[1] == "daemon" {
+        return daemon::run();
+    }
+    
     let dry_run = args.iter().any(|arg| arg == "--dry-run" || arg == "-d");
     let show_verify = args.iter().any(|arg| arg == "--verify" || arg == "-v");
     let use_network = args.iter().any(|arg| arg == "--network" || arg == "-n");
@@ -212,6 +218,3 @@ fn execute_actual_install(engine: EngineType) {
     let status = Command::new(cmd).env_clear().env("HOME", &home).env("PATH", safe_path).args(&args).status().expect("Native install failed");
     exit(status.code().unwrap_or(1));
 }
-
-mod network;
-mod semver;
