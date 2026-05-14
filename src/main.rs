@@ -205,7 +205,7 @@ fn execute_actual_install(engine: EngineType) {
         exit(0);
     }};
     let args = match engine { EngineType::Cargo => vec!["build"], EngineType::Go => vec!["mod", "download"], _ => vec!["install"] };
-    let status = Command::new(cmd).args(&args).status().expect("Native install failed");
+    let status = Command::new(cmd).env_clear().env("PATH", "/usr/bin:/bin:/usr/local/bin").args(&args).status().expect("Native install failed");
     exit(status.code().unwrap_or(1));
 }
 

@@ -205,7 +205,7 @@ impl DepGraph {
     }
 
     fn build_from_yarn() -> Result<Self> {
-        let output = Command::new("yarn").args(&["npm", "ls", "--all", "--json"]).output().context("Failed to execute 'yarn npm ls'.")?;
+        let output = Command::new("yarn").env_clear().env("PATH", "/usr/bin:/bin:/usr/local/bin").args(&["npm", "ls", "--all", "--json"]).output().context("Failed to execute 'yarn npm ls'.")?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::error::GateError::Graph(format!("yarn failed: {}", stderr)));
