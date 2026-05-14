@@ -188,7 +188,7 @@ impl DepGraph {
             if let Some(pkg_json_path) = find_package_json(package_name) {
                 if let Ok(content) = fs::read_to_string(pkg_json_path) {
                     if let Ok(pkg_json) = MiniParser::parse_json(&content) {
-                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("preinstall") || s.contains_key("install") }).unwrap_or(false);
                         if has_scripts || pkg_json.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(package_info.clone()); }
                         if MiniParser::detect_obfuscation(&content) { suspicious_packages.insert(package_info.clone()); }
                     }
@@ -227,7 +227,7 @@ impl DepGraph {
             if let Some(pkg_json_path) = find_package_json(package_name) {
                 if let Ok(content) = fs::read_to_string(pkg_json_path) {
                     if let Ok(pkg_json) = MiniParser::parse_json(&content) {
-                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("preinstall") || s.contains_key("install") }).unwrap_or(false);
                         if has_scripts || pkg_json.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(id.to_string()); }
                         if MiniParser::detect_obfuscation(id) { suspicious_packages.insert(id.to_string()); }
                     }
@@ -315,7 +315,7 @@ impl DepGraph {
                             if crate::parser::MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
 
                             if let Some(pkg_data) = versions_obj.get(best_version) {
-                                let has_scripts = pkg_data.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                                let has_scripts = pkg_data.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("preinstall") || s.contains_key("install") }).unwrap_or(false);
                                 if has_scripts || pkg_data.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(full_name.clone()); }
                                 
                                 if let Some(deps) = pkg_data.get("dependencies").and_then(|d| d.as_object()) {
@@ -393,7 +393,7 @@ impl DepGraph {
             if MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
 
             if let Some(scripts) = val.get("scripts").and_then(|s| s.as_object()) {
-                if scripts.contains_key("postinstall") || scripts.contains_key("prepare") { execution_packages.insert(full_name.clone()); }
+                if scripts.contains_key("postinstall") || scripts.contains_key("preinstall") { execution_packages.insert(full_name.clone()); }
             }
             if let Some(dependencies) = val.get("dependencies").and_then(|d| d.as_array()) {
                 for dep in dependencies { Self::parse_bun_json_dependencies(dep, graph, node_indices, Some(current_idx), execution_packages, suspicious_packages); }
