@@ -268,25 +268,18 @@ impl DepGraph {
                 }
             }
         }
-        
-        let mut request_count = 0;
-        let max_requests = 200; // Hard limit to prevent infinite loops during testing/MVP
 
         while let Some((parent_idx, pkg_name, req)) = queue.pop() {
-            if request_count >= max_requests {
-                println!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Network traversal limit reached ({} requests). Graph may be incomplete.", max_requests);
-                break;
-            }
-
             let cache_key = format!("{}@{}", pkg_name, req);
-            if visited.contains(&cache_key) { continue; }
+            if visited.contains(&cache_key) {
+                continue;
+            }
             visited.insert(cache_key.clone());
 
             let meta_json_str = match crate::network::fetch_npm_metadata(&pkg_name) {
                 Ok(s) => s,
                 Err(e) => { eprintln!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Failed to fetch metadata for {}: {}", pkg_name, e); continue; }
             };
-            request_count += 1;
 
             if let Ok(meta_json) = MiniParser::parse_json(&meta_json_str) {
                 if let Some(versions_obj) = meta_json.get("versions").and_then(|v| v.as_object()) {
