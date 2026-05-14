@@ -206,12 +206,21 @@ impl DepGraph {
 
     fn build_from_yarn() -> Result<Self> {
         let output = Command::new("yarn").args(&["npm", "ls", "--all", "--json"]).output().context("Failed to execute 'yarn npm ls'.")?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(crate::error::GateError::Graph(format!("yarn failed: {}", stderr)));
+        }
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         Self::parse_yarn_output(&stdout_str)
     }
 
     fn parse_yarn_output(stdout: &str) -> Result<Self> {
-        let root = MiniParser::parse_json(stdout)?;
+        let json_str = if let Some(idx) = stdout.find('{') {
+            &stdout[idx..]
+        } else {
+            stdout
+        };
+        let root = MiniParser::parse_json(json_str)?;
         let mut graph = DiGraph::new();
         let mut node_indices = BTreeMap::new();
         let mut execution_packages = BTreeSet::new();
@@ -375,12 +384,21 @@ impl DepGraph {
 
     fn build_from_cargo() -> Result<Self> {
         let output = Command::new("cargo").args(&["metadata", "--format-version", "1"]).output().context("Failed to execute cargo metadata.")?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(crate::error::GateError::Graph(format!("cargo metadata failed: {}", stderr)));
+        }
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         Self::parse_cargo_metadata(&stdout_str)
     }
 
     fn parse_cargo_metadata(stdout: &str) -> Result<Self> {
-        let root = MiniParser::parse_json(stdout).context("Failed to parse Cargo metadata.")?;
+        let json_str = if let Some(idx) = stdout.find('{') {
+            &stdout[idx..]
+        } else {
+            stdout
+        };
+        let root = MiniParser::parse_json(json_str).context("Failed to parse Cargo metadata.")?;
         let mut graph = DiGraph::new();
         let mut node_indices = BTreeMap::new();
         let mut execution_packages = BTreeSet::new();
