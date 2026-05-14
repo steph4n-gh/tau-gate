@@ -205,7 +205,11 @@ fn execute_actual_install(engine: EngineType) {
         exit(0);
     }};
     let args = match engine { EngineType::Cargo => vec!["build"], EngineType::Go => vec!["mod", "download"], _ => vec!["install"] };
-    let status = Command::new(cmd).env_clear().env("PATH", "/usr/bin:/bin:/usr/local/bin").args(&args).status().expect("Native install failed");
+    
+    let home = std::env::var("HOME").unwrap_or_default();
+    let safe_path = format!("/usr/bin:/bin:/usr/local/bin:{}/.cargo/bin", home);
+    
+    let status = Command::new(cmd).env_clear().env("HOME", &home).env("PATH", safe_path).args(&args).status().expect("Native install failed");
     exit(status.code().unwrap_or(1));
 }
 
