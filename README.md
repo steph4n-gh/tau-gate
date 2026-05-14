@@ -41,7 +41,64 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 
 ---
 
+## 🏛️ Dual-Mode Architecture
+
+$\tau$-Gate is designed to be embedded into any software stack, operating in two distinct modes:
+
+### 1. Daemon Mode (Inter-Process)
+For Python, Node.js, or networked applications, $\tau$-Gate runs as a lightweight UNIX subprocess, accepting NDJSON payloads over standard I/O for secure, language-agnostic integration.
+
+### 2. Native Library Mode (Zero-Latency FFI)
+For high-performance applications (like C++ MLX engines or `llama.cpp` forks), $\tau$-Gate can be compiled as a static C library (`libtau_gate.a`), providing $O(1)$ memory access and zero serialization overhead.
+
+To build the static library:
+```bash
+cargo build --release
+# Outputs: target/release/libtau_gate.a
+```
+
+#### C/C++ API Reference (`tau_gate.h`)
+When embedding the static library, use the following C-compatible interface:
+
+```c
+#pragma once
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct {
+    char** nodes;              // Array of strings (Island node names)
+    size_t nodes_count;        // Number of nodes in the island
+    double tau;                // The Fiedler value
+    double connectivity_score; // Algebraic connectivity metric (\lambda_2)
+} FFIPartitionResult;
+
+// Analyze a graph natively
+FFIPartitionResult* tau_gate_analyze(
+    const int* edges_ptr,      // Flattened array of edge pairs: [u1, v1, u2, v2...]
+    size_t edges_count,        // Number of edge *pairs* (length of array / 2)
+    const char** nodes_ptr,    // Array of node name strings
+    size_t nodes_count         // Number of nodes
+);
+
+// ⚠️ CRITICAL: Memory Ownership
+// You MUST call this function to free the result struct. 
+// Rust allocates the strings; C++ cannot use `free()` or `delete`.
+void tau_gate_free_result(FFIPartitionResult* ptr);
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+> **⚠️ CRITICAL MEMORY WARNING:** When using the FFI bridge, the Rust allocator owns the memory for the returned strings in `FFIPartitionResult`. You **must** pass the pointer back to `tau_gate_free_result()` when you are done. Attempting to free this memory from C/C++ will cause segmentation faults or memory leaks.
+
+---
+
 ## 🚀 Quick Start
+
 
 1.  **Install Globally:**
     ```bash
