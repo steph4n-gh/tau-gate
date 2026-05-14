@@ -14,6 +14,8 @@ pub enum EngineType {
     Bun,
     Yarn,
     Cargo,
+    Network,
+    Go,
 }
 
 /// A directed graph representing the project's dependency topology.
@@ -27,9 +29,15 @@ pub struct DepGraph {
 
 impl DepGraph {
     /// Discovers the project type and builds the dependency graph using the appropriate engine.
-    pub fn build() -> Result<(Self, EngineType)> {
+    pub fn build(use_network: bool) -> Result<(Self, EngineType)> {
+        if use_network && Path::new("package.json").exists() {
+            return Ok((Self::build_from_network()?, EngineType::Network));
+        }
+
         if Path::new("Cargo.toml").exists() {
             Ok((Self::build_from_cargo()?, EngineType::Cargo))
+        } else if Path::new("go.mod").exists() {
+            Ok((Self::build_from_go()?, EngineType::Go))
         } else if Path::new("pnpm-lock.yaml").exists() {
             Ok((Self::build_from_pnpm()?, EngineType::Pnpm))
         } else if Path::new("bun.lockb").exists() || Path::new("bun.lock").exists() {
@@ -183,7 +191,7 @@ impl DepGraph {
             if let Some(pkg_json_path) = find_package_json(package_name) {
                 if let Ok(content) = fs::read_to_string(pkg_json_path) {
                     if let Ok(pkg_json) = MiniParser::parse_json(&content) {
-                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("preinstall") || s.contains_key("install") }).unwrap_or(false);
                         if has_scripts || pkg_json.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(package_info.clone()); }
                         if MiniParser::detect_obfuscation(&content) { suspicious_packages.insert(package_info.clone()); }
                     }
@@ -197,13 +205,22 @@ impl DepGraph {
     }
 
     fn build_from_yarn() -> Result<Self> {
-        let output = Command::new("yarn").args(&["npm", "ls", "--all", "--json"]).output().context("Failed to execute 'yarn npm ls'.")?;
+        let output = Command::new("yarn").env_clear().env("PATH", "/usr/bin:/bin:/usr/local/bin").args(&["npm", "ls", "--all", "--json"]).output().context("Failed to execute 'yarn npm ls'.")?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(crate::error::GateError::Graph(format!("yarn failed: {}", stderr)));
+        }
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         Self::parse_yarn_output(&stdout_str)
     }
 
     fn parse_yarn_output(stdout: &str) -> Result<Self> {
-        let root = MiniParser::parse_json(stdout)?;
+        let json_str = if let Some(idx) = stdout.find('{') {
+            &stdout[idx..]
+        } else {
+            stdout
+        };
+        let root = MiniParser::parse_json(json_str)?;
         let mut graph = DiGraph::new();
         let mut node_indices = BTreeMap::new();
         let mut execution_packages = BTreeSet::new();
@@ -222,7 +239,7 @@ impl DepGraph {
             if let Some(pkg_json_path) = find_package_json(package_name) {
                 if let Ok(content) = fs::read_to_string(pkg_json_path) {
                     if let Ok(pkg_json) = MiniParser::parse_json(&content) {
-                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("prepare") || s.contains_key("install") }).unwrap_or(false);
+                        let has_scripts = pkg_json.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("preinstall") || s.contains_key("install") }).unwrap_or(false);
                         if has_scripts || pkg_json.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(id.to_string()); }
                         if MiniParser::detect_obfuscation(id) { suspicious_packages.insert(id.to_string()); }
                     }
@@ -234,14 +251,154 @@ impl DepGraph {
         }
     }
 
+    pub fn build_from_network() -> Result<Self> {
+        let manifest_content = fs::read_to_string("package.json").context("Missing package.json for Network Engine")?;
+        let root_json = MiniParser::parse_json(&manifest_content)?;
+        
+        let mut graph = DiGraph::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
+        
+        let root_idx = graph.add_node("root".to_string());
+        node_indices.insert("root".to_string(), root_idx);
+
+        let mut queue = Vec::new();
+        let mut visited = BTreeSet::new();
+
+        if let Some(deps) = root_json.get("dependencies").and_then(|d| d.as_object()) {
+            for (dep_name, dep_version_node) in deps {
+                if let Some(req) = dep_version_node.as_str() {
+                    queue.push((root_idx, dep_name.clone(), req.to_string()));
+                }
+            }
+        }
+        if let Some(dev_deps) = root_json.get("devDependencies").and_then(|d| d.as_object()) {
+            for (dep_name, dep_version_node) in dev_deps {
+                if let Some(req) = dep_version_node.as_str() {
+                    queue.push((root_idx, dep_name.clone(), req.to_string()));
+                }
+            }
+        }
+
+        while !queue.is_empty() {
+            let mut batch = Vec::new();
+            let chunk_size = 50; // Parallel network requests
+            while let Some((parent_idx, pkg_name, req)) = queue.pop() {
+                let cache_key = format!("{}@{}", pkg_name, req);
+                if !visited.contains(&cache_key) {
+                    visited.insert(cache_key);
+                    batch.push((parent_idx, pkg_name, req));
+                    if batch.len() >= chunk_size { break; }
+                }
+            }
+
+            if batch.is_empty() { break; }
+
+            let mut results = Vec::new();
+            std::thread::scope(|s| {
+                let mut handles = Vec::new();
+                for (parent_idx, pkg_name, req) in batch {
+                    let handle = s.spawn(move || {
+                        let meta_json_str = crate::network::fetch_npm_metadata(&pkg_name);
+                        (parent_idx, pkg_name, req, meta_json_str)
+                    });
+                    handles.push(handle);
+                }
+                for handle in handles {
+                    results.push(handle.join().unwrap());
+                }
+            });
+
+            for (parent_idx, pkg_name, req, meta_res) in results {
+                let meta_json_str = match meta_res {
+                    Ok(s) => s,
+                    Err(e) => { eprintln!("[\u{03C4}-Gate] \u{26A0}\u{FE0F} Failed to fetch metadata for {}: {}", pkg_name, e); continue; }
+                };
+
+                if let Ok(meta_json) = MiniParser::parse_json(&meta_json_str) {
+                    if let Some(versions_obj) = meta_json.get("versions").and_then(|v| v.as_object()) {
+                        let available: Vec<String> = versions_obj.keys().cloned().collect();
+                        if let Some(best_version) = crate::semver::Semver::resolve(&req, &available) {
+                            let full_name = format!("{}@{}", pkg_name, best_version);
+                            
+                            let current_idx = *node_indices.entry(full_name.clone()).or_insert_with(|| graph.add_node(full_name.clone()));
+                            graph.add_edge(parent_idx, current_idx);
+                            if crate::parser::MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
+
+                            if let Some(pkg_data) = versions_obj.get(best_version) {
+                                let has_scripts = pkg_data.get("scripts").and_then(|s| s.as_object()).map(|s| { s.contains_key("postinstall") || s.contains_key("preinstall") || s.contains_key("install") }).unwrap_or(false);
+                                if has_scripts || pkg_data.get("hasInstallScript").and_then(|v| v.as_bool()).unwrap_or(false) { execution_packages.insert(full_name.clone()); }
+                                
+                                if let Some(deps) = pkg_data.get("dependencies").and_then(|d| d.as_object()) {
+                                    for (dep_name, dep_version_node) in deps {
+                                        if let Some(dep_req) = dep_version_node.as_str() { queue.push((current_idx, dep_name.clone(), dep_req.to_string())); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(Self { graph, execution_packages, suspicious_packages })
+    }
+
+    fn build_from_go() -> Result<Self> {
+        let output = Command::new("go").args(&["mod", "graph"]).output().context("Failed to execute go mod graph.")?;
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        Self::parse_go_mod_graph(&stdout_str)
+    }
+
+    fn parse_go_mod_graph(stdout: &str) -> Result<Self> {
+        let mut graph = DiGraph::new();
+        let mut node_indices = BTreeMap::new();
+        let execution_packages = BTreeSet::new(); // Go doesn't have standard pre/postinstall hooks
+        let mut suspicious_packages = BTreeSet::new();
+
+        for line in stdout.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() == 2 {
+                let from = parts[0];
+                let to = parts[1];
+
+                let from_idx = *node_indices.entry(from.to_string()).or_insert_with(|| {
+                    if MiniParser::detect_obfuscation(from) { suspicious_packages.insert(from.to_string()); }
+                    graph.add_node(from.to_string())
+                });
+
+                let to_idx = *node_indices.entry(to.to_string()).or_insert_with(|| {
+                    if MiniParser::detect_obfuscation(to) { suspicious_packages.insert(to.to_string()); }
+                    graph.add_node(to.to_string())
+                });
+
+                graph.add_edge(from_idx, to_idx);
+            }
+        }
+        
+        // Go mod graph doesn't explicitly add a root if there are no dependencies, but if there are, 
+        // the root module name is listed without an @version usually.
+
+        Ok(Self { graph, execution_packages, suspicious_packages })
+    }
+
     fn build_from_cargo() -> Result<Self> {
         let output = Command::new("cargo").args(&["metadata", "--format-version", "1"]).output().context("Failed to execute cargo metadata.")?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(crate::error::GateError::Graph(format!("cargo metadata failed: {}", stderr)));
+        }
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         Self::parse_cargo_metadata(&stdout_str)
     }
 
     fn parse_cargo_metadata(stdout: &str) -> Result<Self> {
-        let root = MiniParser::parse_json(stdout).context("Failed to parse Cargo metadata.")?;
+        let json_str = if let Some(idx) = stdout.find('{') {
+            &stdout[idx..]
+        } else {
+            stdout
+        };
+        let root = MiniParser::parse_json(json_str).context("Failed to parse Cargo metadata.")?;
         let mut graph = DiGraph::new();
         let mut node_indices = BTreeMap::new();
         let mut execution_packages = BTreeSet::new();
@@ -295,7 +452,7 @@ impl DepGraph {
             if MiniParser::detect_obfuscation(&full_name) { suspicious_packages.insert(full_name.clone()); }
 
             if let Some(scripts) = val.get("scripts").and_then(|s| s.as_object()) {
-                if scripts.contains_key("postinstall") || scripts.contains_key("prepare") { execution_packages.insert(full_name.clone()); }
+                if scripts.contains_key("postinstall") || scripts.contains_key("preinstall") { execution_packages.insert(full_name.clone()); }
             }
             if let Some(dependencies) = val.get("dependencies").and_then(|d| d.as_array()) {
                 for dep in dependencies { Self::parse_bun_json_dependencies(dep, graph, node_indices, Some(current_idx), execution_packages, suspicious_packages); }
@@ -380,5 +537,13 @@ snapshots:
         let content = r#"{"value": "root@1.0.0", "children": {"a@1.0.0": {"value": "a@1.0.0", "children": {}}}}"#;
         let dg = DepGraph::parse_yarn_output(content).unwrap();
         assert_eq!(dg.graph.node_count(), 2);
+    }
+
+    #[test]
+    fn test_go_mod_graph_extraction() {
+        let content = "my/module github.com/some/dep@v1.0.0\ngithub.com/some/dep@v1.0.0 github.com/other/dep@v2.0.0";
+        let dg = DepGraph::parse_go_mod_graph(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 3);
+        assert_eq!(dg.execution_packages.len(), 0);
     }
 }

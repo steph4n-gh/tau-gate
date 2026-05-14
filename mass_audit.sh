@@ -48,7 +48,7 @@ for REPO in $REPOS; do
 
     # Run the audit and capture the exit code
     set +e
-    tau-gate -d > tau-gate.log 2>&1
+    ../../target/release/tau-gate -d > tau-gate.log 2>&1
     EXIT_CODE=$?
     set -e
     

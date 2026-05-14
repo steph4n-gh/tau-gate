@@ -1,4 +1,4 @@
-# $\tau$-Gate (v2.0.1)
+# $\tau$-Gate (v3.0.0)
 **Geometric Zero-Trust: Integrity in Code and Deployment.**
 
 [![Security Audit](https://github.com/steph4n-gh/tau-gate/actions/workflows/release.yml/badge.svg)](https://github.com/steph4n-gh/tau-gate/actions)
@@ -14,14 +14,14 @@
 
 ---
 
-## 🛡️ v2.0.1: Architectural Self-Sufficiency
-$\tau$-Gate v2.0 implements a self-contained security model designed to address the "Auditor's Paradox"—the risk that a security tool itself is compromised by its own dependencies.
+## 🛡️ v3.0.0: The Network-Level Resolution Engine
+$\tau$-Gate v3.0 achieves ultimate architectural self-sufficiency. It builds dependency graphs entirely in-memory by interfacing directly with package registries via a multi-threaded OS subprocess pool, completely bypassing the vulnerabilities, stdout corruption, and unstandardized behaviors of local package managers (like `npm` and `yarn`).
 
 ### Technical Integrity Features:
-*   **Zero External Dependencies:** Every line of code, from the $O(E)$ sparse solver to the lockfile extractors, is implemented using the **Rust Standard Library.** This eliminates transitive supply chain risk in the auditor itself.
-*   **Minimal-Action CI/CD:** The release pipeline utilizes native system utilities (`git`, `rustup`, `gh`) instead of 3rd-party GitHub Actions, reducing the infrastructure attack surface.
+*   **Zero External Dependencies:** Every line of code, from the $O(E)$ sparse solver to the concurrent HTTP resolution engine, is implemented using the **Rust Standard Library.** This eliminates transitive supply chain risk in the auditor itself.
+*   **Topological Execution Detection:** Natively intercepts `preinstall`, `install`, and `postinstall` hooks embedded within mathematically isolated nodes.
+*   **Minimal-Action CI/CD:** The release pipeline utilizes native system utilities instead of 3rd-party GitHub Actions.
 *   **Formal Reproducibility:** Byte-for-byte identical binary generation using `reproduce.sh`. Verification proof that your binary matches our source code.
-*   **Entropy Engine:** Natively detects obfuscated (high-entropy) payloads in metadata by looking for long continuous strings (>128 chars) with high character variance (>16 distinct chars), catching "Sleeper Cells" while preventing false positives on mock packages.
 
 ---
 
@@ -47,9 +47,9 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
     ```bash
     curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
     ```
-2.  **Audit Your Project:**
+2.  **Audit Your Project (Network Mode):**
     ```bash
-    tau-gate --dry-run
+    tau-gate --dry-run --network
     ```
 
 ---
@@ -61,16 +61,7 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 | **[Setup & Integration](./docs/setup.md)** | Installation, CLI flags, and Zero-Action CI/CD. |
 | **[Governance & Policy](./docs/policy.md)** | Configuration guide, Advisory Mode, and attack scenarios. |
 | **[The Mathematics](./docs/whitepaper.md)** | In-depth technical whitepaper on Spectral Bisection. |
-| **[Empirical Validation](./docs/validation.md)** | Performance and accuracy data from real-world audits. |
-| **[Strategy Audit](./docs/marketing.md)** | Stakeholder talking points and competitive analysis. |
-| **[v3.0 Roadmap](./docs/roadmap_v3.md)** | Future architecture: Network-Level Resolution Engine. |
-| **[Extensibility Guide](./docs/extensibility.md)** | How to add support for new package managers. |
-
----
-
-## ⚖️ License: Free for People, Not for Profit
-$\tau$-Gate is licensed under the **Polyform Non-Commercial License 1.0.0**.
-
-*   **Individuals & Researchers:** 100% Free. Use it, hack it, share it.
-*   **Organizations:** 100% Free for **internal use** to protect your own pipelines.
-*   **Commercial Use:** You may **not** sell $\tau$-Gate or build a commercial product/service based on this source code.
+| **[v3.0 Architecture](./docs/v3_engine.md)** | How the Network-Level Resolution Engine bypasses package managers. |
+| **[Empirical Findings](./docs/v3_findings.md)** | Insights on execution hooks, parallelization, and topological math traps. |
+| **[Mass Audit Benchmark](./docs/benchmark.md)** | Performance and accuracy data from auditing the Top 500 repositories. |
+| **[Interpreting Anomalies](./docs/interpretation.md)** | How to understand the graph output and manage your whitelist. |
