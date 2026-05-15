@@ -8,7 +8,7 @@ Before panicking, it is crucial to understand *how* $\tau$-Gate thinks. $\tau$-G
 
 When a package manager builds a dependency tree, it forms a massive, highly connected "mainland." 
 
-A classic supply chain attack (like the `event-stream` or `xz` hacks) typically involves an attacker inserting a tiny, obfuscated script deep into a forgotten sub-dependency. 
+A classic supply chain attack (like **Dependency Confusion** or **Typosquatting** hacks) typically involves an attacker inserting a tiny, obfuscated script deep into a forgotten sub-dependency. 
 
 Mathematically, this creates a **Topological Island**: a small cluster of nodes that is barely connected to the mainland but requests **execution privileges** (like `preinstall` or `postinstall` scripts) to run code on your machine.
 

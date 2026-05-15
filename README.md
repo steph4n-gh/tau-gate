@@ -34,7 +34,7 @@ A dependency auditor that blocks supply chain attacks before they execute. It bu
 ## 🧠 The Problem & Solution (Explain Like I'm 6)
 
 ### The Problem: Transitive Secrecy
-Modern supply chain attacks (like the XZ Utils backdoor) bypass traditional scanners because they hide in **Transitive Secrecy**. Attackers establish structural bottlenecks deep in your dependency tree to execute malicious code quietly.
+Modern supply chain attacks (like **Dependency Confusion** or **Typosquatting**) bypass traditional scanners because they hide in **Transitive Secrecy**. Attackers establish structural bottlenecks deep in your dependency tree to execute malicious code quietly.
 
 ### The Solution: $\tau$-Gate
 Imagine your computer is a big city. When you download a new app, it's like a new person moving into town. Most people move into busy neighborhoods and make lots of friends. But sometimes, a **bad guy** tries to sneak in. He stays in a tiny, hidden basement, doesn't talk to anyone, and tries to build a secret tunnel to the city's bank vault.
