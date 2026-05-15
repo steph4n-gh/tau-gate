@@ -14,6 +14,19 @@
 
 ---
 
+## 🚀 Quick Start
+
+1.  **Install Globally:**
+    ```bash
+    curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
+    ```
+2.  **Audit Your Project (Network Mode):**
+    ```bash
+    tau-gate --dry-run --network
+    ```
+
+---
+
 ## 🛡️ v3.0.0: The Network-Level Resolution Engine
 $\tau$-Gate v3.0 achieves ultimate architectural self-sufficiency. It builds dependency graphs entirely in-memory by interfacing directly with package registries via a multi-threaded OS subprocess pool, completely bypassing the vulnerabilities, stdout corruption, and unstandardized behaviors of local package managers (like `npm` and `yarn`).
 
@@ -98,20 +111,6 @@ void tau_gate_free_result(FFIPartitionResult* ptr);
 ```
 
 > **⚠️ CRITICAL MEMORY WARNING:** When using the FFI bridge, the Rust allocator owns the memory for the returned strings in `FFIPartitionResult`. You **must** pass the pointer back to `tau_gate_free_result()` when you are done. Attempting to free this memory from C/C++ will cause segmentation faults or memory leaks.
-
----
-
-## 🚀 Quick Start
-
-
-1.  **Install Globally:**
-    ```bash
-    curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
-    ```
-2.  **Audit Your Project (Network Mode):**
-    ```bash
-    tau-gate --dry-run --network
-    ```
 
 ---
 
