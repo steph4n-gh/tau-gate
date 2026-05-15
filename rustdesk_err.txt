@@ -1,0 +1,11 @@
+error: failed to load manifest for workspace member `/Volumes/Storage/bigworkspace/supplychain/go_rust_audit/rustdesk/libs/scrap`
+referenced by workspace at `/Volumes/Storage/bigworkspace/supplychain/go_rust_audit/rustdesk/Cargo.toml`
+
+Caused by:
+  failed to load manifest for dependency `hbb_common`
+
+Caused by:
+  failed to read `/Volumes/Storage/bigworkspace/supplychain/go_rust_audit/rustdesk/libs/hbb_common/Cargo.toml`
+
+Caused by:
+  No such file or directory (os error 2)

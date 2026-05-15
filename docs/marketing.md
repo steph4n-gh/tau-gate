@@ -1,13 +1,13 @@
-# $\tau$-Gate: Strategy & Truth Audit (v2.0.1)
+# $\tau$-Gate: Strategy & Truth Audit (v3.0.0)
 
 This document provides a technical audit and discussion points for the self-contained security model.
 
 ## 🛡️ The Technical Truth Audit
 
-This audit evaluates the v2.0.1 implementation against sophisticated threat actors.
+This audit evaluates the v3.0.0 implementation against sophisticated threat actors.
 
 ### 1. Self-Contained Integrity
-*   **Zero External Dependencies:** v2.0.1 is built with 0 external crates. This removes transitive supply chain risk in $\tau$-Gate's own runtime.
+*   **Zero External Dependencies:** v3.0.0 is built with 0 external crates. This removes transitive supply chain risk in $\tau$-Gate's own runtime.
 *   **Formal Reproducibility:** Every build is byte-for-byte identical. Users can verify that the binary on their machine matches the source code.
 *   **Minimal-Action CI/CD:** We have eliminated 3rd-party GitHub Actions from our pipeline, utilizing native system tools to reduce infrastructure-level supply chain risk.
 
@@ -18,7 +18,7 @@ This audit evaluates the v2.0.1 implementation against sophisticated threat acto
 
 ### 3. Constraints & Scoping
 *   **Installation Pipeline Audit:** $\tau$-Gate audits the **Shape of Trust** during installation. It is not a runtime monitor or a source-code logic scanner.
-*   **The "Loud" Attack Defense:** v2.0.1 uses the **Connectivity Score ($\lambda_2$)** to identify "Bloated Trojans"—addressing the paradox where an infiltrator tries to bypass size thresholds by adding dependencies.
+*   **The "Loud" Attack Defense:** v3.0.0 uses the **Connectivity Score ($\lambda_2$)** to identify "Bloated Trojans"—addressing the paradox where an infiltrator tries to bypass size thresholds by adding dependencies.
 
 ---
 

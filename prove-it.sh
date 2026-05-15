@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# τ-Gate: "PROVE IT" - v1.3.1 (The Final Proof Milestone)
+# τ-Gate: "PROVE IT" - v3.0.0 (The Final Proof Milestone)
 # This script uses high-fidelity topological mocks to ensure 100% test success.
 
 set -e
@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}--------------------------------------------------${NC}"
-echo -e "${BLUE}   τ-Gate: Definitive Mathematical Proof (v1.3.1)  ${NC}"
+echo -e "${BLUE}   τ-Gate: Definitive Mathematical Proof (v3.0.0)  ${NC}"
 echo -e "${BLUE}--------------------------------------------------${NC}"
 
 # 1. Build the Latest Binary

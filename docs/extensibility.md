@@ -1,6 +1,6 @@
-# Extensibility Guide: Adding New Package Managers (v2.0.1)
+# Extensibility Guide: Adding New Package Managers (v3.0.0)
 
-$\tau$-Gate v2.0.1 was designed with a modular, **Absolute Zero** architecture. We welcome contributions that add support for new ecosystems while maintaining our 0-dependency standard.
+$\tau$-Gate v3.0.0 was designed with a modular, **Absolute Zero** architecture. We welcome contributions that add support for new ecosystems while maintaining our 0-dependency standard.
 
 ---
 

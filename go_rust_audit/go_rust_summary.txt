@@ -1,0 +1,17 @@
+--- Go & Rust Ecosystem Audit ---
+
+--- Go Audits ---
+✅ PASS: avelino/awesome-go | [τ-Gate] ✅ Analyzed 53 nodes in 116 ms
+✅ PASS: ollama/ollama | [τ-Gate] ✅ Analyzed 404 nodes in 54 ms
+✅ PASS: golang/go | No metric
+✅ PASS: kubernetes/kubernetes | [τ-Gate] ✅ Analyzed 614 nodes in 131 ms
+✅ PASS: fatedier/frp | [τ-Gate] ✅ Analyzed 294 nodes in 62 ms
+
+--- Rust Audits ---
+✅ PASS: ultraworkers/claw-code | No metric
+❌ ERROR: rustdesk/rustdesk
+[τ-Gate] ❌ Lockfile Extraction Failed: Graph Error: cargo metadata failed: error: failed to load manifest for workspace member `/Volumes/Storage/bigworkspace/supplychain/go_rust_audit/rustdesk/libs/scrap`
+✅ PASS: rust-lang/rust | [τ-Gate] ✅ Analyzed 645 nodes in 611 ms
+✅ PASS: denoland/deno | [τ-Gate] ✅ Analyzed 1152 nodes in 1523 ms
+✅ PASS: tauri-apps/tauri | [τ-Gate] ✅ Analyzed 1038 nodes in 784 ms
+Audit Complete.

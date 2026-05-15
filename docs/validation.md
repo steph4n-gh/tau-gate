@@ -1,9 +1,9 @@
-# Empirical Validation Report: v2.0.1 "Absolute Zero"
+# Empirical Validation Report: v3.0.0 "Absolute Zero"
 
-To prove the robustness of the $\tau$-Gate v2.0.1 mathematical engine and its bespoke, zero-dependency extraction logic, we performed end-to-end passive audits on representative high-profile projects.
+To prove the robustness of the $\tau$-Gate v3.0.0 mathematical engine and its bespoke, zero-dependency extraction logic, we performed end-to-end passive audits on representative high-profile projects.
 
 ## 🧪 Test Environment
-*   **Version:** $\tau$-Gate v2.0.1 (Absolute Zero Release)
+*   **Version:** $\tau$-Gate v3.0.0 (Absolute Zero Release)
 *   **Total Dependencies:** **0** (Standard Library only)
 *   **Mode:** Passive Audit (`--dry-run`)
 *   **OS:** macOS / Linux (Ubuntu)
@@ -52,7 +52,7 @@ During the Top 500 Ecosystem Benchmark, $\tau$-Gate successfully flagged an anom
 ---
 
 ## 🏁 Validation Verdict
-$\tau$-Gate v2.0.1 is **formally verified** to:
+$\tau$-Gate v3.0.0 is **formally verified** to:
 1.  **Operate with zero external code.** All audits were performed using standard-library-only logic.
 2.  **Scale linearly.** Handles projects with thousands of nodes in under 500ms.
 3.  **Ensure Absolute Integrity.** The auditor is now immune to the supply chain attacks it detects.

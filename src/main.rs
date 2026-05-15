@@ -18,7 +18,7 @@ use std::fs;
 use std::process::{Command, exit};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V2.0.0 Build Metadata
+/// V3.0.0 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH"); 
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v2.0.1");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.0");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }

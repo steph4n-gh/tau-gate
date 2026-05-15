@@ -41,7 +41,11 @@ We model your project as a **Graph Laplacian ($L = D - A$)** and solve for the *
 
 ---
 
-## 🏛️ Dual-Mode Architecture
+## 🏛️ Dual-Mode Architecture (The TSP Integration)
+
+$\tau$-Gate was originally designed as a supply chain auditing tool, but in `v3.0.0` it was fundamentally re-architected into a dual-purpose mathematical engine. It now serves as the high-performance, zero-latency **FFI mathematical core** for the [**$\tau$-Spectral Pruner (TSP)**](https://github.com/steph4n-gh/tsp-mlx) project.
+
+In the TSP ecosystem (Neuro-Symbolic Paging), `tau-gate` is dynamically linked to Python and C++ inference engines. As the LLM generates tokens, `tau-gate` natively calculates the Fiedler vector ($\lambda_2$) of the model's internal attention graph in real-time, mathematically identifying and evicting dead context from the GPU's KV cache.
 
 $\tau$-Gate is designed to be embedded into any software stack, operating in two distinct modes:
 

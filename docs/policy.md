@@ -7,7 +7,7 @@ This document explains how to configure $\tau$-Gate and translates its mathemati
 ## ⚙️ Configuration (`tau-gate.toml`)
 
 ### Operational Modes
-V2.0.0 introduces **Advisory Mode**, allowing teams to baseline projects without blocking development.
+V3.0.0 introduces **Advisory Mode**, allowing teams to baseline projects without blocking development.
 
 ```toml
 # "enforcement" (Kill build - Default) or "advisory" (Warn only)

@@ -1,12 +1,15 @@
-# Gemini CLI: Developer Guide for $\tau$-Gate (v2.0.1)
+# Gemini CLI: Developer Guide for $\tau$-Gate (v3.0.0)
 
 This guide establishes the architectural standards for the **Absolute Zero** security primitive. Maintain these patterns to ensure mathematical stability and zero-dependency integrity.
 
 ---
 
-## 🛡️ The Absolute Zero Standard (v2.0+)
+## 🛡️ The Absolute Zero Standard (v3.0.0+)
 
-$\tau$-Gate v2.0 is a self-contained security primitive. To protect against "Auditor's Paradox" supply chain attacks, the project follows a strict **Zero-Dependency** mandate.
+$\tau$-Gate v3.0 is a self-contained security primitive. To protect against "Auditor's Paradox" supply chain attacks, the project follows a strict **Zero-Dependency** mandate.
+
+### The TSP Integration Mandate
+$\tau$-Gate now serves a dual purpose: it is both a CLI supply chain auditor and the high-speed FFI mathematical core (`cdylib`) for the `tsp-mlx` (Neuro-Symbolic Paging) project. Any changes to the `tau_gate_analyze` FFI bridge or the underlying Laplacian math must be rigorously tested to ensure they do not break the real-time VRAM pruning operations of the TSP Python and C++ inference engines.
 
 ### ⚠️ Mandatory Constraints:
 1.  **Rust Standard Library Only:** No external crates are allowed in the core binary.
