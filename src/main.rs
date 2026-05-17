@@ -18,7 +18,7 @@ use std::fs;
 use std::process::{exit, Command};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V3.0.3 Build Metadata
+/// V3.0.4 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH");
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.3");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.4");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -110,10 +110,10 @@ fn main() -> Result<()> {
     let mut execution_threats = Vec::new();
     let mut entropy_threats = Vec::new();
 
-    // v3.0.3 Hardening: Normalize connectivity threshold based on graph size (n).
-    // Algebraic connectivity (lambda_2) naturally decays at O(1/n^2).
-    // We use a dynamic threshold to prevent the math model from collapsing on large graphs.
-    let global_scan_threshold = 1.0 / (total_nodes * total_nodes);
+    // v3.0.4 Paradox Resolution: Re-normalize connectivity threshold.
+    // Real-world NPM dependencies are dense small-world networks. 1/n^2 was too conservative.
+    // We use a more aggressive 10.0/n heuristic to catch modular isolation in interconnected graphs.
+    let global_scan_threshold = 10.0 / total_nodes;
     let global_scan_mode = partition_result.connectivity_score < global_scan_threshold;
     let nodes_to_scan = if global_scan_mode {
         (0..node_count)

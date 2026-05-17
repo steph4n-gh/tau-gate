@@ -66,6 +66,8 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let iterations = 2000;
     let tolerance = 1e-9;
     let mut fiedler_value = 0.0;
+    let mut v_prev = v.clone();
+    let beta = 0.85; // Momentum factor
 
     for _ in 0..iterations {
         let sum: f64 = v.iter().sum();
@@ -81,6 +83,12 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
                 v_next[i] += alpha * v[neighbor];
             }
         }
+
+        // v3.0.4 Paradox Resolution: Heavy Ball Momentum to accelerate diffusion.
+        for i in 0..n {
+            v_next[i] += beta * (v_next[i] - v_prev[i]);
+        }
+        v_prev = v.clone();
 
         let norm: f64 = v_next.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm < 1e-15 {

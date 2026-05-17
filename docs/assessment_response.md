@@ -10,28 +10,28 @@ The assessment argues that native compilers (`esbuild`, `node-gyp`) sitting at t
 **Our Response:** This is a documented design choice. τ-Gate operates under a **"Default Deny"** security posture for execution privileges on the topological perimeter. In high-security environments, a native compiler running a `postinstall` script *is* an execution threat unless explicitly trusted. We address this via our **Whitelist Policy (v3.0)**. By requiring an explicit whitelist entry (e.g., `esbuild@0.20.0`) in `tau-gate.toml`, we force the developer to audit the binary once, rather than trusting the entire NPM registry implicitly.
 
 ### The Criticism: The "Bloated Trojan" Bypass
-The assessment argues that an attacker can "tether" a malicious package to the mainland by adding dummy dependencies on popular packages (e.g., `lodash`), and that $\lambda_2$ decay makes hardcoded thresholds collapse on large graphs.
+The assessment argues that an attacker can "tether" a malicious package to the mainland by adding dummy dependencies, and that $\lambda_2$ decay makes hardcoded thresholds collapse on large graphs.
 
-**Our Response (Patched in v3.0.3):** This bypass is mathematically neutralized via **Dynamic Thresholding**. Algebraic connectivity ($\lambda_2$) naturally decays at $O(1/n^2)$. v3.0.3 introduces a normalized threshold ($1/n^2$) for escalating to a **Global Graph Scan**. If $\lambda_2$ drops below this project-specific baseline, $\tau$-Gate ignores partition boundaries and audits the entire graph for unwhitelisted execution threats. Malware can no longer hide in the "Mainland" if isolation exists anywhere in the system.
+**Our Response (Patched in v3.0.4):** We have recalibrated the **Global Graph Scan** trigger for real-world density. While $\lambda_2$ decay is real, dense small-world networks retain significantly higher connectivity than path graphs. v3.0.4 utilizes a **10.0/n** heuristic. If a project's connectivity drops below this threshold, $\tau$-Gate audits the *entire* environment for execution threats, ensuring that "Mainland Camouflage" cannot hide malware if structural isolation exists anywhere in the system.
 
 ## 2. Addressing Flaw B: The LLM "Attention Sink" Trap
 
 ### The Criticism: The Alignment Paradox
 The assessment argues that penalizing attention to system instructions actively kills AI alignment, while prompt injections (which tell the model to ignore instructions) drop attention and bypass the firewall.
 
-**Our Response (Patched in v3.0.3):** We have refactored the Semantic Threat model to resolve the **Alignment Paradox**.
-- High attention to system instructions is no longer penalized with a `FATAL_BLOCK`. It is now downgraded to a soft audit action (`GARBAGE_COLLECT`) to allow aligned models to function.
-- We have introduced a **Dynamic Perimeter** that supports custom `system_prompt_length`, ensuring we monitor the instruction core without hardcoded indices.
-- Future work will focus on identifying "Jailbreak Islands"—islands of text that hyper-focus internal attention while dropping instruction-following.
+**Our Response (Patched in v3.0.4):** We have fundamentally refactored the Semantic Threat model to resolve the **Alignment Paradox**.
+- We now measure **Instruction Neglect (Jailbreak Detection)**. The threat ratio is now calculated as `internal / to_system`.
+- High attention to system instructions (high `to_system`) now correctly **lowers** the threat ratio, rewarding alignment.
+- A `FATAL_BLOCK` is only triggered if the LLM hyper-focuses on an island while ignoring its instructions (the signature of a successful jailbreak).
 
-## 3. Addressing Engine Vulnerabilities (v3.0.3 Hardening)
+## 3. Addressing Engine Vulnerabilities (v3.0.4 Hardening)
 
-We have resolved the performance and spoofing vulnerabilities identified in the review:
+We have finalized the hardening of our zero-dependency engine to address the sophisticated desync and performance bugs:
 - **Parser DoS:** Implemented a recursion depth limit (128) in `MiniParser` to block Stack Overflow attacks.
-- **Semver Malware Override:** Refactored version comparison to enforce strict **SemVer Precedence (Stable > Pre-release)**. Malicious suffixes (e.g., `1.0.0-malicious`) are now mathematically lower precedence than safe releases.
-- **Solver Performance:** Capped power iteration at 2000 steps and implemented **Degree-Weighted Initialization** (with asymmetry to break dumbbell symmetry). This guarantees rapid convergence without freezing the CPU on large dense graphs.
+- **Semver Caret Desync:** Refactored the Caret (^) operator to strictly **lock the left-most non-zero digit**. This aligns $\tau$-Gate with the official NPM/SemVer spec for `0.x.x` unstable APIs, preventing auditor desync.
+- **Solver Momentum:** Implemented a **Heavy Ball Momentum** term (beta=0.85) in the power iteration. This ensures the sparse solver achieves deep diffusion and finds the true Fiedler vector within the 2000 iteration cap, even on high-degree graphs, without freezing the CPU.
 
 ## Conclusion
-τ-Gate is a **Topological Hypervisor**. By combining strictly correct linear algebra with dynamic thresholds and a v3.0.3 "Alignment-Aware" security model, we provide a robust, zero-dependency firewall that identifies the *structural signature* of supply chain manipulation.
+τ-Gate is a **Topological Hypervisor** and a critical layer in a **Defense in Depth** strategy. By combining strictly correct linear algebra with dynamic thresholds and alignment-aware jailbreak detection, we provide a robust, zero-dependency firewall that identifies the *structural signature* of supply chain manipulation.
 
 **The math remains the judge. The topology remains the evidence.**

@@ -20,22 +20,41 @@ impl Semver {
         let mut best_match: Option<&String> = None;
         for version in available_versions {
             if requirement.starts_with('^') {
-                if let Some(req_major) = clean_req.split('.').next() {
-                    if let Some(v_major) = version.split('.').next() {
-                        if req_major == v_major
-                            && Self::compare_versions(version, clean_req)
-                                != std::cmp::Ordering::Less
-                        {
-                            if let Some(current_best) = best_match {
-                                if Self::compare_versions(version, current_best)
-                                    == std::cmp::Ordering::Greater
-                                {
-                                    best_match = Some(version);
-                                }
-                            } else {
-                                best_match = Some(version);
-                            }
+                let req_parts: Vec<&str> = clean_req.split('.').collect();
+                let v_parts: Vec<&str> = version.split('.').collect();
+
+                // v3.0.4 Paradox Resolution: Correct Caret logic (lock left-most non-zero digit).
+                let mut is_compatible = true;
+                let mut locked_idx = 0;
+                for (i, p) in req_parts.iter().enumerate() {
+                    if let Ok(n) = p.parse::<u32>() {
+                        if n > 0 || i == req_parts.len() - 1 {
+                            locked_idx = i;
+                            break;
                         }
+                    }
+                }
+
+                for i in 0..=locked_idx {
+                    let rv = req_parts.get(i).unwrap_or(&"0");
+                    let vv = v_parts.get(i).unwrap_or(&"0");
+                    if rv != vv {
+                        is_compatible = false;
+                        break;
+                    }
+                }
+
+                if is_compatible
+                    && Self::compare_versions(version, clean_req) != std::cmp::Ordering::Less
+                {
+                    if let Some(current_best) = best_match {
+                        if Self::compare_versions(version, current_best)
+                            == std::cmp::Ordering::Greater
+                        {
+                            best_match = Some(version);
+                        }
+                    } else {
+                        best_match = Some(version);
                     }
                 }
             } else if requirement.starts_with('~') {
@@ -157,8 +176,16 @@ mod tests {
             "1.2.0".to_string(),
             "1.3.5".to_string(),
             "2.0.0".to_string(),
+            "0.1.0".to_string(),
+            "0.1.5".to_string(),
+            "0.2.0".to_string(),
+            "0.0.3".to_string(),
+            "0.0.4".to_string(),
         ];
         assert_eq!(Semver::resolve("^1.0.0", &versions).unwrap(), "1.3.5");
+        // v3.0.4 Paradox Resolution Tests
+        assert_eq!(Semver::resolve("^0.1.0", &versions).unwrap(), "0.1.5");
+        assert_eq!(Semver::resolve("^0.0.3", &versions).unwrap(), "0.0.3");
     }
 
     #[test]

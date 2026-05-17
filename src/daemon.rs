@@ -202,16 +202,17 @@ pub fn run() -> Result<()> {
                 }
             }
 
-            let threat_ratio = if internal > 0.0 {
-                to_system / internal
+            // v3.0.4 Paradox Resolution: Redefine threat as "Instruction Neglect" (Jailbreak Detection).
+            // A high ratio of internal island attention relative to system instruction attention 
+            // indicates the agent is ignoring its constraints.
+            let injection_ratio = if to_system > 0.0 {
+                internal / to_system
             } else {
-                to_system
+                internal
             };
 
-            let action = if !island.is_empty() && threat_ratio > threat_threshold {
-                // v3.0.3 Paradox Resolution: High system attention indicates Alignment/Instruction Following.
-                // We downgrade this from FATAL_BLOCK to GARBAGE_COLLECT to prevent killing aligned agents.
-                "GARBAGE_COLLECT"
+            let action = if !island.is_empty() && injection_ratio > threat_threshold {
+                "FATAL_BLOCK"
             } else if !island.is_empty() {
                 "GARBAGE_COLLECT"
             } else {
