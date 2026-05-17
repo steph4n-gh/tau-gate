@@ -18,7 +18,7 @@ use std::fs;
 use std::process::{exit, Command};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V3.0.2 Build Metadata
+/// V3.0.3 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH");
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.2");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.3");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -110,10 +110,11 @@ fn main() -> Result<()> {
     let mut execution_threats = Vec::new();
     let mut entropy_threats = Vec::new();
 
-    // v3.0.2 Hardening: If connectivity is extremely low, check the ENTIRE graph.
-    // This prevents "Mainland Camouflage" where an attacker adds dummy edges to hide in partition_a
-    // while the math is distracted by a different isolated island (like esbuild).
-    let global_scan_mode = partition_result.connectivity_score < 1e-4;
+    // v3.0.3 Hardening: Normalize connectivity threshold based on graph size (n).
+    // Algebraic connectivity (lambda_2) naturally decays at O(1/n^2).
+    // We use a dynamic threshold to prevent the math model from collapsing on large graphs.
+    let global_scan_threshold = 1.0 / (total_nodes * total_nodes);
+    let global_scan_mode = partition_result.connectivity_score < global_scan_threshold;
     let nodes_to_scan = if global_scan_mode {
         (0..node_count)
             .filter_map(|i| dep_graph.graph.node_weight(i))
@@ -123,7 +124,7 @@ fn main() -> Result<()> {
     };
 
     if global_scan_mode {
-        println!("[\u{03C4}-Gate] \u{1F6A8}  EXTREME ISOLATION DETECTED. Escalating to Global Graph Scan...");
+        println!("[\u{03C4}-Gate] \u{1F6A8}  EXTREME ISOLATION DETECTED (\u{03BB}\u{2082} < {:.2e}). Escalating to Global Graph Scan...", global_scan_threshold);
     }
 
     for node in nodes_to_scan {

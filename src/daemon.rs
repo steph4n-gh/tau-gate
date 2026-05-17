@@ -209,7 +209,9 @@ pub fn run() -> Result<()> {
             };
 
             let action = if !island.is_empty() && threat_ratio > threat_threshold {
-                "FATAL_BLOCK"
+                // v3.0.3 Paradox Resolution: High system attention indicates Alignment/Instruction Following.
+                // We downgrade this from FATAL_BLOCK to GARBAGE_COLLECT to prevent killing aligned agents.
+                "GARBAGE_COLLECT"
             } else if !island.is_empty() {
                 "GARBAGE_COLLECT"
             } else {

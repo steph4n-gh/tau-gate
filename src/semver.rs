@@ -66,32 +66,55 @@ impl Semver {
     }
 
     fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
-        // v3.0.2 Hardening: Structural comparison to prevent alphanumeric spoofing.
+        // v3.0.3 Hardening: Strict SemVer precedence. Stable > Pre-release.
         let a_raw_parts: Vec<&str> = a.split('.').collect();
         let b_raw_parts: Vec<&str> = b.split('.').collect();
 
-        for i in 0..std::cmp::max(a_raw_parts.len(), b_raw_parts.len()) {
-            let a_part = a_raw_parts.get(i).unwrap_or(&"0");
-            let b_part = b_raw_parts.get(i).unwrap_or(&"0");
+        let max_len = std::cmp::max(a_raw_parts.len(), b_raw_parts.len());
+        for i in 0..max_len {
+            let a_part = a_raw_parts.get(i);
+            let b_part = b_raw_parts.get(i);
 
-            let a_num = a_part.parse::<u32>();
-            let b_num = b_part.parse::<u32>();
-
-            match (a_num, b_num) {
-                (Ok(an), Ok(bn)) => {
-                    match an.cmp(&bn) {
-                        std::cmp::Ordering::Equal => continue,
-                        other => return other,
+            match (a_part, b_part) {
+                (Some(ap), Some(bp)) => {
+                    let an = ap.parse::<u32>();
+                    let bn = bp.parse::<u32>();
+                    match (an, bn) {
+                        (Ok(an_val), Ok(bn_val)) => {
+                            if an_val != bn_val {
+                                return an_val.cmp(&bn_val);
+                            }
+                        }
+                        (Ok(_), Err(_)) => return std::cmp::Ordering::Greater,
+                        (Err(_), Ok(_)) => return std::cmp::Ordering::Less,
+                        (Err(_), Err(_)) => {
+                            if ap != bp {
+                                return ap.cmp(bp);
+                            }
+                        }
                     }
                 }
-                // If one is numeric and the other isn't, numeric loses to pre-release 
-                // in some systems, but here we just want to ensure they aren't equal.
-                // Standard semver: 1.0.0-alpha < 1.0.0
-                _ => {
-                    if a_part != b_part {
-                        return a_part.cmp(b_part);
+                (Some(ap), None) => {
+                    // a is longer.
+                    if let Ok(val) = ap.parse::<u32>() {
+                        if val == 0 {
+                            continue;
+                        }
+                        return std::cmp::Ordering::Greater;
                     }
+                    return std::cmp::Ordering::Less; // Pre-release
                 }
+                (None, Some(bp)) => {
+                    // b is longer.
+                    if let Ok(val) = bp.parse::<u32>() {
+                        if val == 0 {
+                            continue;
+                        }
+                        return std::cmp::Ordering::Less;
+                    }
+                    return std::cmp::Ordering::Greater; // Pre-release
+                }
+                (None, None) => break,
             }
         }
         std::cmp::Ordering::Equal
@@ -116,10 +139,14 @@ mod tests {
             Semver::compare_versions("1.0", "1.0.0"),
             std::cmp::Ordering::Equal
         );
-        // v3.0.2 Test: Pre-release and malicious spoofing
-        assert_ne!(
-            Semver::compare_versions("1.0-malicious", "1.0.0"),
-            std::cmp::Ordering::Equal
+        // v3.0.3 Test: Stable > Pre-release/Malicious
+        assert_eq!(
+            Semver::compare_versions("1.0.0-malicious", "1.0.0"),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            Semver::compare_versions("1.0.0", "1.0.0-alpha"),
+            std::cmp::Ordering::Greater
         );
     }
 

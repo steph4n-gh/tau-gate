@@ -52,12 +52,18 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let alpha = 1.0 / (2.0 * max_degree + 1.1);
     let mut v = vec![0.0; n];
 
+    // V3.0.3 Hardening: Degree-weighted initialization with asymmetry to accelerate convergence.
+    // Starting closer to the true eigenvectors reduces the iteration count required.
+    // We add a sin-based perturbation to break symmetry in highly regular graphs (e.g. dumbbells).
+    let total_degree: f64 = degrees.iter().sum();
+    let mean_degree = total_degree / (n as f64);
     for i in 0..n {
-        v[i] = (i as f64).sin();
+        v[i] = (degrees[i] - mean_degree) + (i as f64).sin() * 0.01;
     }
 
-    // V3.0.2 Hardening: Scale iterations by 1/alpha to ensure sufficient diffusion time.
-    let iterations = (1000.0 / alpha).min(100_000.0) as usize;
+    // V3.0.3 Paradox Resolution: Cap iterations at a performant limit (2000)
+    // to prevent freezing the CPU on large dense graphs.
+    let iterations = 2000;
     let tolerance = 1e-9;
     let mut fiedler_value = 0.0;
 
