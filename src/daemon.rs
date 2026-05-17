@@ -10,12 +10,17 @@ pub fn run() -> Result<()> {
 
     for line in stdin.lock().lines() {
         let line = line?;
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
 
         if let Ok(json) = MiniParser::parse_json(&line) {
             let mut edges = Vec::new();
             let mut sinks = BTreeSet::new();
-            let threat_threshold = json.get("threat_threshold").and_then(|t| get_f64(t)).unwrap_or(2.0);
+            let threat_threshold = json
+                .get("threat_threshold")
+                .and_then(get_f64)
+                .unwrap_or(2.0);
 
             if let Some(sinks_arr) = json.get("sinks").and_then(|s| s.as_array()) {
                 for s in sinks_arr {
@@ -39,8 +44,12 @@ pub fn run() -> Result<()> {
 
             let mut max_node = 0;
             for &(u, v) in &edges {
-                if u > max_node { max_node = u; }
-                if v > max_node { max_node = v; }
+                if u > max_node {
+                    max_node = u;
+                }
+                if v > max_node {
+                    max_node = v;
+                }
             }
             let n = max_node + 1;
 
@@ -68,8 +77,10 @@ pub fn run() -> Result<()> {
             if max_degree > 0.0 {
                 let alpha = 1.0 / (2.0 * max_degree + 1.1);
                 let mut v_vec = vec![0.0; n];
-                for i in 0..n { 
-                    if !sinks.contains(&i) { v_vec[i] = (i as f64).sin(); }
+                for i in 0..n {
+                    if !sinks.contains(&i) {
+                        v_vec[i] = (i as f64).sin();
+                    }
                 }
 
                 let iterations = 1000;
@@ -85,12 +96,16 @@ pub fn run() -> Result<()> {
                     }
                     let mean = if count > 0.0 { sum / count } else { 0.0 };
                     for i in 0..n {
-                        if !sinks.contains(&i) { v_vec[i] -= mean; }
+                        if !sinks.contains(&i) {
+                            v_vec[i] -= mean;
+                        }
                     }
 
                     let mut v_next = vec![0.0; n];
                     for i in 0..n {
-                        if sinks.contains(&i) { continue; }
+                        if sinks.contains(&i) {
+                            continue;
+                        }
                         v_next[i] = (1.0 - alpha * degrees[i]) * v_vec[i];
                         for &neighbor in &adj[i] {
                             v_next[i] += alpha * v_vec[neighbor];
@@ -99,10 +114,14 @@ pub fn run() -> Result<()> {
 
                     let mut norm_sq = 0.0;
                     for i in 0..n {
-                        if !sinks.contains(&i) { norm_sq += v_next[i] * v_next[i]; }
+                        if !sinks.contains(&i) {
+                            norm_sq += v_next[i] * v_next[i];
+                        }
                     }
                     let norm = norm_sq.sqrt();
-                    if norm < 1e-15 { break; }
+                    if norm < 1e-15 {
+                        break;
+                    }
 
                     let mut max_diff = 0.0;
                     for i in 0..n {
@@ -112,11 +131,19 @@ pub fn run() -> Result<()> {
                         }
                     }
                     v_vec = v_next;
-                    if max_diff < tolerance { break; }
+                    if max_diff < tolerance {
+                        break;
+                    }
                 }
 
-                let mut indexed_fiedler: Vec<(usize, f64)> = v_vec.iter().copied().enumerate().filter(|(i, _)| !sinks.contains(i)).collect();
-                indexed_fiedler.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                let mut indexed_fiedler: Vec<(usize, f64)> = v_vec
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .filter(|(i, _)| !sinks.contains(i))
+                    .collect();
+                indexed_fiedler
+                    .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
                 let mut max_gap = -1.0;
                 let mut cut_idx = 0;
@@ -133,10 +160,18 @@ pub fn run() -> Result<()> {
                 let mut side_large = Vec::new();
                 let mut side_small = Vec::new();
                 for (i, val) in indexed_fiedler.iter().enumerate() {
-                    if i <= cut_idx { side_small.push(val.0); } else { side_large.push(val.0); }
+                    if i <= cut_idx {
+                        side_small.push(val.0);
+                    } else {
+                        side_large.push(val.0);
+                    }
                 }
 
-                partition_b = if side_small.len() < side_large.len() { side_small } else { side_large };
+                partition_b = if side_small.len() < side_large.len() {
+                    side_small
+                } else {
+                    side_large
+                };
             }
 
             // Semantic Threat Calculation
@@ -146,16 +181,26 @@ pub fn run() -> Result<()> {
 
             for &(u, v) in &edges {
                 if island.contains(&u) {
-                    if v <= 15 { to_system += 1.0; }
-                    else if island.contains(&v) { internal += 1.0; }
+                    if v <= 15 {
+                        to_system += 1.0;
+                    } else if island.contains(&v) {
+                        internal += 1.0;
+                    }
                 }
                 if island.contains(&v) && u != v {
-                    if u <= 15 { to_system += 1.0; }
-                    else if island.contains(&u) { internal += 1.0; }
+                    if u <= 15 {
+                        to_system += 1.0;
+                    } else if island.contains(&u) {
+                        internal += 1.0;
+                    }
                 }
             }
 
-            let threat_ratio = if internal > 0.0 { to_system / internal } else { to_system };
+            let threat_ratio = if internal > 0.0 {
+                to_system / internal
+            } else {
+                to_system
+            };
 
             let action = if !island.is_empty() && threat_ratio > threat_threshold {
                 "FATAL_BLOCK"
@@ -165,8 +210,15 @@ pub fn run() -> Result<()> {
                 "ALLOW"
             };
 
-            let island_json = partition_b.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(",");
-            let res = format!(r#"{{"action":"{}","island_indices":[{}]}}"#, action, island_json);
+            let island_json = partition_b
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            let res = format!(
+                r#"{{"action":"{}","island_indices":[{}]}}"#,
+                action, island_json
+            );
             println!("{}", res);
             let _ = stdout.flush();
         }
@@ -177,6 +229,6 @@ pub fn run() -> Result<()> {
 fn get_f64(n: &JsonNode) -> Option<f64> {
     match n {
         JsonNode::Number(num) => Some(*num),
-        _ => None
+        _ => None,
     }
 }

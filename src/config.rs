@@ -39,16 +39,18 @@ impl SentinelConfig {
         if !path.exists() {
             return Ok(Self::default());
         }
-        
-        let content = fs::read_to_string(path).map_err(|e| GateError::Config(format!("Failed to read config file: {}", e)))?;
-        let map = MiniParser::parse_config(&content).map_err(|e| GateError::Config(format!("Failed to parse config file: {}", e)))?;
-        
+
+        let content = fs::read_to_string(path)
+            .map_err(|e| GateError::Config(format!("Failed to read config file: {}", e)))?;
+        let map = MiniParser::parse_config(&content)
+            .map_err(|e| GateError::Config(format!("Failed to parse config file: {}", e)))?;
+
         let mut config = Self::default();
-        
+
         if let Some(ConfigValue::Float(val)) = map.get("threshold_percentage") {
             config.threshold_percentage = *val;
         }
-        
+
         if let Some(ConfigValue::Array(val)) = map.get("whitelist") {
             config.whitelist = val.clone();
         }
@@ -58,7 +60,7 @@ impl SentinelConfig {
                 config.mode = EnforcementMode::Advisory;
             }
         }
-        
+
         Ok(config)
     }
 }

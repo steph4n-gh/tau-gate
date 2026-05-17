@@ -14,14 +14,16 @@ pub struct PartitionResult {
 
 /// Computes the Fiedler Vector and bisects the graph using an O(E) Sparse Iterative Solver.
 ///
-/// V2.6 Hardening: 
+/// V2.6 Hardening:
 /// 1. Corrected alpha bound (2 * max_degree) for mathematical convergence.
 /// 2. Removed null epsilon-fuzzing logic.
 /// 3. Replaced median cut with Maximum Spectral Gap cut to isolate anomalies.
 pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let n = graph.node_count();
     if n < 3 {
-        return Err(GateError::Math("Graph is too small for meaningful structural analysis.".to_string()));
+        return Err(GateError::Math(
+            "Graph is too small for meaningful structural analysis.".to_string(),
+        ));
     }
 
     // 1. Build Symmetrized Sparse Adjacency List
@@ -31,7 +33,7 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     for &(u, v) in graph.edges() {
         if u != v {
             adj[u].push(v);
-            adj[v].push(u); 
+            adj[v].push(u);
             degrees[u] += 1.0;
             degrees[v] += 1.0;
         }
@@ -50,7 +52,9 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let alpha = 1.0 / (2.0 * max_degree + 1.1);
     let mut v = vec![0.0; n];
 
-    for i in 0..n { v[i] = (i as f64).sin(); }
+    for i in 0..n {
+        v[i] = (i as f64).sin();
+    }
 
     let iterations = 1000;
     let tolerance = 1e-9;
@@ -59,7 +63,9 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     for _ in 0..iterations {
         let sum: f64 = v.iter().sum();
         let mean = sum / (n as f64);
-        for x in &mut v { *x -= mean; }
+        for x in &mut v {
+            *x -= mean;
+        }
 
         let mut v_next = vec![0.0; n];
         for i in 0..n {
@@ -70,7 +76,9 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         }
 
         let norm: f64 = v_next.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm < 1e-15 { break; }
+        if norm < 1e-15 {
+            break;
+        }
 
         let mut max_diff = 0.0;
         for i in 0..n {
@@ -89,12 +97,15 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         fiedler_value = v_l_v;
 
         v = v_next;
-        if max_diff < tolerance { break; }
+        if max_diff < tolerance {
+            break;
+        }
     }
 
     let fiedler_vector = v;
 
-    let mut indexed_fiedler: Vec<(usize, f64)> = fiedler_vector.iter().copied().enumerate().collect();
+    let mut indexed_fiedler: Vec<(usize, f64)> =
+        fiedler_vector.iter().copied().enumerate().collect();
     indexed_fiedler.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
     let mut max_gap = -1.0;
@@ -113,14 +124,27 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let mut side_large = Vec::new();
 
     for (i, val) in indexed_fiedler.iter().enumerate() {
-        let node_name = graph.node_weight(val.0).unwrap().clone();
-        if i <= cut_idx { side_small.push(node_name); } else { side_large.push(node_name); }
+        if let Some(node_name) = graph.node_weight(val.0) {
+            if i <= cut_idx {
+                side_small.push(node_name.clone());
+            } else {
+                side_large.push(node_name.clone());
+            }
+        }
     }
 
     if side_small.len() > side_large.len() {
-        Ok(PartitionResult { partition_b: side_large, tau, connectivity_score: fiedler_value })
+        Ok(PartitionResult {
+            partition_b: side_large,
+            tau,
+            connectivity_score: fiedler_value,
+        })
     } else {
-        Ok(PartitionResult { partition_b: side_small, tau, connectivity_score: fiedler_value })
+        Ok(PartitionResult {
+            partition_b: side_small,
+            tau,
+            connectivity_score: fiedler_value,
+        })
     }
 }
 
@@ -132,7 +156,7 @@ mod tests {
     #[test]
     fn test_dumbbell_bisection() {
         let mut graph = DiGraph::new();
-        
+
         let a0 = graph.add_node("A0".to_string());
         let a1 = graph.add_node("A1".to_string());
         let a2 = graph.add_node("A2".to_string());
@@ -156,7 +180,7 @@ mod tests {
     #[test]
     fn test_anomaly_isolation() {
         let mut graph = DiGraph::new();
-        
+
         let nodes: Vec<_> = (0..20).map(|i| graph.add_node(format!("M{}", i))).collect();
         for i in 0..20 {
             graph.add_edge(nodes[i], nodes[(i + 1) % 20]);
@@ -167,7 +191,7 @@ mod tests {
         graph.add_edge(nodes[0], island);
 
         let result = analyze_graph(&graph).expect("Analysis failed");
-        
+
         assert_eq!(result.partition_b.len(), 1);
         assert_eq!(result.partition_b[0], "ISLAND");
     }
@@ -178,7 +202,7 @@ mod tests {
         graph.add_node("A".to_string());
         graph.add_node("B".to_string());
         graph.add_node("C".to_string());
-        
+
         let result = analyze_graph(&graph).expect("Should handle no edges");
         assert_eq!(result.partition_b.len(), 0);
     }

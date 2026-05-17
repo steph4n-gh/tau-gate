@@ -15,8 +15,11 @@ jobs:
       # V2.0: Absolute Zero CI - Use only pre-installed runner tools
       - name: Manual Checkout
         run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} .
-          git checkout ${{ github.sha }}
+          git init
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git fetch --depth 1 origin ${{ github.sha }}
+          git checkout FETCH_HEAD
+
 
       - name: Setup Rust Environment
         run: |
