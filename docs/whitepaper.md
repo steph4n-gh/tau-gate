@@ -49,8 +49,20 @@ This eliminates the "Auditor's Paradox"—ensuring the tool cannot be compromise
 
 ---
 
-## 4. Conclusion
+## 5. The Immutable Agent: Integrating with Neuro-Symbolic Memory (TSP)
 
-$\tau$-Gate implements **Spectral Bisection** to audit software supply chains. By calculating $\lambda_2$ and the Maximum Spectral Gap, we provide a measurable, provable upper bound on the **Conductance** of a project's execution paths.
+While $\tau$-Gate serves as a standalone auditor for human-led development, its ultimate realization is found in the **Immutable Agent** architecture. By integrating with the **$\tau$-Spectral Pruner (TSP)** memory engine, $\tau$-Gate acts as a high-integrity security hypervisor for autonomous AI agents.
+
+In this unified model:
+1.  **Semantic Firewall:** TSP monitors the internal attention graph of the agent to block prompt injections.
+2.  **Topological Hypervisor:** $\tau$-Gate monitors the external environment. When an agent attempts to execute a terminal command (e.g., `npm install`), $\tau$-Gate performs a real-time topological audit. If a structural anomaly is detected, the execution is blocked, and the failure is fed back to the agent as a semantic constraint, forcing it to autonomously pivot to a secure alternative.
+
+This creates a closed-loop system where both the agent's internal memory and its external execution environment are governed by the same mathematical truth: **Spectral Graph Theory.**
+
+---
+
+## 6. Conclusion
+
+$\tau$-Gate implements **Spectral Bisection** to audit software supply chains. By calculating $\lambda_2$ and the Maximum Spectral Gap, we provide a measurable, topologically grounded upper bound on the **Conductance** of a project's execution paths.
 
 **The math is the judge. The topology is the evidence.**
