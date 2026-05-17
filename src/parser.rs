@@ -11,20 +11,28 @@ impl MiniParser {
         let mut map = BTreeMap::new();
         for line in content.lines() {
             let line = line.trim();
-            if line.is_empty() || line.starts_with('#') { continue; }
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
             if let Some((key, value)) = line.split_once('=') {
                 let key = key.trim().to_string();
                 let val_raw = value.trim();
                 if val_raw.starts_with('[') && val_raw.ends_with(']') {
-                    let inner = &val_raw[1..val_raw.len()-1];
-                    let items = inner.split(',')
+                    let inner = &val_raw[1..val_raw.len() - 1];
+                    let items = inner
+                        .split(',')
                         .map(|s| s.trim())
                         .filter(|s| !s.is_empty())
                         .map(|s| s.trim_matches(|c| c == '"' || c == '\'').to_string())
                         .collect();
                     map.insert(key, ConfigValue::Array(items));
                 } else if val_raw.starts_with('"') || val_raw.starts_with('\'') {
-                    map.insert(key, ConfigValue::String(val_raw.trim_matches(|c| c == '"' || c == '\'').to_string()));
+                    map.insert(
+                        key,
+                        ConfigValue::String(
+                            val_raw.trim_matches(|c| c == '"' || c == '\'').to_string(),
+                        ),
+                    );
                 } else if let Ok(val) = val_raw.parse::<f64>() {
                     map.insert(key, ConfigValue::Float(val));
                 }
@@ -77,21 +85,48 @@ impl MiniParser {
         for line in yaml.lines() {
             let indent = line.chars().take_while(|c| c.is_whitespace()).count();
             let line_trimmed = line.trim();
-            if line_trimmed.is_empty() || line_trimmed.starts_with('#') { continue; }
+            if line_trimmed.is_empty() || line_trimmed.starts_with('#') {
+                continue;
+            }
 
-            if line_trimmed.starts_with("snapshots:") { current_section = "snapshots"; continue; }
-            if line_trimmed.starts_with("packages:") { current_section = "packages"; continue; }
+            if line_trimmed.starts_with("snapshots:") {
+                current_section = "snapshots";
+                continue;
+            }
+            if line_trimmed.starts_with("packages:") {
+                current_section = "packages";
+                continue;
+            }
 
             if indent == 2 && line_trimmed.contains(':') {
-                let id = if let Some((id, _)) = line_trimmed.split_once(':') { id } else { line_trimmed };
-                current_pkg_id = id.trim().trim_matches(|c| c == '"' || c == '\'').to_string();
+                let id = if let Some((id, _)) = line_trimmed.split_once(':') {
+                    id
+                } else {
+                    line_trimmed
+                };
+                current_pkg_id = id
+                    .trim()
+                    .trim_matches(|c| c == '"' || c == '\'')
+                    .to_string();
                 if current_section == "snapshots" {
-                    snapshots.insert(current_pkg_id.clone(), PnpmSnapshot { dependencies: Vec::new() });
+                    snapshots.insert(
+                        current_pkg_id.clone(),
+                        PnpmSnapshot {
+                            dependencies: Vec::new(),
+                        },
+                    );
                 } else if current_section == "packages" {
-                    packages.insert(current_pkg_id.clone(), PnpmPackage { has_install_script: false });
+                    packages.insert(
+                        current_pkg_id.clone(),
+                        PnpmPackage {
+                            has_install_script: false,
+                        },
+                    );
                 }
                 if line_trimmed.contains("hasInstallScript: true") {
-                    if let Some(pkg) = packages.get_mut(&current_pkg_id) { pkg.has_install_script = true; }
+                    if let Some(pkg) = packages.get_mut(&current_pkg_id) {
+                        pkg.has_install_script = true;
+                    }
                 }
                 continue;
             }
@@ -99,19 +134,28 @@ impl MiniParser {
             if indent == 4 && line_trimmed.starts_with("hasInstallScript:") {
                 let has = line_trimmed.contains("true");
                 if current_section == "packages" {
-                    if let Some(pkg) = packages.get_mut(&current_pkg_id) { pkg.has_install_script = has; }
+                    if let Some(pkg) = packages.get_mut(&current_pkg_id) {
+                        pkg.has_install_script = has;
+                    }
                 }
             }
 
             if indent == 6 && current_section == "snapshots" {
                 if let Some((name, _ver)) = line_trimmed.split_once(':') {
                     if let Some(snap) = snapshots.get_mut(&current_pkg_id) {
-                        snap.dependencies.push(name.trim().trim_matches(|c| c == '"' || c == '\'').to_string());
+                        snap.dependencies.push(
+                            name.trim()
+                                .trim_matches(|c| c == '"' || c == '\'')
+                                .to_string(),
+                        );
                     }
                 }
             }
         }
-        Ok(PnpmMetadata { snapshots, packages })
+        Ok(PnpmMetadata {
+            snapshots,
+            packages,
+        })
     }
 }
 
@@ -147,19 +191,34 @@ pub enum JsonNode {
 
 impl JsonNode {
     pub fn get(&self, key: &str) -> Option<&JsonNode> {
-        match self { JsonNode::Object(m) => m.get(key), _ => None }
+        match self {
+            JsonNode::Object(m) => m.get(key),
+            _ => None,
+        }
     }
     pub fn as_str(&self) -> Option<&str> {
-        match self { JsonNode::String(s) => Some(s), _ => None }
+        match self {
+            JsonNode::String(s) => Some(s),
+            _ => None,
+        }
     }
     pub fn as_bool(&self) -> Option<bool> {
-        match self { JsonNode::Bool(b) => Some(*b), _ => None }
+        match self {
+            JsonNode::Bool(b) => Some(*b),
+            _ => None,
+        }
     }
     pub fn as_object(&self) -> Option<&BTreeMap<String, JsonNode>> {
-        match self { JsonNode::Object(m) => Some(m), _ => None }
+        match self {
+            JsonNode::Object(m) => Some(m),
+            _ => None,
+        }
     }
     pub fn as_array(&self) -> Option<&Vec<JsonNode>> {
-        match self { JsonNode::Array(a) => Some(a), _ => None }
+        match self {
+            JsonNode::Array(a) => Some(a),
+            _ => None,
+        }
     }
 }
 
@@ -178,22 +237,34 @@ impl JsonLexer {
                     it.next();
                     let mut s = String::new();
                     while let Some(nc) = it.next() {
-                        if nc == '"' { break; }
-                        if nc == '\\' { if let Some(esc) = it.next() { s.push(esc); } } else { s.push(nc); }
+                        if nc == '"' {
+                            break;
+                        }
+                        if nc == '\\' {
+                            if let Some(esc) = it.next() {
+                                s.push(esc);
+                            }
+                        } else {
+                            s.push(nc);
+                        }
                     }
                     tokens.push(format!("\"{}\"", s));
                 }
-                c if c.is_whitespace() => { it.next(); }
+                c if c.is_whitespace() => {
+                    it.next();
+                }
                 _ => {
                     let mut s = String::new();
                     while let Some(&nc) = it.peek() {
                         if nc.is_alphanumeric() || nc == '.' || nc == '-' || nc == '_' {
                             s.push(nc);
                             it.next();
-                        } else { break; }
+                        } else {
+                            break;
+                        }
                     }
-                    if !s.is_empty() { 
-                        tokens.push(s); 
+                    if !s.is_empty() {
+                        tokens.push(s);
                     } else {
                         it.next();
                     }
@@ -207,41 +278,78 @@ impl JsonLexer {
 struct JsonParser;
 impl JsonParser {
     fn parse(tokens: &mut Vec<String>) -> Result<JsonNode> {
-        if tokens.is_empty() { return Err(GateError::Generic("Empty JSON".to_string())); }
-        let token = tokens.pop().unwrap();
+        let token = tokens
+            .pop()
+            .ok_or_else(|| GateError::Generic("Empty JSON".to_string()))?;
         match token.as_str() {
             "{" => Self::parse_object(tokens),
             "[" => Self::parse_array(tokens),
-            s if s.starts_with('"') => Ok(JsonNode::String(s[1..s.len()-1].to_string())),
+            s if s.starts_with('"') => Ok(JsonNode::String(s[1..s.len() - 1].to_string())),
             "true" => Ok(JsonNode::Bool(true)),
             "false" => Ok(JsonNode::Bool(false)),
             "null" => Ok(JsonNode::Null),
             s => {
-                if let Ok(n) = s.parse::<f64>() { Ok(JsonNode::Number(n)) } else { Err(GateError::Generic(format!("Invalid JSON token: {}", s))) }
+                if let Ok(n) = s.parse::<f64>() {
+                    Ok(JsonNode::Number(n))
+                } else {
+                    Err(GateError::Generic(format!("Invalid JSON token: {}", s)))
+                }
             }
         }
     }
     fn parse_object(tokens: &mut Vec<String>) -> Result<JsonNode> {
         let mut map = BTreeMap::new();
         while let Some(peek) = tokens.last() {
-            if peek == "}" { tokens.pop(); return Ok(JsonNode::Object(map)); }
-            let key_raw = tokens.pop().unwrap();
-            let key = if key_raw.starts_with('"') { key_raw[1..key_raw.len()-1].to_string() } else { key_raw };
-            if tokens.is_empty() || tokens.pop().unwrap() != ":" { return Err(GateError::Generic("Expected ':' in JSON object".to_string())); }
+            if peek == "}" {
+                tokens.pop();
+                return Ok(JsonNode::Object(map));
+            }
+            let key_raw = tokens.pop().ok_or_else(|| {
+                GateError::Generic("Unexpected EOF in JSON object key".to_string())
+            })?;
+            let key = if key_raw.starts_with('"') {
+                key_raw[1..key_raw.len() - 1].to_string()
+            } else {
+                key_raw
+            };
+            if tokens.is_empty()
+                || tokens.pop().ok_or_else(|| {
+                    GateError::Generic("Unexpected EOF in JSON object colon".to_string())
+                })? != ":"
+            {
+                return Err(GateError::Generic(
+                    "Expected ':' in JSON object".to_string(),
+                ));
+            }
             let val = Self::parse(tokens)?;
             map.insert(key, val);
-            if tokens.is_empty() { break; }
-            if tokens.last().unwrap() == "," { tokens.pop(); }
+            if tokens.is_empty() {
+                break;
+            }
+            if let Some(comma) = tokens.last() {
+                if comma == "," {
+                    tokens.pop();
+                }
+            }
         }
         Err(GateError::Generic("Unclosed JSON object".to_string()))
     }
     fn parse_array(tokens: &mut Vec<String>) -> Result<JsonNode> {
         let mut arr = Vec::new();
         while let Some(peek) = tokens.last() {
-            if peek == "]" { tokens.pop(); return Ok(JsonNode::Array(arr)); }
+            if peek == "]" {
+                tokens.pop();
+                return Ok(JsonNode::Array(arr));
+            }
             arr.push(Self::parse(tokens)?);
-            if tokens.is_empty() { break; }
-            if tokens.last().unwrap() == "," { tokens.pop(); }
+            if tokens.is_empty() {
+                break;
+            }
+            if let Some(comma) = tokens.last() {
+                if comma == "," {
+                    tokens.pop();
+                }
+            }
         }
         Err(GateError::Generic("Unclosed JSON array".to_string()))
     }
@@ -254,7 +362,10 @@ mod tests {
     fn test_mini_parser_config() {
         let toml = "threshold_percentage = 15.0\nwhitelist = [\"@astrojs/*\", 'vite']";
         let map = MiniParser::parse_config(toml).unwrap();
-        assert_eq!(map.get("threshold_percentage"), Some(&ConfigValue::Float(15.0)));
+        assert_eq!(
+            map.get("threshold_percentage"),
+            Some(&ConfigValue::Float(15.0))
+        );
     }
     #[test]
     fn test_mini_parser_json_basic() {
@@ -275,7 +386,12 @@ snapshots:
   /zod@3.22.0: {}
 "#;
         let meta = MiniParser::parse_pnpm_yaml(yaml).unwrap();
-        assert!(meta.packages.get("/lodash@4.17.21").unwrap().has_install_script);
+        assert!(
+            meta.packages
+                .get("/lodash@4.17.21")
+                .unwrap()
+                .has_install_script
+        );
         assert!(meta.snapshots.contains_key("/zod@3.22.0"));
     }
 }

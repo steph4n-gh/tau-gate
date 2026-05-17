@@ -24,11 +24,12 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
     let local_dir = Path::new("logs");
 
     if !local_dir.exists() {
-        fs::create_dir_all(local_dir).map_err(|e| GateError::Telemetry(format!("Failed to create logs directory: {}", e)))?;
+        fs::create_dir_all(local_dir)
+            .map_err(|e| GateError::Telemetry(format!("Failed to create logs directory: {}", e)))?;
     }
 
     let log_path = local_dir.join("tau-gate_anomalies.json");
-    
+
     // Manual JSON serialization to move toward zero-dependency
     let mut json = String::new();
     json.push_str("{\n");
@@ -46,8 +47,11 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
         }
     }
     json.push_str("  ],\n");
-    json.push_str(&format!("  \"message\": \"{}\"\n", log.message.replace("\"", "\\\"")));
-    json.push_str("}");
+    json.push_str(&format!(
+        "  \"message\": \"{}\"\n",
+        log.message.replace("\"", "\\\"")
+    ));
+    json.push('}');
 
     let mut file = OpenOptions::new()
         .create(true)
@@ -55,7 +59,9 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
         .open(log_path)
         .map_err(|e| GateError::Telemetry(format!("Failed to open telemetry log file: {}", e)))?;
 
-    writeln!(file, "{}", json).map_err(|e| GateError::Telemetry(format!("Failed to write to telemetry log file: {}", e)))?;
+    writeln!(file, "{}", json).map_err(|e| {
+        GateError::Telemetry(format!("Failed to write to telemetry log file: {}", e))
+    })?;
 
     Ok(())
 }
