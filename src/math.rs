@@ -56,7 +56,8 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         v[i] = (i as f64).sin();
     }
 
-    let iterations = 1000;
+    // V3.0.2 Hardening: Scale iterations by 1/alpha to ensure sufficient diffusion time.
+    let iterations = (1000.0 / alpha).min(100_000.0) as usize;
     let tolerance = 1e-9;
     let mut fiedler_value = 0.0;
 

@@ -66,15 +66,32 @@ impl Semver {
     }
 
     fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
-        let a_parts: Vec<u32> = a.split('.').filter_map(|p| p.parse().ok()).collect();
-        let b_parts: Vec<u32> = b.split('.').filter_map(|p| p.parse().ok()).collect();
+        // v3.0.2 Hardening: Structural comparison to prevent alphanumeric spoofing.
+        let a_raw_parts: Vec<&str> = a.split('.').collect();
+        let b_raw_parts: Vec<&str> = b.split('.').collect();
 
-        for i in 0..std::cmp::max(a_parts.len(), b_parts.len()) {
-            let a_val = a_parts.get(i).unwrap_or(&0);
-            let b_val = b_parts.get(i).unwrap_or(&0);
-            match a_val.cmp(b_val) {
-                std::cmp::Ordering::Equal => continue,
-                other => return other,
+        for i in 0..std::cmp::max(a_raw_parts.len(), b_raw_parts.len()) {
+            let a_part = a_raw_parts.get(i).unwrap_or(&"0");
+            let b_part = b_raw_parts.get(i).unwrap_or(&"0");
+
+            let a_num = a_part.parse::<u32>();
+            let b_num = b_part.parse::<u32>();
+
+            match (a_num, b_num) {
+                (Ok(an), Ok(bn)) => {
+                    match an.cmp(&bn) {
+                        std::cmp::Ordering::Equal => continue,
+                        other => return other,
+                    }
+                }
+                // If one is numeric and the other isn't, numeric loses to pre-release 
+                // in some systems, but here we just want to ensure they aren't equal.
+                // Standard semver: 1.0.0-alpha < 1.0.0
+                _ => {
+                    if a_part != b_part {
+                        return a_part.cmp(b_part);
+                    }
+                }
             }
         }
         std::cmp::Ordering::Equal
@@ -97,6 +114,11 @@ mod tests {
         );
         assert_eq!(
             Semver::compare_versions("1.0", "1.0.0"),
+            std::cmp::Ordering::Equal
+        );
+        // v3.0.2 Test: Pre-release and malicious spoofing
+        assert_ne!(
+            Semver::compare_versions("1.0-malicious", "1.0.0"),
             std::cmp::Ordering::Equal
         );
     }

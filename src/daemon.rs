@@ -174,21 +174,27 @@ pub fn run() -> Result<()> {
                 };
             }
 
-            // Semantic Threat Calculation
+            let system_prompt_len = json
+                .get("system_prompt_length")
+                .and_then(get_f64)
+                .unwrap_or(15.0) as usize;
+
+            // Semantic Threat Calculation (v3.0.2 Mitigation: Attention Sink Offset)
+            // We ignore tokens 0-4 as these are mathematically proven "Attention Sinks" (StreamingLLM, 2023).
             let mut to_system = 0.0;
             let mut internal = 0.0;
             let island: BTreeSet<usize> = partition_b.iter().copied().collect();
 
             for &(u, v) in &edges {
                 if island.contains(&u) {
-                    if v <= 15 {
+                    if v >= 5 && v <= system_prompt_len {
                         to_system += 1.0;
                     } else if island.contains(&v) {
                         internal += 1.0;
                     }
                 }
                 if island.contains(&v) && u != v {
-                    if u <= 15 {
+                    if u >= 5 && u <= system_prompt_len {
                         to_system += 1.0;
                     } else if island.contains(&u) {
                         internal += 1.0;

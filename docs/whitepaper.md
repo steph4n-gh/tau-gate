@@ -34,12 +34,21 @@ Trusted software creates a dense "continent" with high algebraic connectivity ($
 ### Scenario B: Structural Isolation (The Island)
 An isolated malicious package results in $\lambda_2 \approx 0$. The **Maximum Spectral Gap** algorithm identifies the numerical "cliff" between the island and the core mainland.
 
-### Scenario C: The Bloated Trojan (Evasion Resistance)
-If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ remains extremely low. v3.0.0 uses this **Algebraic Connectivity Score** as an absolute trigger for isolation detection, even if the partition is large.
+### Scenario C: The Bloated Trojan (v3.0.2 Hardening: Global Graph Scan)
+If an attacker adds fake dependencies to bypass size thresholds ("Mainland Camouflage"), $\lambda_2$ remains extremely low. v3.0.2 now uses this **Algebraic Connectivity Score** as an absolute trigger. If $\lambda_2 < 1e-4$, τ-Gate escalates to a **Global Graph Scan**, checking every node in the entire environment for execution privileges, regardless of which partition they reside in.
 
 ---
 
-## 3. Implementation Integrity: Self-Contained Architecture
+## 4. Parser & Extraction Integrity
+
+To ensure absolute zero-dependency safety, v3.0.2 implements:
+1. **Recursion Depth Limits:** Prevents Stack Overflow DoS attacks via deeply nested malicious manifests.
+2. **Structural Semver Validation:** Blocks alphanumeric spoofing (e.g., `1.0-malicious` evaluating as `1.0.0`).
+3. **Dynamic Iteration Scaling:** Adjusts Power Iteration steps based on graph density to guarantee mathematical convergence on high-degree nodes.
+
+---
+
+## 5. Implementation Integrity: Self-Contained Architecture
 
 In v3.0.0, $\tau$-Gate achieves **Architectural Self-Sufficiency**. Every line of code, from the $O(E)$ sparse solver to the native lockfile parsers, is implemented using the **Rust Standard Library**. 
 

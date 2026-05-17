@@ -45,7 +45,7 @@ impl MiniParser {
     pub fn parse_json(json: &str) -> Result<JsonNode> {
         let mut tokens = JsonLexer::tokenize(json);
         tokens.reverse();
-        JsonParser::parse(&mut tokens)
+        JsonParser::parse(&mut tokens, 0)
     }
 
     /// V2.0 Hardening: Detects high-entropy strings (potential obfuscation) in manifests.
@@ -72,7 +72,7 @@ impl MiniParser {
             max_continuous = current;
             max_distinct = distinct_chars.len();
         }
-        max_continuous > 128 && max_distinct > 16
+        max_continuous > 64 && max_distinct > 16
     }
 
     /// A minimal YAML extractor for pnpm-lock.yaml.
@@ -277,13 +277,16 @@ impl JsonLexer {
 
 struct JsonParser;
 impl JsonParser {
-    fn parse(tokens: &mut Vec<String>) -> Result<JsonNode> {
+    fn parse(tokens: &mut Vec<String>, depth: usize) -> Result<JsonNode> {
+        if depth > 128 {
+            return Err(GateError::Generic("Max nesting depth exceeded".to_string()));
+        }
         let token = tokens
             .pop()
             .ok_or_else(|| GateError::Generic("Empty JSON".to_string()))?;
         match token.as_str() {
-            "{" => Self::parse_object(tokens),
-            "[" => Self::parse_array(tokens),
+            "{" => Self::parse_object(tokens, depth + 1),
+            "[" => Self::parse_array(tokens, depth + 1),
             s if s.starts_with('"') => Ok(JsonNode::String(s[1..s.len() - 1].to_string())),
             "true" => Ok(JsonNode::Bool(true)),
             "false" => Ok(JsonNode::Bool(false)),
@@ -297,7 +300,7 @@ impl JsonParser {
             }
         }
     }
-    fn parse_object(tokens: &mut Vec<String>) -> Result<JsonNode> {
+    fn parse_object(tokens: &mut Vec<String>, depth: usize) -> Result<JsonNode> {
         let mut map = BTreeMap::new();
         while let Some(peek) = tokens.last() {
             if peek == "}" {
@@ -321,7 +324,7 @@ impl JsonParser {
                     "Expected ':' in JSON object".to_string(),
                 ));
             }
-            let val = Self::parse(tokens)?;
+            let val = Self::parse(tokens, depth)?;
             map.insert(key, val);
             if tokens.is_empty() {
                 break;
@@ -334,14 +337,14 @@ impl JsonParser {
         }
         Err(GateError::Generic("Unclosed JSON object".to_string()))
     }
-    fn parse_array(tokens: &mut Vec<String>) -> Result<JsonNode> {
+    fn parse_array(tokens: &mut Vec<String>, depth: usize) -> Result<JsonNode> {
         let mut arr = Vec::new();
         while let Some(peek) = tokens.last() {
             if peek == "]" {
                 tokens.pop();
                 return Ok(JsonNode::Array(arr));
             }
-            arr.push(Self::parse(tokens)?);
+            arr.push(Self::parse(tokens, depth)?);
             if tokens.is_empty() {
                 break;
             }
@@ -372,6 +375,22 @@ mod tests {
         let json = r#"{"name": "test", "version": "1.0", "active": true, "deps": ["a", "b"]}"#;
         let node = MiniParser::parse_json(json).unwrap();
         assert_eq!(node.get("name").unwrap().as_str(), Some("test"));
+    }
+    #[test]
+    fn test_mini_parser_depth_limit() {
+        let mut deep_json = String::new();
+        for _ in 0..150 {
+            deep_json.push_str("{\"a\":");
+        }
+        deep_json.push_str("1");
+        for _ in 0..150 {
+            deep_json.push('}');
+        }
+        let res = MiniParser::parse_json(&deep_json);
+        assert!(res.is_err());
+        if let Err(GateError::Generic(e)) = res {
+            assert!(e.contains("Max nesting depth exceeded"));
+        }
     }
     #[test]
     fn test_pnpm_yaml_extractor() {

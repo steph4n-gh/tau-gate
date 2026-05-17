@@ -18,7 +18,7 @@ use std::fs;
 use std::process::{exit, Command};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V3.0.0 Build Metadata
+/// V3.0.2 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH");
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.0");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.2");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -110,7 +110,23 @@ fn main() -> Result<()> {
     let mut execution_threats = Vec::new();
     let mut entropy_threats = Vec::new();
 
-    for node in &partition_result.partition_b {
+    // v3.0.2 Hardening: If connectivity is extremely low, check the ENTIRE graph.
+    // This prevents "Mainland Camouflage" where an attacker adds dummy edges to hide in partition_a
+    // while the math is distracted by a different isolated island (like esbuild).
+    let global_scan_mode = partition_result.connectivity_score < 1e-4;
+    let nodes_to_scan = if global_scan_mode {
+        (0..node_count)
+            .filter_map(|i| dep_graph.graph.node_weight(i))
+            .collect::<Vec<_>>()
+    } else {
+        partition_result.partition_b.iter().collect::<Vec<_>>()
+    };
+
+    if global_scan_mode {
+        println!("[\u{03C4}-Gate] \u{1F6A8}  EXTREME ISOLATION DETECTED. Escalating to Global Graph Scan...");
+    }
+
+    for node in nodes_to_scan {
         let is_exec = check_threat_match(node, &dep_graph.execution_packages);
         let is_entropy = check_threat_match(node, &dep_graph.suspicious_packages);
 
@@ -145,54 +161,53 @@ fn main() -> Result<()> {
     }
 
     // 5. The Gate Phase (Enforcement)
-    let extreme_isolation = partition_result.connectivity_score < 1e-4
-        && (!execution_threats.is_empty() || !entropy_threats.is_empty());
+    if !execution_threats.is_empty() || !entropy_threats.is_empty() {
+        let should_block = global_scan_mode || percentage < config.threshold_percentage;
 
-    if (!execution_threats.is_empty() || !entropy_threats.is_empty())
-        && (percentage < config.threshold_percentage || extreme_isolation)
-    {
-        eprintln!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  CRITICAL TOPOLOGICAL ANOMALY!");
+        if should_block {
+            eprintln!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  CRITICAL TOPOLOGICAL ANOMALY!");
 
-        if !execution_threats.is_empty() {
-            eprintln!("Quarantined execution-privileged nodes:");
-            for node in &execution_threats {
-                eprintln!("  \u{2192} {}", node);
+            if !execution_threats.is_empty() {
+                eprintln!("Quarantined execution-privileged nodes:");
+                for node in &execution_threats {
+                    eprintln!("  \u{2192} {}", node);
+                }
             }
-        }
 
-        if !entropy_threats.is_empty() {
-            eprintln!("Quarantined high-entropy (obfuscated) nodes:");
-            for node in &entropy_threats {
-                eprintln!("  \u{26A0} {}", node);
+            if !entropy_threats.is_empty() {
+                eprintln!("Quarantined high-entropy (obfuscated) nodes:");
+                for node in &entropy_threats {
+                    eprintln!("  \u{26A0} {}", node);
+                }
             }
-        }
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs().to_string())
-            .unwrap_or_else(|_| "0".to_string());
-        let log = telemetry::AnomalyLog {
-            timestamp,
-            tau: partition_result.tau,
-            anomaly_size: partition_result.partition_b.len(),
-            total_nodes: total_nodes as usize,
-            isolated_nodes: execution_threats.clone(),
-            message: format!(
-                "Isolation Detection. Score: {:.6}, Partition: {:.2}%",
-                partition_result.connectivity_score, percentage
-            ),
-        };
-        let _ = telemetry::log_anomaly(&log);
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs().to_string())
+                .unwrap_or_else(|_| "0".to_string());
+            let log = telemetry::AnomalyLog {
+                timestamp,
+                tau: partition_result.tau,
+                anomaly_size: partition_result.partition_b.len(),
+                total_nodes: total_nodes as usize,
+                isolated_nodes: execution_threats.clone(),
+                message: format!(
+                    "Isolation Detection. Score: {:.6}, Partition: {:.2}%",
+                    partition_result.connectivity_score, percentage
+                ),
+            };
+            let _ = telemetry::log_anomaly(&log);
 
-        if let EngineType::Npm = engine {
-            let _ = fs::remove_file("package-lock.json");
-        }
+            if let EngineType::Npm = engine {
+                let _ = fs::remove_file("package-lock.json");
+            }
 
-        if config.mode == EnforcementMode::Enforcement {
-            eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
-            exit(1);
-        } else {
-            println!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  ADVISORY MODE: Anomaly detected but proceeding as per policy.");
+            if config.mode == EnforcementMode::Enforcement {
+                eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
+                exit(1);
+            } else {
+                println!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  ADVISORY MODE: Anomaly detected but proceeding as per policy.");
+            }
         }
     }
 
