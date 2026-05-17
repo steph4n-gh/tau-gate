@@ -249,7 +249,10 @@ fn execute_actual_install(engine: EngineType) {
     };
 
     let home = std::env::var("HOME").unwrap_or_default();
-    let safe_path = format!("/usr/bin:/bin:/usr/local/bin:{}/.cargo/bin", home);
+    let safe_path = format!(
+        "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:{}/.cargo/bin",
+        home
+    );
 
     let status = Command::new(cmd)
         .env_clear()

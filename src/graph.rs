@@ -326,17 +326,40 @@ impl DepGraph {
     }
 
     fn build_from_yarn() -> Result<Self> {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let safe_path = format!(
+            "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:{}/.cargo/bin",
+            home
+        );
+
         let output = Command::new("yarn")
             .env_clear()
-            .env("PATH", "/usr/bin:/bin:/usr/local/bin")
+            .env("HOME", &home)
+            .env("PATH", &safe_path)
             .args(["npm", "ls", "--all", "--json"])
             .output()
             .context("Failed to execute 'yarn npm ls'.")?;
+
         if !output.status.success() {
+            // Yarn v1 fallback: attempt 'yarn list --json'
+            let v1_output = Command::new("yarn")
+                .env_clear()
+                .env("HOME", &home)
+                .env("PATH", &safe_path)
+                .args(["list", "--json"])
+                .output()
+                .context("Failed to execute 'yarn list' as fallback.")?;
+
+            if v1_output.status.success() {
+                let stdout_str = String::from_utf8_lossy(&v1_output.stdout);
+                return Self::parse_yarn_v1_output(&stdout_str);
+            }
+
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::error::GateError::Graph(format!(
-                "yarn failed: {}",
-                stderr
+                "yarn failed (Berry): {}\nyarn failed (v1): {}",
+                stderr,
+                String::from_utf8_lossy(&v1_output.stderr)
             )));
         }
         let stdout_str = String::from_utf8_lossy(&output.stdout);
@@ -367,6 +390,108 @@ impl DepGraph {
             execution_packages,
             suspicious_packages,
         })
+    }
+
+    fn parse_yarn_v1_output(stdout: &str) -> Result<Self> {
+        let mut graph = DiGraph::new();
+        let mut node_indices = BTreeMap::new();
+        let mut execution_packages = BTreeSet::new();
+        let mut suspicious_packages = BTreeSet::new();
+
+        // Yarn v1 output can have multiple JSON objects (one per line usually)
+        for line in stdout.lines() {
+            if let Ok(root) = MiniParser::parse_json(line) {
+                if let Some(data) = root.get("data").and_then(|d| d.get("trees")).and_then(|t| t.as_array()) {
+                    for node in data {
+                        Self::parse_yarn_v1_recursive(
+                            node,
+                            &mut graph,
+                            &mut node_indices,
+                            None,
+                            &mut execution_packages,
+                            &mut suspicious_packages,
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(Self {
+            graph,
+            execution_packages,
+            suspicious_packages,
+        })
+    }
+
+    fn parse_yarn_v1_recursive(
+        val: &JsonNode,
+        graph: &mut DiGraph,
+        node_indices: &mut BTreeMap<String, usize>,
+        parent_idx: Option<usize>,
+        execution_packages: &mut BTreeSet<String>,
+        suspicious_packages: &mut BTreeSet<String>,
+    ) {
+        if let Some(id) = val.get("name").and_then(|v| v.as_str()) {
+            let current_idx = *node_indices
+                .entry(id.to_string())
+                .or_insert_with(|| graph.add_node(id.to_string()));
+            if let Some(p_idx) = parent_idx {
+                graph.add_edge(p_idx, current_idx);
+            }
+            if MiniParser::detect_obfuscation(id) {
+                suspicious_packages.insert(id.to_string());
+            }
+
+            let package_name = if let Some(idx) = id.rfind('@') {
+                if idx > 0 {
+                    &id[0..idx]
+                } else {
+                    id
+                }
+            } else {
+                id
+            };
+
+            if let Some(pkg_json_path) = find_package_json(package_name) {
+                if let Ok(content) = fs::read_to_string(pkg_json_path) {
+                    if let Ok(pkg_json) = MiniParser::parse_json(&content) {
+                        let has_scripts = pkg_json
+                            .get("scripts")
+                            .and_then(|s| s.as_object())
+                            .map(|s| {
+                                s.contains_key("postinstall")
+                                    || s.contains_key("preinstall")
+                                    || s.contains_key("install")
+                            })
+                            .unwrap_or(false);
+                        if has_scripts
+                            || pkg_json
+                                .get("hasInstallScript")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false)
+                        {
+                            execution_packages.insert(id.to_string());
+                        }
+                        if MiniParser::detect_obfuscation(id) {
+                            suspicious_packages.insert(id.to_string());
+                        }
+                    }
+                }
+            }
+
+            if let Some(children) = val.get("children").and_then(|c| c.as_array()) {
+                for child in children {
+                    Self::parse_yarn_v1_recursive(
+                        child,
+                        graph,
+                        node_indices,
+                        Some(current_idx),
+                        execution_packages,
+                        suspicious_packages,
+                    );
+                }
+            }
+        }
     }
 
     fn parse_yarn_json_recursive(
@@ -629,7 +754,10 @@ impl DepGraph {
 
     fn build_from_cargo() -> Result<Self> {
         let home = std::env::var("HOME").unwrap_or_default();
-        let safe_path = format!("/usr/bin:/bin:/usr/local/bin:{}/.cargo/bin", home);
+        let safe_path = format!(
+            "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:{}/.cargo/bin",
+            home
+        );
 
         let output = Command::new("cargo")
             .env_clear()
@@ -840,6 +968,13 @@ snapshots:
         let dg = DepGraph::parse_bun_output(content).unwrap();
         assert_eq!(dg.graph.node_count(), 1);
         assert!(dg.execution_packages.contains("test(1.0.0)"));
+    }
+
+    #[test]
+    fn test_yarn_v1_extraction() {
+        let content = r#"{"type":"tree","data":{"type":"list","trees":[{"name":"a@1.0.0","children":[{"name":"b@1.0.0"}]}]}}"#;
+        let dg = DepGraph::parse_yarn_v1_output(content).unwrap();
+        assert_eq!(dg.graph.node_count(), 2);
     }
 
     #[test]
