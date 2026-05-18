@@ -1,4 +1,4 @@
-# 🛡️ τ-Gate (v3.0.5)
+# 🛡️ τ-Gate (v3.0.6)
 
 **Absolute Zero Security for the Modern Supply Chain.**
 

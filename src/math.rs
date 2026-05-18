@@ -61,6 +61,16 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         v[i] = (degrees[i] - mean_degree) + (i as f64).sin() * 0.01;
     }
 
+    // V3.0.6 Paradox Resolution: Immediately normalize initial vector.
+    // This prevents the "Momentum Shockwave" where unnormalized degree scales (10^3) 
+    // clash with unit-length iterative vectors (0.05).
+    let init_norm: f64 = v.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if init_norm > 1e-15 {
+        for x in &mut v {
+            *x /= init_norm;
+        }
+    }
+
     // V3.0.5 Ironclad: Heavy Ball Momentum with consistent unnormalized state.
     // We store the unnormalized matrix product (v_m) to ensure the momentum delta 
     // is mathematically sound and doesn't trap high-frequency noise.

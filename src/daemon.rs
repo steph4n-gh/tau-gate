@@ -202,10 +202,11 @@ pub fn run() -> Result<()> {
                 }
             }
 
-            // v3.0.5 Ironclad: Explicitly handle infinity for perfect jailbreaks (to_system == 0).
+            // v3.0.6 Ironclad: Seal "Independent Set" jailbreak (to_system == 0).
             let injection_ratio = if to_system > 0.0 {
                 internal / to_system
-            } else if internal > 0.0 {
+            } else if !island.is_empty() {
+                // If it looks at instructions zero times, it is an automatic jailbreak.
                 f64::INFINITY
             } else {
                 0.0

@@ -33,13 +33,16 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
     // Manual JSON serialization to move toward zero-dependency
     let mut json = String::new();
     json.push_str("{\n");
-    json.push_str(&format!("  \"timestamp\": \"{}\",\n", log.timestamp));
+    json.push_str(&format!(
+        "  \"timestamp\": \"{}\",\n",
+        escape_json_string(&log.timestamp)
+    ));
     json.push_str(&format!("  \"tau\": {},\n", log.tau));
     json.push_str(&format!("  \"anomaly_size\": {},\n", log.anomaly_size));
     json.push_str(&format!("  \"total_nodes\": {},\n", log.total_nodes));
     json.push_str("  \"isolated_nodes\": [\n");
     for (i, node) in log.isolated_nodes.iter().enumerate() {
-        json.push_str(&format!("    \"{}\"", node.replace("\"", "\\\"")));
+        json.push_str(&format!("    \"{}\"", escape_json_string(node)));
         if i < log.isolated_nodes.len() - 1 {
             json.push_str(",\n");
         } else {
@@ -49,7 +52,7 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
     json.push_str("  ],\n");
     json.push_str(&format!(
         "  \"message\": \"{}\"\n",
-        log.message.replace("\"", "\\\"")
+        escape_json_string(&log.message)
     ));
     json.push('}');
 
@@ -64,4 +67,19 @@ pub fn log_anomaly(log: &AnomalyLog) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+fn escape_json_string(s: &str) -> String {
+    let mut escaped = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => escaped.push_str("\\\\"),
+            '\"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
 }

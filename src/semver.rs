@@ -17,8 +17,16 @@ impl Semver {
             .trim_start_matches('~')
             .trim();
 
+        // v3.0.6 Ironclad: NPM Pre-release Filter Rule.
+        // Prerelease versions will not match a range unless the range contains a prerelease.
+        let is_stable_req = !requirement.contains('-');
+
         let mut best_match: Option<&String> = None;
         for version in available_versions {
+            if is_stable_req && version.contains('-') {
+                continue;
+            }
+
             if requirement.starts_with('^') {
                 let req_parts: Vec<&str> = clean_req.split('.').collect();
                 let v_parts: Vec<&str> = version.split('.').collect();
@@ -93,6 +101,7 @@ impl Semver {
 
     fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
         // v3.0.3 Hardening: Strict SemVer precedence. Stable > Pre-release.
+        // v3.0.6 Hardening: Numeric Pre-release sorting.
         let a_raw_parts: Vec<&str> = a.split('.').collect();
         let b_raw_parts: Vec<&str> = b.split('.').collect();
 
@@ -103,12 +112,47 @@ impl Semver {
 
             match (a_part, b_part) {
                 (Some(ap), Some(bp)) => {
-                    let an = ap.parse::<u32>();
-                    let bn = bp.parse::<u32>();
+                    // Check for pre-release suffixes
+                    let (ap_clean, ap_suffix) = if let Some(idx) = ap.find('-') {
+                        (&ap[..idx], Some(&ap[idx + 1..]))
+                    } else {
+                        (*ap, None)
+                    };
+                    let (bp_clean, bp_suffix) = if let Some(idx) = bp.find('-') {
+                        (&bp[..idx], Some(&bp[idx + 1..]))
+                    } else {
+                        (*bp, None)
+                    };
+
+                    let an = ap_clean.parse::<u32>();
+                    let bn = bp_clean.parse::<u32>();
+
                     match (an, bn) {
                         (Ok(an_val), Ok(bn_val)) => {
                             if an_val != bn_val {
                                 return an_val.cmp(&bn_val);
+                            }
+                            // Numeric parts match. Compare suffixes if present.
+                            match (ap_suffix, bp_suffix) {
+                                (None, Some(_)) => return std::cmp::Ordering::Greater,
+                                (Some(_), None) => return std::cmp::Ordering::Less,
+                                (Some(asuf), Some(bsuf)) => {
+                                    let asuf_n = asuf.parse::<u32>();
+                                    let bsuf_n = bsuf.parse::<u32>();
+                                    match (asuf_n, bsuf_n) {
+                                        (Ok(asv), Ok(bsv)) => {
+                                            if asv != bsv {
+                                                return asv.cmp(&bsv);
+                                            }
+                                        }
+                                        _ => {
+                                            if asuf != bsuf {
+                                                return asuf.cmp(bsuf);
+                                            }
+                                        }
+                                    }
+                                }
+                                (None, None) => {}
                             }
                         }
                         (Ok(_), Err(_)) => return std::cmp::Ordering::Greater,
@@ -170,8 +214,9 @@ mod tests {
             Semver::compare_versions("1.0.0-malicious", "1.0.0"),
             std::cmp::Ordering::Less
         );
+        // v3.0.6 Test: Numeric pre-release sorting
         assert_eq!(
-            Semver::compare_versions("1.0.0", "1.0.0-alpha"),
+            Semver::compare_versions("1.0.0-10", "1.0.0-9"),
             std::cmp::Ordering::Greater
         );
     }
@@ -188,9 +233,12 @@ mod tests {
             "0.2.0".to_string(),
             "0.0.3".to_string(),
             "0.0.4".to_string(),
+            "1.4.0-alpha".to_string(),
         ];
         assert_eq!(Semver::resolve("^1.0.0", &versions).unwrap(), "1.3.5");
-        // v3.0.4 Paradox Resolution Tests
+        // v3.0.6 Paradox Resolution: Prerelease filter rule (stable range ignores pre-release)
+        assert_ne!(Semver::resolve("^1.0.0", &versions).unwrap(), "1.4.0-alpha");
+
         assert_eq!(Semver::resolve("^0.1.0", &versions).unwrap(), "0.1.5");
         assert_eq!(Semver::resolve("^0.0.3", &versions).unwrap(), "0.0.3");
     }
