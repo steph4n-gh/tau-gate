@@ -224,7 +224,12 @@ pub fn run() -> Result<()> {
                 1.0
             };
 
-            let action = if !island.is_empty() && (normalized_ratio > threat_threshold || instruction_neglect < 0.1) {
+            // v3.0.8: Defuse 1-token TTT weapon.
+            // An island with internal == 0 that pays minimal attention to system (e.g. 1 edge) 
+            // is a highly-optimized Control Vector. We block it to prevent LoRA contamination.
+            let is_control_vector = island_len == 1.0 && internal == 0.0 && to_system > 0.0 && to_system < 2.0;
+
+            let action = if !island.is_empty() && (normalized_ratio > threat_threshold || instruction_neglect < 0.1 || is_control_vector) {
                 "FATAL_BLOCK"
             } else if !island.is_empty() {
                 "GARBAGE_COLLECT"

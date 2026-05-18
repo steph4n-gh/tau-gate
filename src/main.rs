@@ -18,7 +18,7 @@ use std::fs;
 use std::process::{exit, Command};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V3.0.7 Build Metadata
+/// V3.0.8 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH");
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.7");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.8");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -135,6 +135,27 @@ fn main() -> Result<()> {
             current_graph = dep_graph.graph.subgraph(&partition_result.partition_a);
             iteration += 1;
         } else {
+            // v3.0.8 Deep Perimeter: Mainland Sweep.
+            // When the loop breaks, we MUST scan the remaining Mainland (partition_a)
+            // to ensure no malware is hiding behind the "Chaff" of dummy isolated nodes.
+            for node in &partition_result.partition_a {
+                let is_exec = check_threat_match(node, &dep_graph.execution_packages);
+                let is_entropy = check_threat_match(node, &dep_graph.suspicious_packages);
+
+                if is_exec || is_entropy {
+                    let mut is_whitelisted = false;
+                    for pattern_str in &config.whitelist {
+                        if glob_match(pattern_str, node) {
+                            is_whitelisted = true;
+                            break;
+                        }
+                    }
+                    if !is_whitelisted {
+                        if is_exec { total_quarantined_execution.insert(node.clone()); }
+                        if is_entropy { total_quarantined_entropy.insert(node.clone()); }
+                    }
+                }
+            }
             break;
         }
     }

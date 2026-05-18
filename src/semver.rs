@@ -18,7 +18,6 @@ impl Semver {
             .trim();
 
         // v3.0.6 Ironclad: NPM Pre-release Filter Rule.
-        // Prerelease versions will not match a range unless the range contains a prerelease.
         let is_pre_release_req = requirement.contains('-');
         let is_stable_req = !is_pre_release_req;
 
@@ -28,17 +27,19 @@ impl Semver {
                 continue;
             }
 
+            // v3.0.8 Deep Perimeter: Unified Tuple Locking Rule.
+            // If the range has a prerelease tag, it only matches the same tuple.
+            if is_pre_release_req {
+                let req_tuple = clean_req.split('-').next().unwrap_or("");
+                let v_tuple = version.split('-').next().unwrap_or("");
+                if req_tuple != v_tuple {
+                    continue;
+                }
+            }
+
             if requirement.starts_with('^') {
                 let req_parts: Vec<&str> = clean_req.split('.').collect();
                 let v_parts: Vec<&str> = version.split('.').collect();
-
-                // v3.0.7: Tuple Locking Rule.
-                // If the range has a prerelease tag, it only matches the same tuple.
-                if is_pre_release_req {
-                    let req_tuple = clean_req.split('-').next().unwrap_or("");
-                    let v_tuple = version.split('-').next().unwrap_or("");
-                    if req_tuple != v_tuple { continue; }
-                }
 
                 // v3.0.5 Ironclad: Robust Caret logic (lock non-zero OR non-numeric/pre-release).
                 let mut is_compatible = true;
@@ -60,8 +61,18 @@ impl Semver {
                 }
 
                 for i in 0..=locked_idx {
-                    let rv = req_parts.get(i).unwrap_or(&"0").split('-').next().unwrap_or("");
-                    let vv = v_parts.get(i).unwrap_or(&"0").split('-').next().unwrap_or("");
+                    let rv = req_parts
+                        .get(i)
+                        .unwrap_or(&"0")
+                        .split('-')
+                        .next()
+                        .unwrap_or("");
+                    let vv = v_parts
+                        .get(i)
+                        .unwrap_or(&"0")
+                        .split('-')
+                        .next()
+                        .unwrap_or("");
                     if rv != vv {
                         is_compatible = false;
                         break;
@@ -109,97 +120,88 @@ impl Semver {
     }
 
     fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
-        // v3.0.3 Hardening: Strict SemVer precedence. Stable > Pre-release.
-        // v3.0.6 Hardening: Numeric Pre-release sorting.
-        let a_raw_parts: Vec<&str> = a.split('.').collect();
-        let b_raw_parts: Vec<&str> = b.split('.').collect();
+        // v3.0.8 Deep Perimeter: Hyphen-First Splitting.
+        let (a_stable, a_pre) = if let Some(idx) = a.find('-') {
+            (&a[..idx], Some(&a[idx + 1..]))
+        } else {
+            (a, None)
+        };
+        let (b_stable, b_pre) = if let Some(idx) = b.find('-') {
+            (&b[..idx], Some(&b[idx + 1..]))
+        } else {
+            (b, None)
+        };
 
-        let max_len = std::cmp::max(a_raw_parts.len(), b_raw_parts.len());
+        // 1. Compare stable parts
+        let a_parts: Vec<&str> = a_stable.split('.').collect();
+        let b_parts: Vec<&str> = b_stable.split('.').collect();
+        let max_len = std::cmp::max(a_parts.len(), b_parts.len());
+
         for i in 0..max_len {
-            let a_part = a_raw_parts.get(i);
-            let b_part = b_raw_parts.get(i);
+            let ap = a_parts.get(i).unwrap_or(&"0");
+            let bp = b_parts.get(i).unwrap_or(&"0");
 
-            match (a_part, b_part) {
-                (Some(ap), Some(bp)) => {
-                    // Check for pre-release suffixes
-                    let (ap_clean, ap_suffix) = if let Some(idx) = ap.find('-') {
-                        (&ap[..idx], Some(&ap[idx + 1..]))
-                    } else {
-                        (*ap, None)
-                    };
-                    let (bp_clean, bp_suffix) = if let Some(idx) = bp.find('-') {
-                        (&bp[..idx], Some(&bp[idx + 1..]))
-                    } else {
-                        (*bp, None)
-                    };
+            let an = ap.parse::<u32>();
+            let bn = bp.parse::<u32>();
 
-                    let an = ap_clean.parse::<u32>();
-                    let bn = bp_clean.parse::<u32>();
-
-                    match (an, bn) {
-                        (Ok(an_val), Ok(bn_val)) => {
-                            if an_val != bn_val {
-                                return an_val.cmp(&bn_val);
-                            }
-                            // Numeric parts match. Compare suffixes if present.
-                            match (ap_suffix, bp_suffix) {
-                                (None, Some(_)) => return std::cmp::Ordering::Greater,
-                                (Some(_), None) => return std::cmp::Ordering::Less,
-                                (Some(asuf), Some(bsuf)) => {
-                                    let asuf_n = asuf.parse::<u32>();
-                                    let bsuf_n = bsuf.parse::<u32>();
-                                    match (asuf_n, bsuf_n) {
-                                        (Ok(asv), Ok(bsv)) => {
-                                            if asv != bsv {
-                                                return asv.cmp(&bsv);
-                                            }
-                                        }
-                                        // v3.0.7: Fix type precedence (Numeric < String)
-                                        (Ok(_), Err(_)) => return std::cmp::Ordering::Less,
-                                        (Err(_), Ok(_)) => return std::cmp::Ordering::Greater,
-                                        _ => {
-                                            if asuf != bsuf {
-                                                return asuf.cmp(bsuf);
-                                            }
-                                        }
-                                    }
-                                }
-                                (None, None) => {}
-                            }
-                        }
-                        (Ok(_), Err(_)) => return std::cmp::Ordering::Greater,
-                        (Err(_), Ok(_)) => return std::cmp::Ordering::Less,
-                        (Err(_), Err(_)) => {
-                            if ap != bp {
-                                return ap.cmp(bp);
-                            }
-                        }
+            match (an, bn) {
+                (Ok(anv), Ok(bnv)) => {
+                    if anv != bnv {
+                        return anv.cmp(&bnv);
                     }
                 }
-                (Some(ap), None) => {
-                    // a is longer.
-                    if let Ok(val) = ap.parse::<u32>() {
-                        if val == 0 {
-                            continue;
-                        }
-                        return std::cmp::Ordering::Greater;
+                (Ok(_), Err(_)) => return std::cmp::Ordering::Less,
+                (Err(_), Ok(_)) => return std::cmp::Ordering::Greater,
+                _ => {
+                    if ap != bp {
+                        return ap.cmp(bp);
                     }
-                    return std::cmp::Ordering::Less; // Pre-release
                 }
-                (None, Some(bp)) => {
-                    // b is longer.
-                    if let Ok(val) = bp.parse::<u32>() {
-                        if val == 0 {
-                            continue;
-                        }
-                        return std::cmp::Ordering::Less;
-                    }
-                    return std::cmp::Ordering::Greater; // Pre-release
-                }
-                (None, None) => break,
             }
         }
-        std::cmp::Ordering::Equal
+
+        // 2. Compare pre-release parts (if stable parts are equal)
+        match (a_pre, b_pre) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Greater, // Stable > Pre-release
+            (Some(_), None) => std::cmp::Ordering::Less,    // Pre-release < Stable
+            (Some(ap), Some(bp)) => {
+                let ap_parts: Vec<&str> = ap.split('.').collect();
+                let bp_parts: Vec<&str> = bp.split('.').collect();
+                let max_pre_len = std::cmp::max(ap_parts.len(), bp_parts.len());
+
+                for i in 0..max_pre_len {
+                    let app = ap_parts.get(i);
+                    let bpp = bp_parts.get(i);
+
+                    match (app, bpp) {
+                        (Some(ap_sub), Some(bp_sub)) => {
+                            let an = ap_sub.parse::<u32>();
+                            let bn = bp_sub.parse::<u32>();
+                            match (an, bn) {
+                                (Ok(anv), Ok(bnv)) => {
+                                    if anv != bnv {
+                                        return anv.cmp(&bnv);
+                                    }
+                                }
+                                // v3.0.7/v3.0.8: Numeric < String
+                                (Ok(_), Err(_)) => return std::cmp::Ordering::Less,
+                                (Err(_), Ok(_)) => return std::cmp::Ordering::Greater,
+                                _ => {
+                                    if ap_sub != bp_sub {
+                                        return ap_sub.cmp(bp_sub);
+                                    }
+                                }
+                            }
+                        }
+                        (Some(_), None) => return std::cmp::Ordering::Greater,
+                        (None, Some(_)) => return std::cmp::Ordering::Less,
+                        (None, None) => break,
+                    }
+                }
+                std::cmp::Ordering::Equal
+            }
+        }
     }
 }
 
@@ -226,17 +228,21 @@ mod tests {
             Semver::compare_versions("1.0.0-malicious", "1.0.0"),
             std::cmp::Ordering::Less
         );
-        // v3.0.6 Test: Numeric pre-release sorting
+        // v3.0.6/v3.0.8 Test: Numeric pre-release sorting
         assert_eq!(
             Semver::compare_versions("1.0.0-10", "1.0.0-9"),
             std::cmp::Ordering::Greater
+        );
+        // v3.0.8 Test: Type precedence (Numeric < String)
+        assert_eq!(
+            Semver::compare_versions("1.0.0-alpha.1", "1.0.0-alpha.beta"),
+            std::cmp::Ordering::Less
         );
     }
 
     #[test]
     fn test_semver_resolve_caret() {
         let versions = vec![
-            "1.0.0".to_string(),
             "1.2.0".to_string(),
             "1.3.5".to_string(),
             "2.0.0".to_string(),
@@ -246,10 +252,16 @@ mod tests {
             "0.0.3".to_string(),
             "0.0.4".to_string(),
             "1.4.0-alpha".to_string(),
+            "1.1.0-alpha.2".to_string(),
+            "1.1.0-alpha.1".to_string(),
         ];
-        assert_eq!(Semver::resolve("^1.0.0", &versions).unwrap(), "1.3.5");
+        assert_eq!(Semver::resolve("^1.2.0", &versions).unwrap(), "1.3.5");
         // v3.0.6 Paradox Resolution: Prerelease filter rule (stable range ignores pre-release)
-        assert_ne!(Semver::resolve("^1.0.0", &versions).unwrap(), "1.4.0-alpha");
+        assert_ne!(Semver::resolve("^1.2.0", &versions).unwrap(), "1.4.0-alpha");
+
+        // v3.0.8 Deep Perimeter: Tuple Locking (Pre-release req only matches same tuple for other pre-releases)
+        assert_eq!(Semver::resolve("^1.1.0-alpha.0", &versions).unwrap(), "1.1.0-alpha.2");
+        assert_ne!(Semver::resolve("^1.1.0-alpha.0", &versions).unwrap(), "1.4.0-alpha");
 
         assert_eq!(Semver::resolve("^0.1.0", &versions).unwrap(), "0.1.5");
         assert_eq!(Semver::resolve("^0.0.3", &versions).unwrap(), "0.0.3");
@@ -258,11 +270,12 @@ mod tests {
     #[test]
     fn test_semver_resolve_tilde() {
         let versions = vec![
-            "1.2.0".to_string(),
-            "1.2.4".to_string(),
             "1.3.0".to_string(),
+            "1.2.1-alpha.1".to_string(),
+            "1.2.1-alpha.2".to_string(),
         ];
-        assert_eq!(Semver::resolve("~1.2.0", &versions).unwrap(), "1.2.4");
+        // v3.0.8 Deep Perimeter: Tilde Tuple Lock
+        assert_eq!(Semver::resolve("~1.2.1-alpha.0", &versions).unwrap(), "1.2.1-alpha.2");
     }
 
     #[test]
