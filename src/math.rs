@@ -61,13 +61,14 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         v[i] = (degrees[i] - mean_degree) + (i as f64).sin() * 0.01;
     }
 
-    // V3.0.3 Paradox Resolution: Cap iterations at a performant limit (2000)
-    // to prevent freezing the CPU on large dense graphs.
-    let iterations = 2000;
+    // V3.0.5 Ironclad: Heavy Ball Momentum with consistent unnormalized state.
+    // We store the unnormalized matrix product (v_m) to ensure the momentum delta 
+    // is mathematically sound and doesn't trap high-frequency noise.
+    let iterations = 10_000;
     let tolerance = 1e-9;
     let mut fiedler_value = 0.0;
-    let mut v_prev = v.clone();
-    let beta = 0.85; // Momentum factor
+    let mut v_prev_m = v.clone(); 
+    let beta = 0.5; // Moderated momentum for stability
 
     for _ in 0..iterations {
         let sum: f64 = v.iter().sum();
@@ -76,19 +77,19 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
             *x -= mean;
         }
 
-        let mut v_next = vec![0.0; n];
+        let mut v_m = vec![0.0; n];
         for i in 0..n {
-            v_next[i] = (1.0 - alpha * degrees[i]) * v[i];
+            v_m[i] = (1.0 - alpha * degrees[i]) * v[i];
             for &neighbor in &adj[i] {
-                v_next[i] += alpha * v[neighbor];
+                v_m[i] += alpha * v[neighbor];
             }
         }
 
-        // v3.0.4 Paradox Resolution: Heavy Ball Momentum to accelerate diffusion.
+        let mut v_next = vec![0.0; n];
         for i in 0..n {
-            v_next[i] += beta * (v_next[i] - v_prev[i]);
+            v_next[i] = v_m[i] + beta * (v_m[i] - v_prev_m[i]);
         }
-        v_prev = v.clone();
+        v_prev_m = v_m;
 
         let norm: f64 = v_next.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm < 1e-15 {

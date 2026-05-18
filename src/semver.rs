@@ -23,12 +23,19 @@ impl Semver {
                 let req_parts: Vec<&str> = clean_req.split('.').collect();
                 let v_parts: Vec<&str> = version.split('.').collect();
 
-                // v3.0.4 Paradox Resolution: Correct Caret logic (lock left-most non-zero digit).
+                // v3.0.5 Ironclad: Robust Caret logic (lock non-zero OR non-numeric/pre-release).
                 let mut is_compatible = true;
                 let mut locked_idx = 0;
                 for (i, p) in req_parts.iter().enumerate() {
-                    if let Ok(n) = p.parse::<u32>() {
-                        if n > 0 || i == req_parts.len() - 1 {
+                    match p.parse::<u32>() {
+                        Ok(n) => {
+                            if n > 0 || i == req_parts.len() - 1 {
+                                locked_idx = i;
+                                break;
+                            }
+                        }
+                        // Non-numeric component (pre-release suffix)
+                        Err(_) => {
                             locked_idx = i;
                             break;
                         }

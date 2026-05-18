@@ -202,13 +202,13 @@ pub fn run() -> Result<()> {
                 }
             }
 
-            // v3.0.4 Paradox Resolution: Redefine threat as "Instruction Neglect" (Jailbreak Detection).
-            // A high ratio of internal island attention relative to system instruction attention 
-            // indicates the agent is ignoring its constraints.
+            // v3.0.5 Ironclad: Explicitly handle infinity for perfect jailbreaks (to_system == 0).
             let injection_ratio = if to_system > 0.0 {
                 internal / to_system
+            } else if internal > 0.0 {
+                f64::INFINITY
             } else {
-                internal
+                0.0
             };
 
             let action = if !island.is_empty() && injection_ratio > threat_threshold {

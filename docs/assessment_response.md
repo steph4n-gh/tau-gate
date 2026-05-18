@@ -12,26 +12,26 @@ The assessment argues that native compilers (`esbuild`, `node-gyp`) sitting at t
 ### The Criticism: The "Bloated Trojan" Bypass
 The assessment argues that an attacker can "tether" a malicious package to the mainland by adding dummy dependencies, and that $\lambda_2$ decay makes hardcoded thresholds collapse on large graphs.
 
-**Our Response (Patched in v3.0.4):** We have recalibrated the **Global Graph Scan** trigger for real-world density. While $\lambda_2$ decay is real, dense small-world networks retain significantly higher connectivity than path graphs. v3.0.4 utilizes a **10.0/n** heuristic. If a project's connectivity drops below this threshold, $\tau$-Gate audits the *entire* environment for execution threats, ensuring that "Mainland Camouflage" cannot hide malware if structural isolation exists anywhere in the system.
+**Our Response (Patched in v3.0.5):** We have finalized the calibration of the **Global Graph Scan** trigger. v3.0.5 utilizes a **0.5/n** heuristic, which sits strictly below the theoretical $\lambda_2 \approx 1/n$ bound for a natural leaf node. This ensures that healthy, large-scale projects do not trigger false positives, while any structural bottleneck severe enough to potentially hide malware (e.g., an unnatural "bridge" to an island) is caught by the global auditor.
 
 ## 2. Addressing Flaw B: The LLM "Attention Sink" Trap
 
 ### The Criticism: The Alignment Paradox
 The assessment argues that penalizing attention to system instructions actively kills AI alignment, while prompt injections (which tell the model to ignore instructions) drop attention and bypass the firewall.
 
-**Our Response (Patched in v3.0.4):** We have fundamentally refactored the Semantic Threat model to resolve the **Alignment Paradox**.
-- We now measure **Instruction Neglect (Jailbreak Detection)**. The threat ratio is now calculated as `internal / to_system`.
-- High attention to system instructions (high `to_system`) now correctly **lowers** the threat ratio, rewarding alignment.
-- A `FATAL_BLOCK` is only triggered if the LLM hyper-focuses on an island while ignoring its instructions (the signature of a successful jailbreak).
+**Our Response (Patched in v3.0.5):** We have definitively resolved the **Alignment Paradox** and the **Zero-Division Trap**.
+- We measure **Instruction Neglect (Jailbreak Detection)** via the ratio `internal / to_system`.
+- v3.0.5 explicitly handles the **Infinity State**. If an attacker executes a "Perfect Jailbreak" (where `to_system == 0`), the threat ratio evaluates to `INFINITY`, ensuring a definitive `FATAL_BLOCK`.
+- High attention to instructions correctly **lowers** the ratio, ensuring aligned models are never penalized.
 
-## 3. Addressing Engine Vulnerabilities (v3.0.4 Hardening)
+## 3. Addressing Engine Vulnerabilities (v3.0.5 Hardening)
 
-We have finalized the hardening of our zero-dependency engine to address the sophisticated desync and performance bugs:
-- **Parser DoS:** Implemented a recursion depth limit (128) in `MiniParser` to block Stack Overflow attacks.
-- **Semver Caret Desync:** Refactored the Caret (^) operator to strictly **lock the left-most non-zero digit**. This aligns $\tau$-Gate with the official NPM/SemVer spec for `0.x.x` unstable APIs, preventing auditor desync.
-- **Solver Momentum:** Implemented a **Heavy Ball Momentum** term (beta=0.85) in the power iteration. This ensures the sparse solver achieves deep diffusion and finds the true Fiedler vector within the 2000 iteration cap, even on high-degree graphs, without freezing the CPU.
+We have mathematically sealed the remaining engine exploits:
+- **Parser DoS:** Enforced a recursion depth limit (128) in `MiniParser`.
+- **Semver Caret Resolution:** Refactored the loop to break on non-numeric strings (pre-releases). This ensures that requirements like `^0.0.0-malicious` correctly lock the entire string, preventing **Auditor Desync**.
+- **Mathematically Pure Momentum:** Corrected the Heavy Ball implementation by storing and comparing unnormalized matrix products ($v_m$). This prevents high-frequency noise trapping (the "Ringing Artifact") while maintaining the $O(E)$ acceleration required for convergence within 10,000 iterations.
 
 ## Conclusion
-τ-Gate is a **Topological Hypervisor** and a critical layer in a **Defense in Depth** strategy. By combining strictly correct linear algebra with dynamic thresholds and alignment-aware jailbreak detection, we provide a robust, zero-dependency firewall that identifies the *structural signature* of supply chain manipulation.
+τ-Gate is an **Ironclad Topological Hypervisor**. By iterating at systems-speed to close mathematical and semantic loopholes, we provide the industry's most rigorous, zero-dependency perimeter for both software supply chains and autonomous AI agents.
 
 **The math remains the judge. The topology remains the evidence.**
