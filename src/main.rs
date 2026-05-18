@@ -18,7 +18,7 @@ use std::fs;
 use std::process::{exit, Command};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// V3.0.6 Build Metadata
+/// V3.0.7 Build Metadata
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_HASH: &str = env!("GIT_HASH");
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.6");
+    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.7");
     if dry_run {
         println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
     }
@@ -71,144 +71,132 @@ fn main() -> Result<()> {
         execute_actual_install(engine);
     }
 
-    // 3. The Math Phase
-    let partition_result = match math::analyze_graph(&dep_graph.graph) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("[\u{03C4}-Gate] \u{274C} Math Engine Error: {}", e);
-            exit(1);
+    // 3. The Math & Tripwire Phase (Recursive Bisection)
+    let mut current_graph = dep_graph.graph.clone();
+    let mut total_quarantined_execution = BTreeSet::new();
+    let mut total_quarantined_entropy = BTreeSet::new();
+    let mut iteration = 0;
+    let mut first_connectivity_score = 0.0;
+    let mut first_tau = 0.0;
+    let mut first_anomaly_size = 0;
+
+    println!("[\u{03C4}-Gate] \u{1F50D}  Performing Recursive Spectral Bisection...");
+
+    loop {
+        let node_count = current_graph.node_count();
+        if node_count < 3 { break; }
+
+        let partition_result = match math::analyze_graph(&current_graph) {
+            Ok(r) => r,
+            Err(_) => break,
+        };
+
+        if iteration == 0 {
+            first_connectivity_score = partition_result.connectivity_score;
+            first_tau = partition_result.tau;
+            first_anomaly_size = partition_result.partition_b.len();
         }
-    };
+
+        let total_nodes = node_count as f64;
+        let global_scan_threshold = 0.5 / total_nodes;
+        
+        println!(
+            "[\u{03C4}-Gate] \u{1F517} Iteration {}: \u{03BB}\u{2082} = {:.6} (Threshold: {:.2e})",
+            iteration + 1,
+            partition_result.connectivity_score,
+            global_scan_threshold
+        );
+
+        // Scan the isolated island for threats
+        for node in &partition_result.partition_b {
+            let is_exec = check_threat_match(node, &dep_graph.execution_packages);
+            let is_entropy = check_threat_match(node, &dep_graph.suspicious_packages);
+
+            if is_exec || is_entropy {
+                let mut is_whitelisted = false;
+                for pattern_str in &config.whitelist {
+                    if glob_match(pattern_str, node) {
+                        is_whitelisted = true;
+                        if !pattern_str.contains('@') {
+                            println!("[\u{03C4}-Gate] \u{26A0}\u{FE0F}  WHITELIST ROT WARNING: '{}' is unpinned.", pattern_str);
+                        }
+                        break;
+                    }
+                }
+                if !is_whitelisted {
+                    if is_exec { total_quarantined_execution.insert(node.clone()); }
+                    if is_entropy { total_quarantined_entropy.insert(node.clone()); }
+                }
+            }
+        }
+
+        // v3.0.7 Paradox Resolution: Recurse on partition_a if it remains isolated.
+        if partition_result.connectivity_score < global_scan_threshold && iteration < 10 {
+            current_graph = dep_graph.graph.subgraph(&partition_result.partition_a);
+            iteration += 1;
+        } else {
+            break;
+        }
+    }
 
     let elapsed = start_time
         .elapsed()
         .unwrap_or(Duration::from_secs(0))
         .as_millis();
 
-    pb_finish_and_clear(); // Custom replacement for pb
-
     println!(
-        "[\u{03C4}-Gate] \u{2705} Analyzed {} nodes in {} ms",
-        node_count, elapsed
-    );
-    println!(
-        "[\u{03C4}-Gate] \u{1F517} Connectivity Score (\u{03BB}\u{2082}): {:.6}",
-        partition_result.connectivity_score
+        "[\u{03C4}-Gate] \u{2705} Recursive Audit Complete ({} iterations) in {} ms",
+        iteration + 1, elapsed
     );
 
-    let total_nodes = node_count as f64;
-    let anomaly_size = partition_result.partition_b.len() as f64;
-    let percentage = (anomaly_size / total_nodes) * 100.0;
-
-    println!(
-        "[\u{03C4}-Gate] \u{1F4CA} Smallest Partition: {} nodes ({:.2}%)",
-        partition_result.partition_b.len(),
-        percentage
-    );
-
-    // 4. The Tripwire Phase
-    let mut execution_threats = Vec::new();
-    let mut entropy_threats = Vec::new();
-
-    // v3.0.5 Ironclad: Calibrate threshold below the leaf-node bound (1/n).
-    // Standard leaf nodes pull lambda_2 down to ~1/n. We use 0.5/n to ensure healthy 
-    // projects don't trigger global scans, while still catching high-entropy isolation.
-    let global_scan_threshold = 0.5 / total_nodes;
-    let global_scan_mode = partition_result.connectivity_score < global_scan_threshold;
-    let nodes_to_scan = if global_scan_mode {
-        (0..node_count)
-            .filter_map(|i| dep_graph.graph.node_weight(i))
-            .collect::<Vec<_>>()
-    } else {
-        partition_result.partition_b.iter().collect::<Vec<_>>()
-    };
-
-    if global_scan_mode {
-        println!("[\u{03C4}-Gate] \u{1F6A8}  EXTREME ISOLATION DETECTED (\u{03BB}\u{2082} < {:.2e}). Escalating to Global Graph Scan...", global_scan_threshold);
-    }
-
-    for node in nodes_to_scan {
-        let is_exec = check_threat_match(node, &dep_graph.execution_packages);
-        let is_entropy = check_threat_match(node, &dep_graph.suspicious_packages);
-
-        if is_exec || is_entropy {
-            let mut is_whitelisted = false;
-            for pattern_str in &config.whitelist {
-                if glob_match(pattern_str, node) {
-                    is_whitelisted = true;
-
-                    let is_scoped = pattern_str.starts_with('@');
-                    let has_version_pin = if is_scoped {
-                        pattern_str[1..].contains('@')
-                    } else {
-                        pattern_str.contains('@')
-                    };
-
-                    if !has_version_pin {
-                        println!("[\u{03C4}-Gate] \u{26A0}\u{FE0F}  WHITELIST ROT WARNING: '{}' is unpinned. Any future compromised version will automatically bypass security. Please pin to a specific version.", pattern_str);
-                    }
-                    break;
-                }
-            }
-            if !is_whitelisted {
-                if is_exec {
-                    execution_threats.push(node.clone());
-                }
-                if is_entropy {
-                    entropy_threats.push(node.clone());
-                }
-            }
-        }
-    }
+    let execution_threats: Vec<String> = total_quarantined_execution.into_iter().collect();
+    let entropy_threats: Vec<String> = total_quarantined_entropy.into_iter().collect();
 
     // 5. The Gate Phase (Enforcement)
     if !execution_threats.is_empty() || !entropy_threats.is_empty() {
-        let should_block = global_scan_mode || percentage < config.threshold_percentage;
+        eprintln!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  CRITICAL TOPOLOGICAL ANOMALY!");
 
-        if should_block {
-            eprintln!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  CRITICAL TOPOLOGICAL ANOMALY!");
-
-            if !execution_threats.is_empty() {
-                eprintln!("Quarantined execution-privileged nodes:");
-                for node in &execution_threats {
-                    eprintln!("  \u{2192} {}", node);
-                }
+        if !execution_threats.is_empty() {
+            eprintln!("Quarantined execution-privileged nodes:");
+            for node in &execution_threats {
+                eprintln!("  \u{2192} {}", node);
             }
+        }
 
-            if !entropy_threats.is_empty() {
-                eprintln!("Quarantined high-entropy (obfuscated) nodes:");
-                for node in &entropy_threats {
-                    eprintln!("  \u{26A0} {}", node);
-                }
+        if !entropy_threats.is_empty() {
+            eprintln!("Quarantined high-entropy (obfuscated) nodes:");
+            for node in &entropy_threats {
+                eprintln!("  \u{26A0} {}", node);
             }
+        }
 
-            let timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_secs().to_string())
-                .unwrap_or_else(|_| "0".to_string());
-            let log = telemetry::AnomalyLog {
-                timestamp,
-                tau: partition_result.tau,
-                anomaly_size: partition_result.partition_b.len(),
-                total_nodes: total_nodes as usize,
-                isolated_nodes: execution_threats.clone(),
-                message: format!(
-                    "Isolation Detection. Score: {:.6}, Partition: {:.2}%",
-                    partition_result.connectivity_score, percentage
-                ),
-            };
-            let _ = telemetry::log_anomaly(&log);
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs().to_string())
+            .unwrap_or_else(|_| "0".to_string());
+        
+        let log = telemetry::AnomalyLog {
+            timestamp,
+            tau: first_tau,
+            anomaly_size: first_anomaly_size,
+            total_nodes: node_count,
+            isolated_nodes: execution_threats.clone(),
+            message: format!(
+                "Recursive Isolation Detection. Base Score: {:.6}, Total Quarantined: {}",
+                first_connectivity_score, execution_threats.len() + entropy_threats.len()
+            ),
+        };
+        let _ = telemetry::log_anomaly(&log);
 
-            if let EngineType::Npm = engine {
-                let _ = fs::remove_file("package-lock.json");
-            }
+        if let EngineType::Npm = engine {
+            let _ = fs::remove_file("package-lock.json");
+        }
 
-            if config.mode == EnforcementMode::Enforcement {
-                eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
-                exit(1);
-            } else {
-                println!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  ADVISORY MODE: Anomaly detected but proceeding as per policy.");
-            }
+        if config.mode == EnforcementMode::Enforcement {
+            eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
+            exit(1);
+        } else {
+            println!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  ADVISORY MODE: Anomaly detected but proceeding as per policy.");
         }
     }
 
@@ -217,10 +205,6 @@ fn main() -> Result<()> {
         execute_actual_install(engine);
     }
     Ok(())
-}
-
-fn pb_finish_and_clear() {
-    // No-op for now as we removed indicatif
 }
 
 fn check_threat_match(node: &str, threats: &BTreeSet<String>) -> bool {

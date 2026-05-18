@@ -3,6 +3,8 @@ use crate::graph_impl::DiGraph;
 
 /// Result of a graph bisection analysis.
 pub struct PartitionResult {
+    /// Nodes in the "Mainland" partition.
+    pub partition_a: Vec<String>,
     /// Nodes in the "Island" or Anomaly Partition.
     pub partition_b: Vec<String>,
     /// The calculated bisection point (Max Spectral Gap).
@@ -42,6 +44,7 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let max_degree = degrees.iter().copied().fold(0.0, f64::max);
     if max_degree == 0.0 {
         return Ok(PartitionResult {
+            partition_a: Vec::new(),
             partition_b: Vec::new(),
             tau: 0.0,
             connectivity_score: 0.0,
@@ -161,12 +164,14 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
 
     if side_small.len() > side_large.len() {
         Ok(PartitionResult {
+            partition_a: side_small,
             partition_b: side_large,
             tau,
             connectivity_score: fiedler_value,
         })
     } else {
         Ok(PartitionResult {
+            partition_a: side_large,
             partition_b: side_small,
             tau,
             connectivity_score: fiedler_value,

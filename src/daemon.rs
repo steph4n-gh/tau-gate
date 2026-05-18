@@ -202,17 +202,29 @@ pub fn run() -> Result<()> {
                 }
             }
 
-            // v3.0.6 Ironclad: Seal "Independent Set" jailbreak (to_system == 0).
-            let injection_ratio = if to_system > 0.0 {
-                internal / to_system
+            // v3.0.7 Recursive Isolation: Scale-Invariant Threat Density.
+            // We normalize by island size (Ni) and system length (Ns) to prevent false positives 
+            // on large context windows (internal edges scale quadratically, system edges linearly).
+            let island_len = island.len() as f64;
+            let system_len = system_prompt_len as f64;
+            
+            let normalized_ratio = if to_system > 0.0 && island_len > 0.0 {
+                (internal * system_len) / (to_system * island_len)
             } else if !island.is_empty() {
-                // If it looks at instructions zero times, it is an automatic jailbreak.
                 f64::INFINITY
             } else {
                 0.0
             };
 
-            let action = if !island.is_empty() && injection_ratio > threat_threshold {
+            // v3.0.7: Seal "Independent Set" jailbreak (Instruction Neglect).
+            // Even if internal == 0, if an island ignores instructions, it's a threat.
+            let instruction_neglect = if !island.is_empty() {
+                to_system / island_len
+            } else {
+                1.0
+            };
+
+            let action = if !island.is_empty() && (normalized_ratio > threat_threshold || instruction_neglect < 0.1) {
                 "FATAL_BLOCK"
             } else if !island.is_empty() {
                 "GARBAGE_COLLECT"

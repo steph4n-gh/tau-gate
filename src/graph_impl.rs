@@ -1,5 +1,6 @@
 /// A bespoke, zero-dependency Directed Graph implementation for Tau-Gate.
 /// Replaces 'petgraph' to ensure architectural isolation.
+#[derive(Clone)]
 pub struct DiGraph {
     nodes: Vec<String>,
     edges: Vec<(usize, usize)>,
@@ -46,6 +47,28 @@ impl DiGraph {
 
     pub fn edges(&self) -> &[(usize, usize)] {
         &self.edges
+    }
+
+    /// v3.0.7: Returns a new graph containing only the nodes in the provided list of weights.
+    /// Used for Recursive Spectral Bisection.
+    pub fn subgraph(&self, weights: &[String]) -> Self {
+        let mut new_graph = Self::new();
+        let mut old_to_new = std::collections::BTreeMap::new();
+
+        for weight in weights {
+            if let Some(old_idx) = self.nodes.iter().position(|n| n == weight) {
+                let new_idx = new_graph.add_node(weight.clone());
+                old_to_new.insert(old_idx, new_idx);
+            }
+        }
+
+        for &(u, v) in &self.edges {
+            if let (Some(&u_new), Some(&v_new)) = (old_to_new.get(&u), old_to_new.get(&v)) {
+                new_graph.add_edge(u_new, v_new);
+            }
+        }
+
+        new_graph
     }
 }
 

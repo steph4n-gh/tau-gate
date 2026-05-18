@@ -19,7 +19,8 @@ impl Semver {
 
         // v3.0.6 Ironclad: NPM Pre-release Filter Rule.
         // Prerelease versions will not match a range unless the range contains a prerelease.
-        let is_stable_req = !requirement.contains('-');
+        let is_pre_release_req = requirement.contains('-');
+        let is_stable_req = !is_pre_release_req;
 
         let mut best_match: Option<&String> = None;
         for version in available_versions {
@@ -31,18 +32,26 @@ impl Semver {
                 let req_parts: Vec<&str> = clean_req.split('.').collect();
                 let v_parts: Vec<&str> = version.split('.').collect();
 
+                // v3.0.7: Tuple Locking Rule.
+                // If the range has a prerelease tag, it only matches the same tuple.
+                if is_pre_release_req {
+                    let req_tuple = clean_req.split('-').next().unwrap_or("");
+                    let v_tuple = version.split('-').next().unwrap_or("");
+                    if req_tuple != v_tuple { continue; }
+                }
+
                 // v3.0.5 Ironclad: Robust Caret logic (lock non-zero OR non-numeric/pre-release).
                 let mut is_compatible = true;
                 let mut locked_idx = 0;
                 for (i, p) in req_parts.iter().enumerate() {
-                    match p.parse::<u32>() {
+                    let part_clean = p.split('-').next().unwrap_or("");
+                    match part_clean.parse::<u32>() {
                         Ok(n) => {
                             if n > 0 || i == req_parts.len() - 1 {
                                 locked_idx = i;
                                 break;
                             }
                         }
-                        // Non-numeric component (pre-release suffix)
                         Err(_) => {
                             locked_idx = i;
                             break;
@@ -51,8 +60,8 @@ impl Semver {
                 }
 
                 for i in 0..=locked_idx {
-                    let rv = req_parts.get(i).unwrap_or(&"0");
-                    let vv = v_parts.get(i).unwrap_or(&"0");
+                    let rv = req_parts.get(i).unwrap_or(&"0").split('-').next().unwrap_or("");
+                    let vv = v_parts.get(i).unwrap_or(&"0").split('-').next().unwrap_or("");
                     if rv != vv {
                         is_compatible = false;
                         break;
@@ -77,8 +86,8 @@ impl Semver {
                 let v_parts: Vec<&str> = version.split('.').collect();
                 if req_parts.len() >= 2
                     && v_parts.len() >= 2
-                    && req_parts[0] == v_parts[0]
-                    && req_parts[1] == v_parts[1]
+                    && req_parts[0].split('-').next() == v_parts[0].split('-').next()
+                    && req_parts[1].split('-').next() == v_parts[1].split('-').next()
                     && Self::compare_versions(version, clean_req) != std::cmp::Ordering::Less
                 {
                     if let Some(current_best) = best_match {
@@ -145,6 +154,9 @@ impl Semver {
                                                 return asv.cmp(&bsv);
                                             }
                                         }
+                                        // v3.0.7: Fix type precedence (Numeric < String)
+                                        (Ok(_), Err(_)) => return std::cmp::Ordering::Less,
+                                        (Err(_), Ok(_)) => return std::cmp::Ordering::Greater,
                                         _ => {
                                             if asuf != bsuf {
                                                 return asuf.cmp(bsuf);

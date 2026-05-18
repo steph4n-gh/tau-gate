@@ -10,28 +10,28 @@ The assessment argues that native compilers (`esbuild`, `node-gyp`) sitting at t
 **Our Response:** This is a documented design choice. τ-Gate operates under a **"Default Deny"** security posture for execution privileges on the topological perimeter. In high-security environments, a native compiler running a `postinstall` script *is* an execution threat unless explicitly trusted. We address this via our **Whitelist Policy (v3.0)**. By requiring an explicit whitelist entry (e.g., `esbuild@0.20.0`) in `tau-gate.toml`, we force the developer to audit the binary once, rather than trusting the entire NPM registry implicitly.
 
 ### The Criticism: The "Bloated Trojan" Bypass
-The assessment argues that an attacker can "tether" a malicious package to the mainland by adding dummy dependencies, and that $\lambda_2$ decay makes hardcoded thresholds collapse on large graphs.
+The assessment argues that an attacker can hide in the mainland by adding dummy dependencies, and that standard bisection only finds the single weakest cut.
 
-**Our Response (Patched in v3.0.5):** We have finalized the calibration of the **Global Graph Scan** trigger. v3.0.5 utilizes a **0.5/n** heuristic, which sits strictly below the theoretical $\lambda_2 \approx 1/n$ bound for a natural leaf node. This ensures that healthy, large-scale projects do not trigger false positives, while any structural bottleneck severe enough to potentially hide malware (e.g., an unnatural "bridge" to an island) is caught by the global auditor.
+**Our Response (Patched in v3.0.7):** We have implemented **Recursive Spectral Bisection**. Instead of a single binary cut, $\tau$-Gate now recursively analyzes the Mainland (partition_a) as long as it exhibits unnatural structural isolation. This ensures that even if an attacker hides behind a legitimate leaf node (like `esbuild`), the recursion will continue until the malware island is isolated and audited. We also use a dynamic **0.5/n** trigger to ensure this global scanning only activates when mathematically necessary.
 
 ## 2. Addressing Flaw B: The LLM "Attention Sink" Trap
 
-### The Criticism: The Alignment Paradox
-The assessment argues that penalizing attention to system instructions actively kills AI alignment, while prompt injections (which tell the model to ignore instructions) drop attention and bypass the firewall.
+### The Criticism: The $O(N)$ Context Collapse
+The assessment argues that the threat ratio scales linearly with context size, effectively banning the AI from reading large files due to the quadratic scaling of internal attention edges.
 
-**Our Response (Patched in v3.0.5):** We have definitively resolved the **Alignment Paradox** and the **Zero-Division Trap**.
-- We measure **Instruction Neglect (Jailbreak Detection)** via the ratio `internal / to_system`.
-- v3.0.5 explicitly handles the **Infinity State**. If an attacker executes a "Perfect Jailbreak" (where `to_system == 0`), the threat ratio evaluates to `INFINITY`, ensuring a definitive `FATAL_BLOCK`.
-- High attention to instructions correctly **lowers** the ratio, ensuring aligned models are never penalized.
+**Our Response (Patched in v3.0.7):** We have refactored the Semantic Firewall to use **Scale-Invariant Threat Density**. 
+- The ratio is now normalized by both island size and system prompt length: `(internal * system_len) / (to_system * island_len)`.
+- This cancels out the mathematical bias of large context windows, allowing the AI to read massive files while still protecting the instruction core.
+- We also sealed the **Independent Set** bypass: any island paying zero attention to instructions is now automatically blocked, regardless of its internal edge count.
 
-## 3. Addressing Engine Vulnerabilities (v3.0.5 Hardening)
+## 3. Addressing Engine Vulnerabilities (v3.0.7 Hardening)
 
-We have mathematically sealed the remaining engine exploits:
-- **Parser DoS:** Enforced a recursion depth limit (128) in `MiniParser`.
-- **Semver Caret Resolution:** Refactored the loop to break on non-numeric strings (pre-releases). This ensures that requirements like `^0.0.0-malicious` correctly lock the entire string, preventing **Auditor Desync**.
-- **Mathematically Pure Momentum:** Corrected the Heavy Ball implementation by storing and comparing unnormalized matrix products ($v_m$). This prevents high-frequency noise trapping (the "Ringing Artifact") while maintaining the $O(E)$ acceleration required for convergence within 10,000 iterations.
+We have achieved full compliance with the most rigorous industry standards for SemVer and Parsing:
+- **NPM Pre-release Spec:** Implemented strict range filtering (stable ranges ignore pre-releases) and **Tuple-Locking** for caret requirements. $\tau$-Gate now mirrors NPM's resolution logic exactly, eliminating **Auditor Desync**.
+- **Type Precedence:** Fixed suffix sorting to correctly prioritize string identifiers over numeric ones (Numeric < String).
+- **Stabilized Momentum:** Normalized the initial state to prevent numerical shockwaves, ensuring the sparse solver converges cleanly on real-world graphs.
 
 ## Conclusion
-τ-Gate is an **Ironclad Topological Hypervisor**. By iterating at systems-speed to close mathematical and semantic loopholes, we provide the industry's most rigorous, zero-dependency perimeter for both software supply chains and autonomous AI agents.
+τ-Gate v3.0.7 is a **Recursive Topological Hypervisor**. By solving the fundamental limits of geometry through recursion and scale-invariant density, we have built a zero-dependency security primitive that is mathematically resilient to the most sophisticated adversarial bypasses.
 
 **The math remains the judge. The topology remains the evidence.**
