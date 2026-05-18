@@ -50,12 +50,27 @@ impl MiniParser {
 
     /// V2.0 Hardening: Detects high-entropy strings (potential obfuscation) in manifests.
     pub fn detect_obfuscation(content: &str) -> bool {
+        // v3.0.6 UX Fix: Strip package manager metadata enclosed in parentheses.
+        // pnpm appends long hashes like (patch_hash=1db11a...) which trigger false positives.
+        // Valid NPM package names do not contain parentheses.
+        let mut clean_content = String::new();
+        let mut in_parens = 0;
+        for c in content.chars() {
+            if c == '(' {
+                in_parens += 1;
+            } else if c == ')' && in_parens > 0 {
+                in_parens -= 1;
+            } else if in_parens == 0 {
+                clean_content.push(c);
+            }
+        }
+
         let mut max_continuous = 0;
         let mut current = 0;
         let mut distinct_chars = std::collections::BTreeSet::new();
         let mut max_distinct = 0;
 
-        for c in content.chars() {
+        for c in clean_content.chars() {
             if c.is_alphanumeric() || c == '/' || c == '+' || c == '=' {
                 current += 1;
                 distinct_chars.insert(c);
