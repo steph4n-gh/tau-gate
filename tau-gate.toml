@@ -1,9 +1,6 @@
-# Tau-Gate Configuration
-
-# The structural median anomaly threshold. If the partition holding suspicious
-# packages drops below this % of the total graph size, the execution is blocked.
+# Explicit --enforce blocks unapproved markers; audit is advisory by default.
+# Exact name@version approvals only; these do not pin artifact digests.
+whitelist = []
+# Legacy compatibility values; validated but not used to gate topology.
+mode = "Advisory"
 threshold_percentage = 15.0
-
-# Whitelist trusted scopes or packages using Glob patterns.
-# Legitimate packages that need to run install scripts but are small/isolated should go here.
-whitelist = ["@astrojs/*", "@types/*", "vite"]

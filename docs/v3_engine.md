@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # $\tau$-Gate v3.0: The Network-Level Resolution Engine
 
 $\tau$-Gate v2.0 achieved the **Absolute Zero** standard for external Rust dependencies. However, in environments where a lockfile is missing, v2.0 fell back to executing local system binaries (e.g., `npm install --package-lock-only`) to resolve the dependency tree.

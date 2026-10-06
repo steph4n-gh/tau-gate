@@ -20,18 +20,17 @@ jobs:
 
       - name: Setup Rust Environment
         run: |
-          rustup toolchain install stable
-          rustup default stable
+          rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
 
-      - name: Build Daemon and Static Library
+      - name: Build CLI and Native Library
         run: |
           echo "[Build] Compiling tau-gate..."
-          cargo build --release
+          cargo build --release --offline
           
       - name: Verify Build Outputs
         run: |
           if [ ! -f target/release/tau-gate ]; then
-            echo "Error: Daemon binary not found!"
+            echo "Error: CLI binary not found!"
             exit 1
           fi
           if [ ! -f target/release/libtau_gate.a ]; then
@@ -41,4 +40,12 @@ jobs:
           echo "✅ Build verified."
 
       - name: Run Tests
-        run: cargo test --release
+        run: cargo test --release --offline --all-targets
+
+      - name: Check formatting and read-only review
+        run: |
+          cargo fmt -- --check
+          cargo clippy --offline --all-targets -- -D warnings
+          ./e2e_zero.sh
+          cc -Iinclude tests/ffi_smoke.c target/release/libtau_gate.a -ldl -lpthread -lm -o /tmp/tau-ffi-smoke
+          /tmp/tau-ffi-smoke

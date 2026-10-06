@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # Extensibility Guide: Adding New Package Managers (v3.0.0)
 
 $\tau$-Gate v3.0.0 was designed with a modular, **Absolute Zero** architecture. We welcome contributions that add support for new ecosystems while maintaining our 0-dependency standard.

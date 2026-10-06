@@ -1,4 +1,7 @@
 #!/bin/bash
+# Historical unqualified prototype: deliberately disabled to avoid resolution/install side effects.
+echo "INCOMPLETE: retired prototype; use read-only npm review (README.md)" >&2
+exit 2
 
 # τ-Gate: Reproducible Build Engine
 # This script ensures that the v2.0 zero-dependency binary is byte-for-byte identical.

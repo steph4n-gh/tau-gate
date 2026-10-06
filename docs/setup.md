@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # Installation & Operation Guide (v3.0.0)
 
 This document provides exhaustive instructions for installing $\tau$-Gate across different use cases.

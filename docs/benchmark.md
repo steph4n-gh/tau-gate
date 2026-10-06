@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # τ-Gate: Mass Ecosystem Benchmark (Draft)
 
 ## Objective

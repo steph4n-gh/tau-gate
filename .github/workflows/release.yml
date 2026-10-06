@@ -24,19 +24,13 @@ jobs:
       - name: Setup Rust Environment
         run: |
           # Use pre-installed rustup to ensure correct toolchain
-          rustup toolchain install stable
-          rustup default stable
+          rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
 
-      - name: Dogfooding Audit
+      - name: Build and validate qualified review
         run: |
-          echo "[Audit] Building τ-Gate for self-audit..."
-          cargo build --release
-          
-          echo "[Audit] Running active spectral bisection on own tree..."
-          # Active Dogfooding: The zero-dependency binary audits itself.
-          ./target/release/tau-gate
-          
-          echo "✅ Dogfooding Audit Passed. Project is secured by itself."
+          cargo build --release --offline
+          cargo test --release --offline --all-targets
+          ./e2e_zero.sh
 
       - name: Manual Release via GH CLI
         run: |

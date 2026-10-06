@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # $\tau$-Gate: Strategy & Truth Audit (v3.0.0)
 
 This document provides a technical audit and discussion points for the self-contained security model.

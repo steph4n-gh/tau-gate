@@ -1,0 +1,33 @@
+{
+  "lockfileVersion": 3,
+  "packages": {
+    "": {
+      "name": "review-demo",
+      "version": "1.0.0",
+      "dependencies": {
+        "bridge": "1.0.0"
+      },
+      "devDependencies": {
+        "test-tool": "1.0.0"
+      }
+    },
+    "node_modules/bridge": {
+      "version": "1.0.0",
+      "resolved": "https://registry.example/bridge-1.0.0.tgz",
+      "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "dependencies": {
+        "leaf": "1.0.0"
+      }
+    },
+    "node_modules/leaf": {
+      "version": "1.0.0"
+    },
+    "node_modules/test-tool": {
+      "version": "1.0.0",
+      "hasInstallScript": true
+    },
+    "node_modules/decoy": {
+      "version": "1.0.0"
+    }
+  }
+}

@@ -1,118 +1,89 @@
-# 🛡️ τ-Gate (v3.0.0)
+# Tau-Gate
 
-**Absolute Zero Security for the Modern Supply Chain.**
+Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-[![Security Audit](https://github.com/steph4n-gh/tau-gate/actions/workflows/release.yml/badge.svg)](https://github.com/steph4n-gh/tau-gate/actions)
-[![Dependencies: 0](https://img.shields.io/badge/Dependencies-0-00f3ff?style=flat-square)](https://github.com/steph4n-gh/tau-gate/blob/main/Cargo.toml)
-[![τ-Gate: Secured](https://img.shields.io/badge/τ--Gate-Secured-00f3ff?style=flat-square)](https://github.com/steph4n-gh/tau-gate)
+A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. Installation markers are review evidence, not malware findings. Downloaded artifacts, dependency script bodies and runtime behavior are not inspected; an absent marker does not prove absence of execution. All lockfile records are included, including dev and optional packages; host installation selection is not simulated.
 
-τ-Gate is a high-integrity security primitive designed to identify topological anomalies via **Deep Graphing**—a recursive analysis that maps the complete transitive execution surface of your software. By resolving deep, multi-level dependency chains into a single mathematical system, τ-Gate eliminates the "Auditor's Paradox" while operating under a strict **Zero-Dependency Mandate** (pure Rust, std-only) to ensure the auditor itself never becomes a vector for the very attacks it detects.
+## Try the review
 
-This surface encompasses:
-- **Transitive Relationships:** The deep, recursive "hidden" connections where a trusted library pulls in a compromised sub-dependency.
-- **Execution Vectors:** Every point where code can run outside your control—including lifecycle scripts (`preinstall`, `postinstall`), build-time macros (`build.rs`), and native binary shims.
-
----
-
-## 🚀 Quick Start
-
-```bash
-# Build the high-integrity binary
-cargo build --release
-
-# Run a dry-run audit on the current project
-./target/release/tau-gate --dry-run
-
-# Audit a project via the Network Engine (no lockfile required)
-./target/release/tau-gate --network
-
-# Combine modes for a passive, network-verified audit
-./target/release/tau-gate --network --dry-run
+```sh
+cargo build --release --offline
+./target/release/tau-gate review --base examples/review/base.json --head examples/review/head.json
+./target/release/tau-gate review --base examples/review/base.json --head examples/review/head.json --json
 ```
 
----
+The fixture changes `bridge` integrity at the **same version** and adds an install marker to `leaf`. `leaf` appears via `root → bridge → leaf` even with an unrelated disconnected package. `test-tool` is separately reported through a dev dependency. The sources and integrity strings are synthetic; no artifact safety claim follows from this example.
 
-## 🛡️ Deep Graphing & The Transitive Explosion
+For a project with an existing npm lockfile:
 
-Most security tools fail because they only see what you *tell* them to install. In modern ecosystems like npm, the average project has a **4.32x Dependency Amplification Factor**—for every 1 package you declare, you pull in over 4 transitive ones. 
+```sh
+/path/to/tau-gate audit --lock package-lock.json --manifest package.json --json
+```
 
-With an average dependency depth of **4.4 levels** (and some reaching 20+), the true "security perimeter" of your project is hidden deep in the transitive tree. This is where attackers hide.
+Capture base/head lockfiles and their root manifests from the revisions you intend to review. Providing both manifests also detects root lifecycle script body changes; omitting manifests is explicitly a format-specific `*_lock_snapshot_only` scope. Reports contain SHA-256 hashes of every consumed lockfile and manifest, full package identities, dependency edge kinds, declared execution candidates and shortest introducer paths. Changed packages also show their before/after introducing paths. JSON output is deterministic for the same bytes and options.
 
-**τ-Gate is a Deep Graphing engine.** It recursively resolves every transitive relationship into a single, interconnected mathematical system (the Laplacian Matrix). This allows τ-Gate to identify "Topological Islands" that are trying to hide in the deep brush of your dependency tree.
+Audit is read-only: it never resolves, installs, deletes inputs or writes logs. `--dry-run` remains a compatibility alias. Missing inputs, malformed data, manifest disagreement, unresolved required dependencies and unqualified formats produce an incomplete report and exit 2. Network resolution and the old daemon are retired. Bun, Go, Cargo CLI and Yarn Berry are unsupported. Cargo metadata parsing remains an incomplete library preview. Multiple detected lockfiles require an explicit --lock.
 
----
+## pnpm and Yarn coverage
 
-## 🧠 The Problem & Solution (Explain Like I'm 6)
+| Format | Identity and supported topology | Execution metadata |
+| --- | --- | --- |
+| npm v3 | Installed lockfile instances, nearest node_modules targets, workspace links | Declared install markers; supplied root lifecycle bodies |
+| pnpm v9 | Namespaced environment/project documents, importer/workspace links, exact snapshot versions, aliases, peer/patch contexts and observed resolution metadata | Transitive scripts unknown; positive build markers retained |
+| Yarn Classic v1 | Exact descriptor groups, aliases, version/resolved/integrity and dependency/optional maps; supplied root manifest gives root edges | Transitive scripts unknown |
 
-### The Problem: Transitive Secrecy
-Modern supply chain attacks (like **Dependency Confusion** or **Typosquatting**) bypass traditional scanners because they hide in **Transitive Secrecy**. Attackers establish structural bottlenecks deep in your dependency tree to execute malicious code quietly.
+pnpm/Yarn snapshots are resolution records, not an installed node_modules tree; `installed_path` is null. Yarn root attribution is incomplete without a manifest, and workspace manifests/peer placement are not inferred. Classic records with rarer unsupported fields (including permissions/prebuiltVariants/uid/registry) are rejected visibly. See [supported contract](docs/review.md).
 
-### The Solution: $\tau$-Gate
-Imagine your computer is a big city. When you download a new app, it's like a new person moving into town. Most people move into busy neighborhoods and make lots of friends. But sometimes, a **bad guy** tries to sneak in. He stays in a tiny, hidden basement, doesn't talk to anyone, and tries to build a secret tunnel to the city's bank vault.
+```sh
+./target/release/tau-gate review --base base-pnpm.yaml --head head-pnpm.yaml --json
+./target/release/tau-gate audit --lock yarn.lock --manifest package.json --json
+```
 
-**$\tau$-Gate is an audit tool for your city.** It analyzes the **Shape of your Dependencies**. It looks at the "map" of where everyone lives. If it sees someone hiding in a tiny, lonely corner (an isolated node) while trying to build a secret tunnel (execute a build script), it **slams the gates shut** and kicks them out before they can do any damage.
+These emit useful graphs/diffs but **exit 2** because dependency execution metadata is unknown, including with --enforce. A topology-complete pnpm/Yarn report explicitly contains:
 
----
+```json
+{"status":"incomplete","topology_status":"complete","execution_metadata_status":"unknown_transitive_scripts"}
+```
 
-## 🛡️ Why τ-Gate? (The XZ Utils Problem)
+Handle that exit code when capturing a report in a `set -e` script; inspect the JSON statuses and issues to distinguish unknown execution coverage from an unresolved graph. Comparisons require the same lockfile format because installed instances, peer-context snapshots and descriptor groups are different identities. Version changes in pnpm snapshot keys appear as removed/added records, rather than inventing an installed upgrade pairing.
 
-Standard security tools look for *known* vulnerabilities (CVEs). τ-Gate looks for **Topological Anomalies**—structural shifts that indicate an attacker is trying to "hide" malicious logic in your dependency graph.
+Pinned real fixtures and independently computed node/edge/artifact hashes are checked into [tests/fixtures/real](tests/fixtures/real/README.md): Hono has 1,100 records and 1,545 typed edges; Yarn Classic 1.22.22 has 1,063 records and 2,074 typed edges. The tests never install dependencies or run fixture scripts.
 
-### Case Study: The XZ Utils Backdoor (2024)
-The XZ Utils attack succeeded because it was structurally subtle. An attacker introduced a complex build-time dependency that linked a compression library (`liblzma`) to a high-privilege system daemon (`sshd`). 
-- **The Anomaly:** In a healthy topology, a compression utility should be a highly-connected, "central" utility node. The attack created a specific, isolated path that only activated under certain build conditions.
-- **How τ-Gate Solves This:** τ-Gate's Laplacian Engine identifies these "Islands of Isolation." By computing the **Maximum Spectral Gap** on the **complete topological graph**, τ-Gate would have flagged the XZ build-time environment as having a high-entropy, topologically isolated component with execution privileges—stopping the backdoor before it could be linked.
-
----
-
-## ⚙️ Core Engines
-
-### 1. Static Extraction Layer
-τ-Gate supports native extraction for the most common ecosystems:
-- **NPM / PNPM / Bun:** Bespoke JSON and YAML parsers for lockfiles.
-- **Yarn (v1 & Berry):** Dual-mode support with structural fallback for legacy v1 trees.
-- **Cargo:** Direct integration with `cargo metadata`.
-- **Go:** Parser for `go mod graph`.
-
-### 2. The Network Engine (`--network`)
-When a local lockfile is missing, corrupted, or suspect, the Network Engine fetches metadata directly from the NPM registry.
-- Resolves full transitive trees via parallelized registry queries.
-- Bypasses local environment noise to provide a "Registry Truth" baseline.
-- Ideal for auditing shallow clones or CI environments where `node_modules` are not yet populated.
-- **Note:** Can be combined with `--dry-run` to perform a passive audit without attempting a post-audit install.
-
-### 3. Mathematical Layer (The Laplacian Engine)
-τ-Gate builds a Laplacian matrix of your dependency graph and computes its second-smallest eigenvalue ($\lambda_2$). 
-- **Connectivity Score ($\lambda_2$):** A lower score indicates higher structural isolation.
-- **Bisection:** Uses the **Maximum Spectral Gap** on the Fiedler Vector to pinpoint exactly which nodes are trying to "hide" in your topology.
-
----
-
-## 🔧 Configuration (`tau-gate.toml`)
+## Optional marker policy
 
 ```toml
-# Minimum anomaly threshold (percentage of total graph)
-threshold_percentage = 15.0
-
-# Trusted scopes or pinned versions
-whitelist = ["@types/*", "vite@5.0.0"]
-
-# Enforcement Mode: "enforcement" (abort build) or "advisory" (warn only)
-mode = "enforcement"
+# tau-gate.toml; no wildcard matching or automatic trust list
+whitelist = ["test-tool@1.0.0"]
 ```
 
----
+```sh
+./target/release/tau-gate audit --lock examples/review/head.json --enforce --json
+```
 
-## 🏗️ FFI & Integration
-τ-Gate includes a `cdylib` target for high-performance integration into Python/C++ inference engines (e.g., `tsp-mlx`). It exposes a safe C FFI for real-time topological pruning.
+Explicit `--enforce` blocks unapproved execution **markers**, checking every candidate independently of the spectral cut. Exact `name@version` approvals do not pin artifact digests. JSON states the outcome and unapproved coordinates. This is a limited marker policy, not a malware or artifact verification gate. Legacy `mode` and `threshold_percentage` configuration values are validated for compatibility but no longer select/block a topology policy; enforcement requires the flag.
 
-## 📚 Documentation & Deep Dives
+| Exit | Meaning |
+| --- | --- |
+| 0 | Completed advisory report, or explicit marker policy allowed |
+| 1 | Explicit marker policy blocked |
+| 2 | Incomplete extraction or invalid input/configuration |
+| 64 | Invalid command/options |
 
-- [Architecture & V3 Engine Deep Dive](docs/v3_engine.md)
-- [Policy Enforcement Guide](docs/policy.md)
-- [FFI & Mathematical Interpretation](docs/interpretation.md)
-- [Validation & Benchmarking](docs/validation.md)
-- [Whitepaper: The Spectral Bisection of Supply Chains](docs/whitepaper.md)
+## Topology and native interface
 
----
-**τ-Gate:** *Topology is Truth.*
+The sparse solver returns a bounded **Rayleigh estimate**, residual, convergence flag and iteration count. Residual convergence does not certify the second eigenpair. A disconnected graph's zero connectivity is handled exactly. Topology cannot distinguish benign and malicious code with the same dependency shape and is never used to hide execution candidates or certify safety.
+
+The C ABI is documented in [include/tau_gate.h](include/tau_gate.h). NULL names and invalid endpoints/counts are rejected; a NULL edge pointer is accepted for zero edges. Result ownership is explicit. The existing four-field result prefix is retained and diagnostics are appended. Rebuild bindings for the new fields. Valid pointers remain the caller's responsibility. The former index-based daemon pruning policy is retired; no TSP/MLX workload benefit is claimed or validated by these tests.
+
+## Validation and scope
+
+```sh
+cargo test --release --offline --all-targets
+cargo fmt -- --check
+./e2e_zero.sh
+./prove-it.sh
+```
+
+Tests cover input preservation, missing/unsupported extraction, nested/workspace resolution, optional/peer/dev paths, strict Unicode JSON, configuration validation, root script and same-version artifact changes, all-candidate reporting, FFI ownership and solver nonconvergence. See [docs/review.md](docs/review.md) for the contract and next work. Older research/marketing documents and ecosystem scripts are historical, unverified prototypes, not current validation evidence.
+
+There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review. Next priorities are manifest-backed dependency capabilities across formats, host installation agreement, digest-pinned approvals and representative benign/adversarial workloads with simple baselines.
