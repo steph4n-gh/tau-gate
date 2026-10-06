@@ -1,6 +1,6 @@
 # Tau-Gate
 
-Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which installed package instances changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
+Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
 A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. Installation markers are review evidence, not malware findings. Downloaded artifacts, dependency script bodies and runtime behavior are not inspected; an absent marker does not prove absence of execution. All lockfile records are included, including dev and optional packages; host installation selection is not simulated.
 
@@ -20,7 +20,7 @@ For a project with an existing npm lockfile:
 /path/to/tau-gate audit --lock package-lock.json --manifest package.json --json
 ```
 
-Capture base/head lockfiles and their root manifests from the revisions you intend to review. Providing both manifests also detects root lifecycle script body changes; omitting manifests is explicitly `npm_v3_lock_snapshot_only`. Reports contain SHA-256 hashes of every consumed lockfile and manifest, full package identities, dependency edge kinds, declared execution candidates and shortest introducer paths. Changed packages also show their before/after introducing paths. JSON output is deterministic for the same bytes and options.
+Capture base/head lockfiles and their root manifests from the revisions you intend to review. Providing both manifests also detects root lifecycle script body changes; omitting manifests is explicitly a format-specific `*_lock_snapshot_only` scope. Reports contain SHA-256 hashes of every consumed lockfile and manifest, full package identities, dependency edge kinds, declared execution candidates and shortest introducer paths. Changed packages also show their before/after introducing paths. JSON output is deterministic for the same bytes and options.
 
 Audit is read-only: it never resolves, installs, deletes inputs or writes logs. `--dry-run` remains a compatibility alias. Missing inputs, malformed data, manifest disagreement, unresolved required dependencies and unqualified formats produce an incomplete report and exit 2. Network resolution and the old daemon are retired. Bun, Go, Cargo CLI and Yarn Berry are unsupported. Cargo metadata parsing remains an incomplete library preview. Multiple detected lockfiles require an explicit --lock.
 
