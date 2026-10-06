@@ -1,4 +1,4 @@
-//! Read-only npm snapshot reports. Execution markers are review evidence, not malware labels.
+//! Read-only dependency snapshot reports. Execution markers are review evidence, not malware labels.
 use crate::{
     digest::sha256,
     error::{GateError, Result},
@@ -6,7 +6,7 @@ use crate::{
     parser::{JsonNode as J, MiniParser},
 };
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fs,
     io::Read,
     path::Path,
@@ -20,9 +20,18 @@ pub fn object<const N: usize>(items: [(&str, J); N]) -> J {
 fn strings(items: impl IntoIterator<Item = String>) -> J {
     J::Array(items.into_iter().map(string).collect())
 }
-fn package(p: &PackageInfo) -> J {
+fn package(p: &PackageInfo, format: SnapshotFormat) -> J {
     object([
         ("path", string(&p.path)),
+        ("identity_kind", string(format.identity_kind())),
+        (
+            "installed_path",
+            if format == SnapshotFormat::Npm {
+                string(&p.path)
+            } else {
+                J::Null
+            },
+        ),
         ("name", string(&p.name)),
         ("version", string(&p.version)),
         ("source", string(&p.source)),
@@ -30,8 +39,56 @@ fn package(p: &PackageInfo) -> J {
         ("capabilities", strings(p.capabilities.clone())),
     ])
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SnapshotFormat {
+    Npm,
+    Pnpm,
+    Yarn,
+}
+impl SnapshotFormat {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Npm => "npm_v3",
+            Self::Pnpm => "pnpm_v9",
+            Self::Yarn => "yarn_classic_v1",
+        }
+    }
+    fn identity_kind(self) -> &'static str {
+        match self {
+            Self::Npm => "installed_package_instance",
+            Self::Pnpm => "pnpm_contextual_resolution_snapshot",
+            Self::Yarn => "yarn_descriptor_record",
+        }
+    }
+    fn detect(text: &str) -> Result<Self> {
+        let t = text.trim_start();
+        if t.starts_with('{') {
+            return Ok(Self::Npm);
+        }
+        if text.lines().any(|l| l.trim() == "# yarn lockfile v1") {
+            return Ok(Self::Yarn);
+        }
+        if text
+            .lines()
+            .any(|l| l.trim_start().starts_with("lockfileVersion:"))
+        {
+            return Ok(Self::Pnpm);
+        }
+        if text
+            .lines()
+            .any(|l| l.trim_start().starts_with("__metadata:"))
+        {
+            return Err(GateError::Graph("INCOMPLETE: Yarn Berry lockfiles are unsupported; supported Yarn format is Classic v1".into()));
+        }
+        Err(GateError::Graph(
+            "INCOMPLETE: unsupported lockfile format; provide npm v3, pnpm v9 or Yarn Classic v1"
+                .into(),
+        ))
+    }
+}
 pub struct Snapshot {
     pub graph: DepGraph,
+    pub format: SnapshotFormat,
     pub hash: String,
     pub manifest_hash: Option<String>,
 }
@@ -40,31 +97,43 @@ impl Snapshot {
         let bytes = read_input(lock)?;
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| GateError::Graph("Lockfile must be UTF-8".into()))?;
-        let mut graph = DepGraph::parse_npm_lockfile(text)?;
+        let format = SnapshotFormat::detect(text)?;
         let mut manifest_hash = None;
-        if let Some(path) = manifest {
-            let bytes = read_input(path)?;
-            manifest_hash = Some(sha256(&bytes));
+        let m = if let Some(path) = manifest {
+            let b = read_input(path)?;
+            manifest_hash = Some(sha256(&b));
             let m = MiniParser::parse_json(
-                std::str::from_utf8(&bytes)
+                std::str::from_utf8(&b)
                     .map_err(|_| GateError::Graph("Manifest must be UTF-8".into()))?,
             )?;
             if m.as_object().is_none() {
                 return Err(GateError::Graph("Manifest must be an object".into()));
             }
-            let root = MiniParser::parse_json(text)?;
-            let locked = root.get("packages").and_then(|p| p.get("")).unwrap();
-            for kind in [
-                "dependencies",
-                "devDependencies",
-                "optionalDependencies",
-                "peerDependencies",
-            ] {
-                let empty = J::Object(Default::default());
-                if m.get(kind).unwrap_or(&empty) != locked.get(kind).unwrap_or(&empty) {
-                    graph
-                        .issues
-                        .push(format!("manifest/lock root {kind} disagree"));
+            Some(m)
+        } else {
+            None
+        };
+        let mut graph = match format {
+            SnapshotFormat::Npm => DepGraph::parse_npm_lockfile(text)?,
+            SnapshotFormat::Pnpm => crate::pnpm::parse(text, m.as_ref())?,
+            SnapshotFormat::Yarn => crate::yarn::parse(text, m.as_ref())?,
+        };
+        if let Some(m) = m.as_ref() {
+            if format == SnapshotFormat::Npm {
+                let root = MiniParser::parse_json(text)?;
+                let locked = root.get("packages").and_then(|p| p.get("")).unwrap();
+                for kind in [
+                    "dependencies",
+                    "devDependencies",
+                    "optionalDependencies",
+                    "peerDependencies",
+                ] {
+                    let empty = J::Object(Default::default());
+                    if m.get(kind).unwrap_or(&empty) != locked.get(kind).unwrap_or(&empty) {
+                        graph
+                            .issues
+                            .push(format!("manifest/lock root {kind} disagree"));
+                    }
                 }
             }
             if m.get("scripts").is_some_and(|s| s.as_object().is_none()) {
@@ -91,6 +160,7 @@ impl Snapshot {
             }
         }
         Ok(Self {
+            format,
             graph,
             hash: sha256(&bytes),
             manifest_hash,
@@ -151,7 +221,7 @@ impl Snapshot {
                         "package",
                         d.packages
                             .get(label)
-                            .map(package)
+                            .map(|p| package(p, self.format))
                             .unwrap_or_else(|| object([("name", string(label))])),
                     ),
                     ("introducer_path", path),
@@ -197,20 +267,34 @@ impl Snapshot {
             .map(|&(u, v)| edge(self, u, v))
             .collect();
         object([("schema_version",J::Number(1.0)),
+            ("format",string(self.format.label())),
+            ("identity_kind",string(self.format.identity_kind())),
+            ("topology_status",string(if d.issues.iter().any(|s|!s.starts_with("Execution capabilities unknown:")&&!s.starts_with("Root attribution incomplete:")){"incomplete"}else{"complete"})),
+            ("root_attribution_status",string(if root.is_some()&&!d.issues.iter().any(|s|s.starts_with("Root attribution incomplete:")){"available"}else{"incomplete"})),
+            ("execution_metadata_status",string(if self.format==SnapshotFormat::Npm{if self.manifest_hash.is_some(){"declared_lock_markers_and_root_lifecycle_bodies"}else{"declared_lock_markers_only"}}else{"unknown_transitive_scripts"})),
             ("status",string(if d.issues.is_empty(){"complete"}else{"incomplete"})),
-            ("scope",string(if self.manifest_hash.is_some(){"npm_v3_lock_and_root_manifest"}else{"npm_v3_lock_snapshot_only"})),
+            ("scope",string(format!("{}_{}",self.format.label(),if self.manifest_hash.is_some(){"lock_and_root_manifest"}else{"lock_snapshot_only"}))),
             ("lock_sha256",string(&self.hash)),
             ("manifest_sha256",self.manifest_hash.as_ref().map(string).unwrap_or(J::Null)),
-            ("limitations",strings(["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential".into(),"Topology cannot distinguish same-shape benign and malicious code".into(),"All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated".into(),"Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution".into()])),
+            ("limitations",strings(["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential".into(),"Topology cannot distinguish same-shape benign and malicious code".into(),"All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated".into(),"Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn".into(),"Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution".into()])),
             ("issues",strings(d.issues.clone())),
             ("optional_omissions",strings(d.optional_omissions.clone())),
-            ("packages",J::Array(d.packages.values().map(package).collect())),
+            ("packages",J::Array(d.packages.values().map(|p|package(p,self.format)).collect())),
             ("edges",J::Array(edges)),
             ("execution_candidates",J::Array(candidates)),
             ("topology",math)])
     }
 }
 pub fn compare(base: &Snapshot, head: &Snapshot) -> J {
+    if base.format != head.format {
+        return object([("schema_version",J::Number(1.0)),
+            ("status",string("incomplete")),
+            ("error",string("Cross-format identities are not comparable; review two snapshots in the same supported format")),
+            ("base",base.report()),
+            ("head",head.report())]);
+    }
+    let ap = ancestry(base);
+    let bp = ancestry(head);
     let a = &base.graph.packages;
     let b = &head.graph.packages;
     let keys: BTreeSet<_> = a.keys().chain(b.keys()).collect();
@@ -251,8 +335,16 @@ pub fn compare(base: &Snapshot, head: &Snapshot) -> J {
                 ("path", string(before.or(after).unwrap().path.clone())),
                 ("change", string(kind)),
                 ("changed_fields", strings(fields)),
-                ("before", before.map(package).unwrap_or(J::Null)),
-                ("after", after.map(package).unwrap_or(J::Null)),
+                (
+                    "before",
+                    before.map(|p| package(p, base.format)).unwrap_or(J::Null),
+                ),
+                (
+                    "after",
+                    after.map(|p| package(p, head.format)).unwrap_or(J::Null),
+                ),
+                ("before_introducer_path", path_for(base, &ap, k)),
+                ("after_introducer_path", path_for(head, &bp, k)),
             ]))
         })
         .collect();
@@ -338,4 +430,57 @@ fn read_input(path: &Path) -> Result<Vec<u8>> {
         return Err(GateError::Graph("Input exceeds 64 MiB".into()));
     }
     Ok(bytes)
+}
+
+struct Ancestry {
+    parents: Vec<Option<usize>>,
+    reached: Vec<bool>,
+    indices: BTreeMap<String, usize>,
+}
+fn ancestry(s: &Snapshot) -> Ancestry {
+    let g = &s.graph.graph;
+    let n = g.node_count();
+    let indices = (0..n)
+        .map(|i| (g.node_weight(i).unwrap().clone(), i))
+        .collect::<BTreeMap<_, _>>();
+    let mut a = Ancestry {
+        parents: vec![None; n],
+        reached: vec![false; n],
+        indices,
+    };
+    let mut adj = vec![BTreeSet::new(); n];
+    for &(u, v) in g.edges() {
+        adj[u].insert(v);
+    }
+    let mut q = VecDeque::new();
+    if let Some(&root) = a.indices.get("root") {
+        a.reached[root] = true;
+        q.push_back(root);
+    }
+    while let Some(u) = q.pop_front() {
+        for &v in &adj[u] {
+            if !a.reached[v] {
+                a.reached[v] = true;
+                a.parents[v] = Some(u);
+                q.push_back(v);
+            }
+        }
+    }
+    a
+}
+fn path_for(s: &Snapshot, a: &Ancestry, label: &str) -> J {
+    let Some(mut i) = a.indices.get(label).copied().filter(|&i| a.reached[i]) else {
+        return J::Null;
+    };
+    let mut path = Vec::new();
+    loop {
+        path.push(s.graph.graph.node_weight(i).unwrap().clone());
+        if let Some(p) = a.parents[i] {
+            i = p
+        } else {
+            break;
+        }
+    }
+    path.reverse();
+    strings(path)
 }

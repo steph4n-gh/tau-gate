@@ -1,0 +1,30 @@
+{
+  "pnpm": {
+    "repository": "https://github.com/honojs/hono",
+    "commit": "5f36607f67aa9357887337328ac84a1c1d48dc04",
+    "lock": "pnpm-hono-v9.yaml",
+    "manifest": "pnpm-hono.package.json",
+    "nodes": 1100,
+    "typed_edges": 1545,
+    "node_sha256": "c9adae604c33b1eadd2a95b15a1b5b1efe20c8d5d57d053f67a183397cd6521c",
+    "edge_sha256": "9819099d92afc9c1e867ec19355d9bfb6a8b7068dcaafe4ec42a39dde32224dd",
+    "artifact_sha256": "dcccf2970180348ce100964159f08eabf338503b1e4e393fc0affe5b43a16044",
+    "oracle": "Independent PyYAML6.0.3; CSV descriptor preprocessing for Yarn; licenses included",
+    "lock_sha256": "3bbe772c131585b3e138d0a48b7f229069c1533dc63225629beb3039a5fcac86",
+    "manifest_sha256": "169a02072e32d85aacb089ad14b62b027d975479d811f741771fbd0f559fb5c9"
+  },
+  "yarn": {
+    "repository": "https://github.com/yarnpkg/yarn",
+    "commit": "740c38c3a962c30ddb344a919bbfb7065620714b",
+    "lock": "yarn-classic-v1.lock",
+    "manifest": "yarn-classic.package.json",
+    "nodes": 1063,
+    "typed_edges": 2074,
+    "node_sha256": "1c18caf9c379a6b8e2ad513f316d69a1e854894270baf946faf1aa60b1854285",
+    "edge_sha256": "8af0a132321330b0b1f39b5a00fe09b24b3966e2babde16d475a237a8760d53b",
+    "artifact_sha256": "26978fecffa1b5b16aa50946acebee299bae677bd364f6d42d676a55d7d33043",
+    "oracle": "Independent PyYAML6.0.3; CSV descriptor preprocessing for Yarn; licenses included",
+    "lock_sha256": "80653a1a393d3747fc6aefe19d3feafc2a9f8249ba843d25c26273020b721cd9",
+    "manifest_sha256": "549eae42b2e80f56784b7fb5ea1ec991ee1a91680845557e2e337e52a192a544"
+  }
+}

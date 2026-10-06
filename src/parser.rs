@@ -128,7 +128,7 @@ impl MiniParser {
         max_continuous > 128 && max_distinct > 16
     }
 
-    /// A minimal YAML extractor for pnpm-lock.yaml.
+    /// Legacy basic YAML diagnostic. Qualified v9 extraction uses the pnpm module.
     pub fn parse_pnpm_yaml(yaml: &str) -> Result<PnpmMetadata> {
         let mut snapshots = BTreeMap::new();
         let mut packages = BTreeMap::new();

@@ -22,7 +22,7 @@ jobs:
         run: |
           rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
 
-      - name: Build Daemon and Static Library
+      - name: Build CLI and Native Library
         run: |
           echo "[Build] Compiling tau-gate..."
           cargo build --release --offline
@@ -30,7 +30,7 @@ jobs:
       - name: Verify Build Outputs
         run: |
           if [ ! -f target/release/tau-gate ]; then
-            echo "Error: Daemon binary not found!"
+            echo "Error: CLI binary not found!"
             exit 1
           fi
           if [ ! -f target/release/libtau_gate.a ]; then

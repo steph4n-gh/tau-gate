@@ -8,7 +8,7 @@ const HELP:&str="tau-gate: read-only dependency review\n\
 Usage: tau-gate [audit] [--lock package-lock.json] [--manifest package.json] [--json] [--enforce]\n\
        tau-gate review --base BASE_LOCK --head HEAD_LOCK [--base-manifest FILE] [--head-manifest FILE] [--json]\n\
        tau-gate --verify | --help\n\
-Audit never resolves, installs, deletes inputs, or writes logs. Npm v3 is the qualified review format.\n\
+Audit never resolves, installs, deletes inputs, or writes logs. Supported topology: npm v3, pnpm v9, Yarn Classic v1; pnpm/Yarn script metadata stays unknown.\n\
 Exit: 0 completed advisory report; 1 explicit enforcement finding; 2 incomplete/invalid; 64 usage.\n\
 --dry-run/-d is a compatibility alias for read-only audit. Network and legacy daemon are unsupported.";
 fn main() -> ExitCode {
@@ -81,7 +81,7 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
     let mut i = usize::from(args.first().is_some_and(|s| !s.starts_with('-')));
     while i < args.len() {
         let key = args[i].as_str();
-        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide an npm v3 lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
+        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide a supported frozen lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
         i += 1;
     }
     let load = |lock: &str, manifest: Option<&str>| {
@@ -123,9 +123,19 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
     {
         return Err(("base/head options require review".into(), 64));
     }
-    let lock = opts.get("--lock").copied().unwrap_or("package-lock.json");
+    let lock = if let Some(lock) = opts.get("--lock").copied() {
+        lock
+    } else {
+        let found = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock"]
+            .into_iter()
+            .filter(|p| Path::new(p).exists())
+            .collect::<Vec<_>>();
+        match found.as_slice(){[lock]=>*lock,[]=>return Err(("INCOMPLETE: missing supported lockfile; audit never resolves or installs dependencies".into(),2)),_=>return Err(("INCOMPLETE: multiple lockfiles; select one explicitly with --lock".into(),2))}
+    };
     let manifest = opts.get("--manifest").copied().or_else(|| {
-        if lock == "package-lock.json" && Path::new("package.json").exists() {
+        if matches!(lock, "package-lock.json" | "pnpm-lock.yaml" | "yarn.lock")
+            && Path::new("package.json").exists()
+        {
             Some("package.json")
         } else {
             None
@@ -172,6 +182,10 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
 }
 
 fn human(r: &J) {
+    if let Some(error) = r.get("error").and_then(J::as_str) {
+        println!("INCOMPLETE: {error}");
+        return;
+    }
     if let Some(changes) = r.get("package_changes").and_then(J::as_array) {
         println!("{} package changes", changes.len());
         for c in changes {
@@ -203,8 +217,15 @@ fn human(r: &J) {
         r.get("scope").and_then(J::as_str).unwrap_or("unknown")
     );
     println!(
-        "All lockfile records; platform/dev/optional installation selection is not evaluated."
+        "Identity: {}; execution metadata: {}",
+        r.get("identity_kind")
+            .and_then(J::as_str)
+            .unwrap_or("unknown"),
+        r.get("execution_metadata_status")
+            .and_then(J::as_str)
+            .unwrap_or("unknown")
     );
+    println!("All lockfile records; host installation selection is not evaluated. pnpm/Yarn records are not installed paths.");
     if let Some(c) = r.get("execution_candidates").and_then(J::as_array) {
         println!(
             "{} execution candidates (markers, not malicious-code findings)",

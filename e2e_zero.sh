@@ -13,3 +13,15 @@ else
   test "$code" -eq 1
 fi
 echo 'Bounded npm fixture validation passed; artifact safety is not inferred.'
+
+for pair in "pnpm-hono-v9.yaml pnpm-hono.package.json" "yarn-classic-v1.lock yarn-classic.package.json"; do
+  read -r lock manifest <<< "$pair"
+  if "$binary" audit --lock "tests/fixtures/real/$lock" --manifest "tests/fixtures/real/$manifest" --enforce --json > /dev/null; then
+    echo 'Expected unknown execution metadata to remain incomplete' >&2
+    exit 1
+  else
+    code=$?
+    test "$code" -eq 2
+  fi
+done
+echo 'Pinned pnpm/Yarn topology emitted; unknown execution capability correctly remains incomplete.'

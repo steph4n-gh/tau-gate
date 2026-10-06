@@ -7,9 +7,11 @@ pub mod graph_impl;
 pub mod math;
 pub mod network;
 pub mod parser;
+pub mod pnpm;
 pub mod review;
 pub mod semver;
 pub mod telemetry;
+pub mod yarn;
 
 use graph_impl::DiGraph;
 use math::analyze_graph;

@@ -277,50 +277,7 @@ impl DepGraph {
     }
 
     pub fn parse_pnpm_lockfile(content: &str) -> Result<Self> {
-        let meta = MiniParser::parse_pnpm_yaml(content)?;
-        let mut graph = DiGraph::new();
-        let mut node_indices = BTreeMap::new();
-        let mut execution_packages = BTreeSet::new();
-        let mut suspicious_packages = BTreeSet::new();
-
-        for id in meta.snapshots.keys() {
-            let idx = graph.add_node(id.clone());
-            node_indices.insert(id.clone(), idx);
-            if let Some(pkg) = meta.packages.get(id.split('(').next().unwrap_or(id)) {
-                if pkg.has_install_script {
-                    execution_packages.insert(id.clone());
-                }
-            }
-            if MiniParser::detect_obfuscation(id) {
-                suspicious_packages.insert(id.clone());
-            }
-        }
-
-        let mut issues=vec!["pnpm execution capabilities are unknown from this lockfile; exact capability review currently supports npm v3".into()];
-        for (id, snap) in &meta.snapshots {
-            let source = node_indices[id];
-            for (name, version) in &snap.dependencies {
-                let target = format!("{name}@{version}");
-                let found = node_indices
-                    .get(&target)
-                    .or_else(|| node_indices.get(&format!("/{target}")))
-                    .or_else(|| node_indices.get(version));
-                if let Some(&idx) = found {
-                    graph.add_edge(source, idx)
-                } else {
-                    issues.push(format!("unresolved pnpm reference {id} -> {target}"));
-                }
-            }
-        }
-        Ok(Self {
-            graph,
-            execution_packages,
-            suspicious_packages,
-            packages: BTreeMap::new(),
-            issues,
-            optional_omissions: Vec::new(),
-            edge_kinds: BTreeMap::new(),
-        })
+        crate::pnpm::parse(content, None)
     }
 
     pub fn build_from_network() -> Result<Self> {
@@ -422,19 +379,13 @@ mod tests {
 
     #[test]
     fn test_pnpm_extraction() {
-        let content = r#"
-packages:
-  /a@1.0.0:
-    hasInstallScript: true
-snapshots:
-  /a@1.0.0:
-    dependencies:
-      b: 1.0.0
-  /b@1.0.0: {}
-"#;
-        let dg = DepGraph::parse_pnpm_lockfile(content).unwrap();
-        assert_eq!(dg.graph.node_count(), 2);
-        assert!(dg.execution_packages.contains("/a@1.0.0"));
+        let content="lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      a:\n        specifier: 1.0.0\n        version: 1.0.0\npackages:\n  a@1.0.0:\n    requiresBuild: true\n  b@1.0.0: {}\nsnapshots:\n  a@1.0.0:\n    dependencies:\n      b: 1.0.0\n  b@1.0.0: {}\n";
+        let d = DepGraph::parse_pnpm_lockfile(content).unwrap();
+        assert_eq!(d.graph.node_count(), 3);
+        assert!(d
+            .execution_packages
+            .contains("pnpm:project:snapshot:a@1.0.0"));
+        assert!(d.issues[0].starts_with("Execution capabilities unknown:"));
     }
 
     #[test]
@@ -495,10 +446,13 @@ mod exact_regressions {
     }
     #[test]
     fn pnpm_exact_versions_peer_context_and_document_reset() {
-        let d=DepGraph::parse_pnpm_lockfile("packages:\n  a@1.0.0(p@2.0.0):\n    requiresBuild: true\nsnapshots:\n  a@1.0.0(p@2.0.0):\n    dependencies:\n      b: 2.0.0(p@2.0.0)\n  b@1.0.0: {}\n  b@2.0.0(p@2.0.0): {}\n---\nsettings:\n  autoInstallPeers: true\n").unwrap();
-        assert_eq!(d.graph.node_count(), 3);
-        assert!(edges(&d).contains(&("a@1.0.0(p@2.0.0)".into(), "b@2.0.0(p@2.0.0)".into())));
-        assert!(!d.issues.is_empty());
+        let content="lockfileVersion: '9.0'\nimporters:\n  .: {}\npackages:\n  a@1.0.0: {}\n  b@1.0.0: {}\n  b@2.0.0: {}\nsnapshots:\n  a@1.0.0(p@2.0.0):\n    dependencies:\n      b: 2.0.0(p@2.0.0)\n  b@1.0.0: {}\n  b@2.0.0(p@2.0.0): {}\nsettings:\n  autoInstallPeers: true\n";
+        let d = DepGraph::parse_pnpm_lockfile(content).unwrap();
+        assert_eq!(d.graph.node_count(), 4);
+        assert!(edges(&d).contains(&(
+            "pnpm:project:snapshot:a@1.0.0(p@2.0.0)".into(),
+            "pnpm:project:snapshot:b@2.0.0(p@2.0.0)".into()
+        )));
     }
     #[test]
     fn cargo_proc_macros_execution() {
