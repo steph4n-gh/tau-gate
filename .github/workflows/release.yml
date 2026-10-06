@@ -24,8 +24,7 @@ jobs:
       - name: Setup Rust Environment
         run: |
           # Use pre-installed rustup to ensure correct toolchain
-          rustup toolchain install stable
-          rustup default stable
+          rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
 
       - name: Build and validate qualified review
         run: |

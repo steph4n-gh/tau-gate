@@ -20,8 +20,7 @@ jobs:
 
       - name: Setup Rust Environment
         run: |
-          rustup toolchain install stable
-          rustup default stable
+          rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
 
       - name: Build Daemon and Static Library
         run: |
