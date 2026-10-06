@@ -182,3 +182,28 @@ fn cross_format_comparison_refuses_incomparable_identity_keys() {
         .unwrap()
         .contains("Cross-format"));
 }
+
+#[test]
+fn pnpm_other_importer_is_an_actual_introducer_root() {
+    let f = Fixture::new();
+    let yaml="lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/web:\n    dependencies:\n      leaf:\n        specifier: 1.0.0\n        version: 1.0.0\npackages:\n  leaf@1.0.0:\n    requiresBuild: true\nsnapshots:\n  leaf@1.0.0: {}\n";
+    fs::write(f.0.join("pnpm-lock.yaml"), yaml).unwrap();
+    let o = f.run(&["--json"]);
+    assert_eq!(o.status.code(), Some(2));
+    let r = json(&o);
+    let c = &r.get("execution_candidates").and_then(J::as_array).unwrap()[0];
+    assert_eq!(
+        c.get("introducer_path").unwrap().to_json(),
+        "[\"pnpm:project:importer:apps/web\",\"pnpm:project:snapshot:leaf@1.0.0\"]"
+    );
+    assert_eq!(
+        r.get("introducer_path_scope").and_then(J::as_str),
+        Some("all_known_importers")
+    );
+    assert!(!r
+        .get("edges")
+        .and_then(J::as_array)
+        .unwrap()
+        .iter()
+        .any(|e| e.get("from").and_then(J::as_str) == Some("root")));
+}

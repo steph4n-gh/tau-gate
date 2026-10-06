@@ -173,9 +173,9 @@ impl Snapshot {
         let mut parents = vec![None; n];
         let mut reached = vec![false; n];
         let mut queue = VecDeque::new();
-        if let Some(r) = root {
+        for r in known_roots(self) {
             reached[r] = true;
-            queue.push_back(r)
+            queue.push_back(r);
         }
         let mut adj = vec![BTreeSet::new(); n];
         let mut degree = vec![0; n];
@@ -268,7 +268,7 @@ impl Snapshot {
             .collect();
         object([("schema_version",J::Number(1.0)),
             ("format",string(self.format.label())),
-            ("identity_kind",string(self.format.identity_kind())),
+            ("identity_kind",string(self.format.identity_kind())),("introducer_roots",strings(known_roots(self).into_iter().map(|i|d.graph.node_weight(i).unwrap().clone()))),("introducer_path_scope",string(if self.format==SnapshotFormat::Pnpm{"all_known_importers"}else{"project_root"})),
             ("topology_status",string(if d.issues.iter().any(|s|!s.starts_with("Execution capabilities unknown:")&&!s.starts_with("Root attribution incomplete:")){"incomplete"}else{"complete"})),
             ("root_attribution_status",string(if root.is_some()&&!d.issues.iter().any(|s|s.starts_with("Root attribution incomplete:")){"available"}else{"incomplete"})),
             ("execution_metadata_status",string(if self.format==SnapshotFormat::Npm{if self.manifest_hash.is_some(){"declared_lock_markers_and_root_lifecycle_bodies"}else{"declared_lock_markers_only"}}else{"unknown_transitive_scripts"})),
@@ -453,7 +453,7 @@ fn ancestry(s: &Snapshot) -> Ancestry {
         adj[u].insert(v);
     }
     let mut q = VecDeque::new();
-    if let Some(&root) = a.indices.get("root") {
+    for root in known_roots(s) {
         a.reached[root] = true;
         q.push_back(root);
     }
@@ -483,4 +483,24 @@ fn path_for(s: &Snapshot, a: &Ancestry, label: &str) -> J {
     }
     path.reverse();
     strings(path)
+}
+
+// Real importers are independent graph roots. No membership edges are invented.
+fn known_roots(s: &Snapshot) -> Vec<usize> {
+    let g = &s.graph.graph;
+    let mut roots = (0..g.node_count())
+        .filter(|&i| {
+            let name = g.node_weight(i).unwrap();
+            name == "root"
+                || (s.format == SnapshotFormat::Pnpm
+                    && (name.starts_with("pnpm:project:importer:")
+                        || name.starts_with("pnpm:environment:importer:")))
+        })
+        .collect::<Vec<_>>();
+    roots.sort_by(|&a, &b| {
+        let a = g.node_weight(a).unwrap();
+        let b = g.node_weight(b).unwrap();
+        (a != "root", a).cmp(&(b != "root", b))
+    });
+    roots
 }
