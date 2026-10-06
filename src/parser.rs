@@ -299,7 +299,7 @@ struct JsonReader<'a> {
     bytes: &'a [u8],
     pos: usize,
 }
-impl<'a> JsonReader<'a> {
+impl JsonReader<'_> {
     fn error(&self) -> GateError {
         GateError::Generic(format!("Invalid JSON at byte {}", self.pos))
     }

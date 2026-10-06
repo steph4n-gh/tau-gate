@@ -64,7 +64,15 @@ pub fn sha256(input: &[u8]) -> String {
             *v = v.wrapping_add(x);
         }
     }
-    h.iter().map(|v| format!("{v:08x}")).collect()
+    let mut digest = String::with_capacity(64);
+    let hex = b"0123456789abcdef";
+    for word in h {
+        for byte in word.to_be_bytes() {
+            digest.push(hex[(byte >> 4) as usize] as char);
+            digest.push(hex[(byte & 15) as usize] as char);
+        }
+    }
+    digest
 }
 #[cfg(test)]
 mod tests {
