@@ -182,7 +182,18 @@ fn human(r: &J) {
                 c.get("changed_fields").unwrap().to_json()
             );
         }
+        if let Some(base) = r.get("base") {
+            println!(
+                "Base snapshot: {}",
+                base.get("status").and_then(J::as_str).unwrap_or("unknown")
+            );
+            human_issues(base, "base");
+        }
         if let Some(h) = r.get("head") {
+            println!(
+                "Head snapshot: {}",
+                h.get("status").and_then(J::as_str).unwrap_or("unknown")
+            );
             human(h)
         }
         return;
@@ -210,11 +221,7 @@ fn human(r: &J) {
             );
         }
     }
-    if let Some(issues) = r.get("issues").and_then(J::as_array) {
-        for issue in issues {
-            println!("INCOMPLETE: {}", issue.as_str().unwrap_or("unknown"));
-        }
-    }
+    human_issues(r, "snapshot");
     if let Some(policy) = r.get("policy") {
         println!(
             "Policy: {}",
@@ -227,4 +234,23 @@ fn human(r: &J) {
     println!(
         "Use --json for input hashes, artifact identities, typed edges and convergence evidence."
     );
+}
+
+fn human_issues(r: &J, label: &str) {
+    if let Some(issues) = r.get("issues").and_then(J::as_array) {
+        for issue in issues {
+            println!(
+                "INCOMPLETE {label}: {}",
+                issue.as_str().unwrap_or("unknown")
+            );
+        }
+    }
+    if let Some(omissions) = r.get("optional_omissions").and_then(J::as_array) {
+        for omission in omissions {
+            println!(
+                "OPTIONAL OMISSION {label}: {}",
+                omission.as_str().unwrap_or("unknown")
+            );
+        }
+    }
 }

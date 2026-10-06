@@ -253,3 +253,18 @@ fn every_consumed_input_unchanged() {
     ]);
     assert_eq!(before, snapshot(&f.0));
 }
+
+#[test]
+fn incomplete_base_human_report_explains_reason() {
+    let f = Fixture::new();
+    f.put(
+        "base.json",
+        r#"{"lockfileVersion":3,"packages":{"":{"dependencies":{"missing":"1"}}}}"#,
+    );
+    f.put("head.json", BASE);
+    let o = f.run(&["review", "--base", "base.json", "--head", "head.json"]);
+    assert_eq!(o.status.code(), Some(2));
+    let text = String::from_utf8(o.stdout).unwrap();
+    assert!(text.contains("INCOMPLETE base: unresolved dependencies"));
+    assert!(text.contains("Head snapshot: complete"));
+}

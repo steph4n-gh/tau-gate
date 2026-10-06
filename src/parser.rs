@@ -89,6 +89,7 @@ impl MiniParser {
             return Err(GateError::Generic("JSON exceeds 64 MiB".into()));
         }
         let mut reader = JsonReader {
+            text: json,
             bytes: json.as_bytes(),
             pos: 0,
         };
@@ -294,6 +295,7 @@ impl JsonNode {
 }
 
 struct JsonReader<'a> {
+    text: &'a str,
     bytes: &'a [u8],
     pos: usize,
 }
@@ -362,8 +364,9 @@ impl<'a> JsonReader<'a> {
                 0..=31 => return Err(self.error()),
                 _ => {
                     self.pos -= 1;
-                    let text =
-                        std::str::from_utf8(&self.bytes[self.pos..]).map_err(|_| self.error())?;
+                    // The input is already valid UTF-8. Slice at a character boundary,
+                    // without revalidating the entire remaining suffix for every scalar.
+                    let text = self.text.get(self.pos..).ok_or_else(|| self.error())?;
                     let c = text.chars().next().ok_or_else(|| self.error())?;
                     out.push(c);
                     self.pos += c.len_utf8();
@@ -616,6 +619,20 @@ mod strict_regressions {
         }
         assert!(
             MiniParser::parse_json(&format!("{}0{}", "[".repeat(130), "]".repeat(130))).is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod large_string_regression {
+    use super::*;
+    #[test]
+    fn long_ascii_and_multibyte_strings() {
+        let text = format!("{}{}", "a".repeat(1024 * 1024), "é😀".repeat(16 * 1024));
+        let j = MiniParser::parse_json(&format!("{{\"payload\":{}}}", json_string(&text))).unwrap();
+        assert_eq!(
+            j.get("payload").and_then(JsonNode::as_str),
+            Some(text.as_str())
         );
     }
 }
