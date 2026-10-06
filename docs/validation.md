@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # Empirical Validation Report: v3.0.0 "Absolute Zero"
 
 To prove the robustness of the $\tau$-Gate v3.0.0 mathematical engine and its bespoke, zero-dependency extraction logic, we performed end-to-end passive audits on representative high-profile projects.

@@ -14,7 +14,7 @@ pub enum EnforcementMode {
 
 /// Configuration for the Tau-Gate security engine.
 pub struct SentinelConfig {
-    /// List of glob patterns for trusted packages.
+    /// Exact name@version approvals; these do not pin artifact digests.
     pub whitelist: Vec<String>,
     /// The structural median anomaly threshold percentage.
     pub threshold_percentage: f64,
@@ -45,9 +45,25 @@ impl SentinelConfig {
         let map = MiniParser::parse_config(&content)
             .map_err(|e| GateError::Config(format!("Failed to parse config file: {}", e)))?;
 
+        for (key, value) in &map {
+            let valid = match key.as_str() {
+                "whitelist" => matches!(value, ConfigValue::Array(_)),
+                "mode" => matches!(value, ConfigValue::String(_)),
+                "threshold_percentage" => matches!(value, ConfigValue::Float(_)),
+                _ => false,
+            };
+            if !valid {
+                return Err(GateError::Config(format!("Invalid type for {key}")));
+            }
+        }
         let mut config = Self::default();
 
         if let Some(ConfigValue::Float(val)) = map.get("threshold_percentage") {
+            if !val.is_finite() || !(0.0..=100.0).contains(val) {
+                return Err(GateError::Config(
+                    "threshold_percentage must be finite and in 0..=100".into(),
+                ));
+            }
             config.threshold_percentage = *val;
         }
 
@@ -56,8 +72,12 @@ impl SentinelConfig {
         }
 
         if let Some(ConfigValue::String(val)) = map.get("mode") {
-            if val == "advisory" {
+            if val.eq_ignore_ascii_case("advisory") {
                 config.mode = EnforcementMode::Advisory;
+            } else if !val.eq_ignore_ascii_case("enforcement") {
+                return Err(GateError::Config(
+                    "mode must be advisory or enforcement".into(),
+                ));
             }
         }
 

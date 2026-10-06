@@ -1,40 +1,6 @@
-# tau-gate.toml
-# Default configuration generated from the Top 500 Ecosystem Benchmark.
-
-# Threshold size (%) for an allowed execution island. 
-# Anything below this is flagged as a topological anomaly.
-threshold_percentage = 15.0 
-
-# "Enforcement" aborts the installation. "Advisory" warns but allows it.
-mode = "Enforcement"
-
-# The Curated Whitelist
-# These native tools form mathematical islands but are known, legitimate build utilities.
-# WARNING: Always pin to a specific version to prevent Whitelist Rot. 
-# The versions below are examples; update them to match your project's lockfile.
-whitelist = [
-    # --- Native File Watchers ---
-    "fsevents@2.3.2",
-    "fsevents@2.3.3",
-    "@parcel/watcher-darwin-arm64@2.4.1",
-    "@parcel/watcher-darwin-x64@2.4.1",
-    "@parcel/watcher-linux-x64-glibc@2.4.1",
-    "@parcel/watcher-linux-x64-musl@2.4.1",
-    "@parcel/watcher-win32-arm64@2.4.1",
-    "@parcel/watcher-win32-ia32@2.4.1",
-    "@parcel/watcher-freebsd-x64@2.4.1",
-    "@parcel/watcher-linux-arm-glibc@2.4.1",
-    "@parcel/watcher-linux-arm-musl@2.4.1",
-
-    # --- Native Compilers / Bundlers ---
-    "esbuild@0.19.11",
-    "esbuild@0.20.2",
-    "@swc/core-darwin-arm64@1.3.100",
-    "@swc/core-win32-x64-msvc@1.3.100",
-    "@swc/core-linux-arm64-gnu@1.3.100",
-    "@swc/core-win32-ia32-msvc@1.3.100",
-    "@swc/core-win32-arm64-msvc@1.3.100",
-    "@swc/core-linux-x64-musl@1.3.100",
-    "@swc/core-linux-x64-gnu@1.3.100",
-    "@swc/core-linux-s390x-gnu@1.3.100"
-]
+# Explicit --enforce blocks unapproved markers; audit is advisory by default.
+# Exact name@version approvals only; these do not pin artifact digests.
+whitelist = []
+# Legacy compatibility values; validated but not used to gate topology.
+mode = "Advisory"
+threshold_percentage = 15.0

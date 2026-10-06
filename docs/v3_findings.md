@@ -1,3 +1,5 @@
+> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+
 # v3.0 Network Engine: Findings & Insights
 
 During the development and empirical validation of the v3.0 Network-Level Resolution Engine, we conducted a mass audit of the top 500 JS/TS repositories globally. This process yielded several fascinating insights into ecosystem behavior, graph topology, and our mathematical primitives.

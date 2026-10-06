@@ -1,285 +1,230 @@
-mod config;
-mod daemon;
-mod error;
-mod graph;
-mod graph_impl;
-mod math;
-mod network;
-mod parser;
-mod semver;
-mod telemetry;
-
-use crate::error::Result;
-use config::{EnforcementMode, SentinelConfig};
-use graph::{DepGraph, EngineType};
-use std::collections::BTreeSet;
-use std::env;
-use std::fs;
-use std::process::{exit, Command};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-/// V3.0.0 Build Metadata
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-const BUILD_HASH: &str = env!("GIT_HASH");
-
-fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() > 1 && args[1] == "daemon" {
-        return daemon::run();
+use std::{env, path::Path, process::ExitCode};
+use tau_gate::{
+    config::SentinelConfig,
+    parser::JsonNode as J,
+    review::{self, Snapshot},
+};
+const HELP:&str="tau-gate: read-only dependency review\n\
+Usage: tau-gate [audit] [--lock package-lock.json] [--manifest package.json] [--json] [--enforce]\n\
+       tau-gate review --base BASE_LOCK --head HEAD_LOCK [--base-manifest FILE] [--head-manifest FILE] [--json]\n\
+       tau-gate --verify | --help\n\
+Audit never resolves, installs, deletes inputs, or writes logs. Npm v3 is the qualified review format.\n\
+Exit: 0 completed advisory report; 1 explicit enforcement finding; 2 incomplete/invalid; 64 usage.\n\
+--dry-run/-d is a compatibility alias for read-only audit. Network and legacy daemon are unsupported.";
+fn main() -> ExitCode {
+    let args: Vec<String> = env::args().skip(1).collect();
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("{HELP}");
+        return ExitCode::SUCCESS;
     }
-
-    let dry_run = args.iter().any(|arg| arg == "--dry-run" || arg == "-d");
-    let show_verify = args.iter().any(|arg| arg == "--verify" || arg == "-v");
-    let use_network = args.iter().any(|arg| arg == "--network" || arg == "-n");
-
-    if show_verify {
-        println!("[\u{03C4}-Gate] \u{1F512}  Integrity Verification");
-        println!("Version: {}", VERSION);
-        println!("Build Hash: {}", BUILD_HASH);
-        return Ok(());
+    if args == ["--verify"] {
+        println!(
+            "Version: {}\nBuild commit: {} (provenance only)",
+            env!("CARGO_PKG_VERSION"),
+            env!("GIT_HASH")
+        );
+        return ExitCode::SUCCESS;
     }
-
-    println!("\n[\u{03C4}-Gate] \u{1F6E1}\u{FE0F}  Zero-Trust Supply Chain Security v3.0.0");
-    if dry_run {
-        println!("[\u{03C4}-Gate] \u{1F50D}  MODE: DRY-RUN (Passive Audit)");
-    }
-    println!("--------------------------------------------------");
-
-    // 1. Initialize Configuration
-    let config = SentinelConfig::load("tau-gate.toml").unwrap_or_default();
-
-    println!("[\u{03C4}-Gate] \u{23F3}  Mapping topology and verifying connectivity...");
-
-    let start_time = SystemTime::now();
-
-    // 2. The Extraction Phase
-    let (dep_graph, engine) = match DepGraph::build(use_network) {
-        Ok(res) => res,
-        Err(e) => {
-            eprintln!("[\u{03C4}-Gate] \u{274C} Lockfile Extraction Failed: {}", e);
-            exit(1);
+    let json = args.iter().any(|a| a == "--json");
+    match run(&args) {
+        Ok((report, code)) => {
+            if json {
+                println!("{}", report.to_json())
+            } else {
+                println!(
+                    "Read-only dependency review: {}",
+                    report
+                        .get("status")
+                        .and_then(J::as_str)
+                        .unwrap_or("complete")
+                );
+                human(&report);
+            }
+            ExitCode::from(code)
         }
+        Err((message, code)) => {
+            if json {
+                println!(
+                    "{}",
+                    review::object([
+                        ("schema_version", J::Number(1.0)),
+                        (
+                            "status",
+                            review::string(if code == 64 {
+                                "usage_error"
+                            } else {
+                                "incomplete"
+                            })
+                        ),
+                        ("error", review::string(message))
+                    ])
+                    .to_json()
+                )
+            } else {
+                eprintln!("{message}")
+            }
+            ExitCode::from(code)
+        }
+    }
+}
+fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
+    let mode = args
+        .first()
+        .filter(|s| !s.starts_with('-'))
+        .map(String::as_str)
+        .unwrap_or("audit");
+    if !matches!(mode, "audit" | "review") {
+        return Err((format!("Unsupported command {mode}; use --help"), 64));
+    }
+    let mut opts = std::collections::BTreeMap::new();
+    let mut enforce = false;
+    let mut i = usize::from(args.first().is_some_and(|s| !s.starts_with('-')));
+    while i < args.len() {
+        let key = args[i].as_str();
+        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide an npm v3 lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
+        i += 1;
+    }
+    let load = |lock: &str, manifest: Option<&str>| {
+        Snapshot::load(Path::new(lock), manifest.map(Path::new)).map_err(|e| (e.to_string(), 2))
     };
-
-    let node_count = dep_graph.graph.node_count();
-
-    if node_count < 3 {
-        println!("[\u{03C4}-Gate] \u{2139}\u{FE0F} Graph too small for audit. Proceeding...");
-        if dry_run {
-            return Ok(());
+    if mode == "review" {
+        if opts.contains_key("--lock") || opts.contains_key("--manifest") {
+            return Err(("lock/manifest options require audit".into(), 64));
         }
-        execute_actual_install(engine);
-    }
-
-    // 3. The Math Phase
-    let partition_result = match math::analyze_graph(&dep_graph.graph) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("[\u{03C4}-Gate] \u{274C} Math Engine Error: {}", e);
-            exit(1);
+        if enforce {
+            return Err((
+                "Review is advisory; --enforce is available only for audit".into(),
+                64,
+            ));
         }
-    };
-
-    let elapsed = start_time
-        .elapsed()
-        .unwrap_or(Duration::from_secs(0))
-        .as_millis();
-
-    pb_finish_and_clear(); // Custom replacement for pb
-
-    println!(
-        "[\u{03C4}-Gate] \u{2705} Analyzed {} nodes in {} ms",
-        node_count, elapsed
-    );
-    println!(
-        "[\u{03C4}-Gate] \u{1F517} Connectivity Score (\u{03BB}\u{2082}): {:.6}",
-        partition_result.connectivity_score
-    );
-
-    let total_nodes = node_count as f64;
-    let anomaly_size = partition_result.partition_b.len() as f64;
-    let percentage = (anomaly_size / total_nodes) * 100.0;
-
-    println!(
-        "[\u{03C4}-Gate] \u{1F4CA} Smallest Partition: {} nodes ({:.2}%)",
-        partition_result.partition_b.len(),
-        percentage
-    );
-
-    // 4. The Tripwire Phase
-    let mut execution_threats = Vec::new();
-    let mut entropy_threats = Vec::new();
-
-    for node in &partition_result.partition_b {
-        let is_exec = check_threat_match(node, &dep_graph.execution_packages);
-        let is_entropy = check_threat_match(node, &dep_graph.suspicious_packages);
-
-        if is_exec || is_entropy {
-            let mut is_whitelisted = false;
-            for pattern_str in &config.whitelist {
-                if glob_match(pattern_str, node) {
-                    is_whitelisted = true;
-
-                    let is_scoped = pattern_str.starts_with('@');
-                    let has_version_pin = if is_scoped {
-                        pattern_str[1..].contains('@')
-                    } else {
-                        pattern_str.contains('@')
-                    };
-
-                    if !has_version_pin {
-                        println!("[\u{03C4}-Gate] \u{26A0}\u{FE0F}  WHITELIST ROT WARNING: '{}' is unpinned. Any future compromised version will automatically bypass security. Please pin to a specific version.", pattern_str);
-                    }
-                    break;
-                }
-            }
-            if !is_whitelisted {
-                if is_exec {
-                    execution_threats.push(node.clone());
-                }
-                if is_entropy {
-                    entropy_threats.push(node.clone());
-                }
-            }
-        }
-    }
-
-    // 5. The Gate Phase (Enforcement)
-    let extreme_isolation = partition_result.connectivity_score < 1e-4
-        && (!execution_threats.is_empty() || !entropy_threats.is_empty());
-
-    if (!execution_threats.is_empty() || !entropy_threats.is_empty())
-        && (percentage < config.threshold_percentage || extreme_isolation)
-    {
-        eprintln!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  CRITICAL TOPOLOGICAL ANOMALY!");
-
-        if !execution_threats.is_empty() {
-            eprintln!("Quarantined execution-privileged nodes:");
-            for node in &execution_threats {
-                eprintln!("  \u{2192} {}", node);
-            }
-        }
-
-        if !entropy_threats.is_empty() {
-            eprintln!("Quarantined high-entropy (obfuscated) nodes:");
-            for node in &entropy_threats {
-                eprintln!("  \u{26A0} {}", node);
-            }
-        }
-
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs().to_string())
-            .unwrap_or_else(|_| "0".to_string());
-        let log = telemetry::AnomalyLog {
-            timestamp,
-            tau: partition_result.tau,
-            anomaly_size: partition_result.partition_b.len(),
-            total_nodes: total_nodes as usize,
-            isolated_nodes: execution_threats.clone(),
-            message: format!(
-                "Isolation Detection. Score: {:.6}, Partition: {:.2}%",
-                partition_result.connectivity_score, percentage
-            ),
-        };
-        let _ = telemetry::log_anomaly(&log);
-
-        if let EngineType::Npm = engine {
-            let _ = fs::remove_file("package-lock.json");
-        }
-
-        if config.mode == EnforcementMode::Enforcement {
-            eprintln!("\n[\u{03C4}-Gate] \u{1F6AB} INSTALLATION ABORTED. Environment secured.\n");
-            exit(1);
+        let base = load(
+            opts.get("--base")
+                .copied()
+                .ok_or_else(|| ("review requires --base".into(), 64))?,
+            opts.get("--base-manifest").copied(),
+        )?;
+        let head = load(
+            opts.get("--head")
+                .copied()
+                .ok_or_else(|| ("review requires --head".into(), 64))?,
+            opts.get("--head-manifest").copied(),
+        )?;
+        let report = review::compare(&base, &head);
+        let code = if report.get("status").and_then(J::as_str) == Some("incomplete") {
+            2
         } else {
-            println!("\n[\u{03C4}-Gate] \u{26A0}\u{FE0F}  ADVISORY MODE: Anomaly detected but proceeding as per policy.");
+            0
+        };
+        return Ok((report, code));
+    }
+    if opts
+        .keys()
+        .any(|k| k.starts_with("--base") || k.starts_with("--head"))
+    {
+        return Err(("base/head options require review".into(), 64));
+    }
+    let lock = opts.get("--lock").copied().unwrap_or("package-lock.json");
+    let manifest = opts.get("--manifest").copied().or_else(|| {
+        if lock == "package-lock.json" && Path::new("package.json").exists() {
+            Some("package.json")
+        } else {
+            None
         }
-    }
-
-    println!("[\u{03C4}-Gate] \u{1F6A7} Topology nominal. Gate opened.");
-    if !dry_run {
-        execute_actual_install(engine);
-    }
-    Ok(())
-}
-
-fn pb_finish_and_clear() {
-    // No-op for now as we removed indicatif
-}
-
-fn check_threat_match(node: &str, threats: &BTreeSet<String>) -> bool {
-    if threats.contains(node) {
-        return true;
-    }
-    for threat in threats {
-        if node.contains(threat) || threat.contains(node) {
-            return true;
-        }
-    }
-    false
-}
-
-fn glob_match(pattern: &str, text: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-    if let Some(prefix) = pattern.strip_suffix("*") {
-        return text.starts_with(prefix);
-    }
-    pattern == text
-}
-
-fn execute_actual_install(engine: EngineType) {
-    let cmd = match engine {
-        EngineType::Npm => "npm",
-        EngineType::Pnpm => "pnpm",
-        EngineType::Bun => "bun",
-        EngineType::Yarn => "yarn",
-        EngineType::Cargo => "cargo",
-        EngineType::Go => "go",
-        EngineType::Network => {
-            println!("[\u{03C4}-Gate] \u{1F6A7} Network audit completed. Bypassing installation due to lack of lockfile context.");
-            exit(0);
-        }
+    });
+    let snapshot = load(lock, manifest)?;
+    let config = SentinelConfig::load("tau-gate.toml").map_err(|e| (e.to_string(), 2))?;
+    let mut report = snapshot.report();
+    let violations: Vec<J> = snapshot
+        .graph
+        .execution_packages
+        .iter()
+        .filter_map(|n| {
+            let p = &snapshot.graph.packages[n];
+            let coord = format!("{}@{}", p.name, p.version);
+            if config.whitelist.contains(&coord) {
+                None
+            } else {
+                Some(review::object([
+                    ("path", review::string(&p.path)),
+                    ("coordinate", review::string(coord)),
+                ]))
+            }
+        })
+        .collect();
+    let outcome = if !snapshot.graph.issues.is_empty() {
+        "incomplete"
+    } else if !enforce {
+        "advisory"
+    } else if !violations.is_empty() {
+        "blocked"
+    } else {
+        "allowed"
     };
-    let args = match engine {
-        EngineType::Cargo => vec!["build"],
-        EngineType::Go => vec!["mod", "download"],
-        _ => vec!["install"],
+    let code = match outcome {
+        "incomplete" => 2,
+        "blocked" => 1,
+        _ => 0,
     };
+    if let J::Object(ref mut fields) = report {
+        fields.insert("policy".into(),review::object([("outcome",review::string(outcome)),("enforcement_requested",J::Bool(enforce)),("approval_scope",review::string("exact name@version; artifact digest is not pinned; missing markers do not prove absence of execution")),("unapproved_execution_candidates",J::Array(violations))]));
+    }
+    Ok((report, code))
+}
 
-    let home = std::env::var("HOME").unwrap_or_default();
-    let safe_path = format!(
-        "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:{}/.cargo/bin",
-        home
+fn human(r: &J) {
+    if let Some(changes) = r.get("package_changes").and_then(J::as_array) {
+        println!("{} package changes", changes.len());
+        for c in changes {
+            println!(
+                "  {} {} ({})",
+                c.get("change").and_then(J::as_str).unwrap_or(""),
+                c.get("path").and_then(J::as_str).unwrap_or("root"),
+                c.get("changed_fields").unwrap().to_json()
+            );
+        }
+        if let Some(h) = r.get("head") {
+            human(h)
+        }
+        return;
+    }
+    println!(
+        "Scope: {}",
+        r.get("scope").and_then(J::as_str).unwrap_or("unknown")
     );
-
-    let status = Command::new(cmd)
-        .env_clear()
-        .env("HOME", &home)
-        .env("PATH", safe_path)
-        .args(&args)
-        .status()
-        .expect("Native install failed");
-    exit(status.code().unwrap_or(1));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::BTreeSet;
-
-    #[test]
-    fn test_glob_match() {
-        assert!(glob_match("*", "anything"));
-        assert!(glob_match("@astrojs/*", "@astrojs/compiler"));
-        assert!(!glob_match("@astrojs/*", "lodash"));
+    println!(
+        "All lockfile records; platform/dev/optional installation selection is not evaluated."
+    );
+    if let Some(c) = r.get("execution_candidates").and_then(J::as_array) {
+        println!(
+            "{} execution candidates (markers, not malicious-code findings)",
+            c.len()
+        );
+        for item in c {
+            let p = item.get("package").unwrap();
+            println!(
+                "  {}@{} [{}] via {}",
+                p.get("name").and_then(J::as_str).unwrap_or(""),
+                p.get("version").and_then(J::as_str).unwrap_or(""),
+                p.get("path").and_then(J::as_str).unwrap_or(""),
+                item.get("introducer_path").unwrap().to_json()
+            );
+        }
     }
-
-    #[test]
-    fn test_threat_match() {
-        let mut threats = BTreeSet::new();
-        threats.insert("malicious".to_string());
-        assert!(check_threat_match("node_modules/malicious@1.0.0", &threats));
+    if let Some(issues) = r.get("issues").and_then(J::as_array) {
+        for issue in issues {
+            println!("INCOMPLETE: {}", issue.as_str().unwrap_or("unknown"));
+        }
     }
+    if let Some(policy) = r.get("policy") {
+        println!(
+            "Policy: {}",
+            policy
+                .get("outcome")
+                .and_then(J::as_str)
+                .unwrap_or("unknown")
+        );
+    }
+    println!(
+        "Use --json for input hashes, artifact identities, typed edges and convergence evidence."
+    );
 }

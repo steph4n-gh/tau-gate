@@ -9,43 +9,95 @@ impl MiniParser {
     /// Parses a TOML-like string into a simple key-value map.
     pub fn parse_config(content: &str) -> Result<BTreeMap<String, ConfigValue>> {
         let mut map = BTreeMap::new();
+        let mut statement = String::new();
+        let mut quote = None;
         for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            if let Some((key, value)) = line.split_once('=') {
-                let key = key.trim().to_string();
-                let val_raw = value.trim();
-                if val_raw.starts_with('[') && val_raw.ends_with(']') {
-                    let inner = &val_raw[1..val_raw.len() - 1];
-                    let items = inner
-                        .split(',')
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.trim_matches(|c| c == '"' || c == '\'').to_string())
-                        .collect();
-                    map.insert(key, ConfigValue::Array(items));
-                } else if val_raw.starts_with('"') || val_raw.starts_with('\'') {
-                    map.insert(
-                        key,
-                        ConfigValue::String(
-                            val_raw.trim_matches(|c| c == '"' || c == '\'').to_string(),
-                        ),
-                    );
-                } else if let Ok(val) = val_raw.parse::<f64>() {
-                    map.insert(key, ConfigValue::Float(val));
+            let mut cleaned = String::new();
+            let mut escape = false;
+            for c in line.chars() {
+                if c == '#' && quote.is_none() {
+                    break;
+                }
+                cleaned.push(c);
+                if escape {
+                    escape = false;
+                    continue;
+                }
+                if c == '\\' && quote == Some('"') {
+                    escape = true;
+                    continue;
+                }
+                if Some(c) == quote {
+                    quote = None
+                } else if quote.is_none() && (c == '"' || c == '\'') {
+                    quote = Some(c)
                 }
             }
+            statement.push_str(cleaned.trim());
+            statement.push(' ');
+            let t = statement.trim();
+            if t.is_empty() {
+                statement.clear();
+                continue;
+            }
+            if quote.is_some() {
+                return Err(GateError::Config("Unterminated string".into()));
+            }
+            let (key, raw) = t
+                .split_once('=')
+                .ok_or_else(|| GateError::Config("Expected key = value".into()))?;
+            let key = key.trim();
+            let raw = raw.trim();
+            if raw.starts_with('[') && !raw.ends_with(']') {
+                continue;
+            }
+            if !matches!(key, "whitelist" | "mode" | "threshold_percentage") {
+                return Err(GateError::Config(format!("Unknown key {key}")));
+            }
+            let value = if raw.starts_with('[') {
+                let mut items = Vec::new();
+                for x in raw[1..raw.len() - 1].split(',') {
+                    let x = x.trim();
+                    if x.is_empty() {
+                        continue;
+                    }
+                    items.push(config_string(x)?);
+                }
+                ConfigValue::Array(items)
+            } else if raw.starts_with('"') || raw.starts_with('\'') {
+                ConfigValue::String(config_string(raw)?)
+            } else {
+                ConfigValue::Float(
+                    raw.parse()
+                        .map_err(|_| GateError::Config("Invalid number".into()))?,
+                )
+            };
+            if map.insert(key.into(), value).is_some() {
+                return Err(GateError::Config("Duplicate key".into()));
+            }
+            statement.clear();
+        }
+        if !statement.trim().is_empty() {
+            return Err(GateError::Config("Unterminated value".into()));
         }
         Ok(map)
     }
 
     /// A basic JSON value representation for custom parsing.
     pub fn parse_json(json: &str) -> Result<JsonNode> {
-        let mut tokens = JsonLexer::tokenize(json);
-        tokens.reverse();
-        JsonParser::parse(&mut tokens)
+        if json.len() > 64 * 1024 * 1024 {
+            return Err(GateError::Generic("JSON exceeds 64 MiB".into()));
+        }
+        let mut reader = JsonReader {
+            bytes: json.as_bytes(),
+            pos: 0,
+        };
+        let value = reader.value(0)?;
+        reader.ws();
+        if reader.pos != reader.bytes.len() {
+            return Err(reader.error());
+        }
+        Ok(value)
     }
 
     /// V2.0 Hardening: Detects high-entropy strings (potential obfuscation) in manifests.
@@ -79,83 +131,102 @@ impl MiniParser {
     pub fn parse_pnpm_yaml(yaml: &str) -> Result<PnpmMetadata> {
         let mut snapshots = BTreeMap::new();
         let mut packages = BTreeMap::new();
-        let mut current_section = "";
-        let mut current_pkg_id = String::new();
-
+        let mut section = "";
+        let mut id = String::new();
+        let mut dependency_section = false;
         for line in yaml.lines() {
-            let indent = line.chars().take_while(|c| c.is_whitespace()).count();
-            let line_trimmed = line.trim();
-            if line_trimmed.is_empty() || line_trimmed.starts_with('#') {
+            let indent = line.chars().take_while(|c| *c == ' ').count();
+            let t = line.trim();
+            if t.is_empty() || t.starts_with('#') {
                 continue;
             }
-
-            if line_trimmed.starts_with("snapshots:") {
-                current_section = "snapshots";
-                continue;
-            }
-            if line_trimmed.starts_with("packages:") {
-                current_section = "packages";
-                continue;
-            }
-
-            if indent == 2 && line_trimmed.contains(':') {
-                let id = if let Some((id, _)) = line_trimmed.split_once(':') {
-                    id
-                } else {
-                    line_trimmed
+            if indent == 0 {
+                section = match t {
+                    "snapshots:" => "snapshots",
+                    "packages:" => "packages",
+                    _ => "",
                 };
-                current_pkg_id = id
-                    .trim()
-                    .trim_matches(|c| c == '"' || c == '\'')
-                    .to_string();
-                if current_section == "snapshots" {
+                id.clear();
+                dependency_section = false;
+                continue;
+            }
+            if section.is_empty() {
+                continue;
+            }
+            if indent == 2 {
+                let (key, _) = t
+                    .split_once(':')
+                    .ok_or_else(|| GateError::Graph("Unsupported pnpm key".into()))?;
+                id = key.trim_matches(|c| c == '"' || c == '\'').into();
+                dependency_section = false;
+                if section == "snapshots" {
                     snapshots.insert(
-                        current_pkg_id.clone(),
+                        id.clone(),
                         PnpmSnapshot {
                             dependencies: Vec::new(),
                         },
                     );
-                } else if current_section == "packages" {
+                } else {
                     packages.insert(
-                        current_pkg_id.clone(),
+                        id.clone(),
                         PnpmPackage {
-                            has_install_script: false,
+                            has_install_script: t.contains("hasInstallScript: true"),
                         },
                     );
                 }
-                if line_trimmed.contains("hasInstallScript: true") {
-                    if let Some(pkg) = packages.get_mut(&current_pkg_id) {
-                        pkg.has_install_script = true;
+                continue;
+            }
+            if indent == 4 {
+                dependency_section = t == "dependencies:" || t == "optionalDependencies:";
+                if section == "packages"
+                    && (t == "hasInstallScript: true" || t == "requiresBuild: true")
+                {
+                    if let Some(p) = packages.get_mut(&id) {
+                        p.has_install_script = true;
                     }
                 }
                 continue;
             }
-
-            if indent == 4 && line_trimmed.starts_with("hasInstallScript:") {
-                let has = line_trimmed.contains("true");
-                if current_section == "packages" {
-                    if let Some(pkg) = packages.get_mut(&current_pkg_id) {
-                        pkg.has_install_script = has;
-                    }
-                }
+            if indent == 6 && section == "snapshots" && dependency_section {
+                let (name, version) = t
+                    .split_once(':')
+                    .ok_or_else(|| GateError::Graph("Unsupported pnpm reference".into()))?;
+                snapshots.get_mut(&id).context_pnpm()?.dependencies.push((
+                    name.trim().trim_matches(|c| c == '"' || c == '\'').into(),
+                    version
+                        .trim()
+                        .trim_matches(|c| c == '"' || c == '\'')
+                        .into(),
+                ));
             }
-
-            if indent == 6 && current_section == "snapshots" {
-                if let Some((name, _ver)) = line_trimmed.split_once(':') {
-                    if let Some(snap) = snapshots.get_mut(&current_pkg_id) {
-                        snap.dependencies.push(
-                            name.trim()
-                                .trim_matches(|c| c == '"' || c == '\'')
-                                .to_string(),
-                        );
-                    }
-                }
-            }
+        }
+        if snapshots.is_empty() {
+            return Err(GateError::Graph(
+                "INCOMPLETE: unsupported/empty pnpm snapshots".into(),
+            ));
         }
         Ok(PnpmMetadata {
             snapshots,
             packages,
         })
+    }
+}
+
+fn config_string(s: &str) -> Result<String> {
+    if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
+        return Ok(s[1..s.len() - 1].into());
+    }
+    match MiniParser::parse_json(s)? {
+        JsonNode::String(s) => Ok(s),
+        _ => Err(GateError::Config("Expected quoted string".into())),
+    }
+}
+trait PnpmContext<T> {
+    fn context_pnpm(self) -> Result<T>;
+}
+impl<T> PnpmContext<T> for Option<T> {
+    fn context_pnpm(self) -> Result<T> {
+        self.ok_or_else(|| GateError::Graph("Invalid pnpm snapshot".into()))
     }
 }
 
@@ -165,7 +236,7 @@ pub struct PnpmMetadata {
 }
 
 pub struct PnpmSnapshot {
-    pub dependencies: Vec<String>,
+    pub dependencies: Vec<(String, String)>,
 }
 
 pub struct PnpmPackage {
@@ -222,136 +293,255 @@ impl JsonNode {
     }
 }
 
-struct JsonLexer;
-impl JsonLexer {
-    fn tokenize(json: &str) -> Vec<String> {
-        let mut tokens = Vec::new();
-        let mut it = json.chars().peekable();
-        while let Some(&c) = it.peek() {
-            match c {
-                '{' | '}' | '[' | ']' | ':' | ',' => {
-                    tokens.push(c.to_string());
-                    it.next();
-                }
-                '"' => {
-                    it.next();
-                    let mut s = String::new();
-                    while let Some(nc) = it.next() {
-                        if nc == '"' {
-                            break;
-                        }
-                        if nc == '\\' {
-                            if let Some(esc) = it.next() {
-                                s.push(esc);
+struct JsonReader<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+}
+impl<'a> JsonReader<'a> {
+    fn error(&self) -> GateError {
+        GateError::Generic(format!("Invalid JSON at byte {}", self.pos))
+    }
+    fn ws(&mut self) {
+        while self
+            .bytes
+            .get(self.pos)
+            .is_some_and(|b| matches!(b, b' ' | b'\n' | b'\r' | b'\t'))
+        {
+            self.pos += 1;
+        }
+    }
+    fn take(&mut self, b: u8) -> bool {
+        self.ws();
+        if self.bytes.get(self.pos) == Some(&b) {
+            self.pos += 1;
+            true
+        } else {
+            false
+        }
+    }
+    fn string(&mut self) -> Result<String> {
+        if !self.take(b'"') {
+            return Err(self.error());
+        }
+        let mut out = String::new();
+        loop {
+            let b = *self.bytes.get(self.pos).ok_or_else(|| self.error())?;
+            self.pos += 1;
+            match b {
+                b'"' => return Ok(out),
+                b'\\' => {
+                    let esc = *self.bytes.get(self.pos).ok_or_else(|| self.error())?;
+                    self.pos += 1;
+                    match esc {
+                        b'"' => out.push('"'),
+                        b'\\' => out.push('\\'),
+                        b'/' => out.push('/'),
+                        b'b' => out.push('\u{8}'),
+                        b'f' => out.push('\u{c}'),
+                        b'n' => out.push('\n'),
+                        b'r' => out.push('\r'),
+                        b't' => out.push('\t'),
+                        b'u' => {
+                            let mut cp = self.hex()?;
+                            if (0xd800..=0xdbff).contains(&cp) {
+                                if self.bytes.get(self.pos..self.pos + 2) != Some(b"\\u") {
+                                    return Err(self.error());
+                                }
+                                self.pos += 2;
+                                let low = self.hex()?;
+                                if !(0xdc00..=0xdfff).contains(&low) {
+                                    return Err(self.error());
+                                }
+                                cp = 0x10000 + ((cp - 0xd800) << 10) + (low - 0xdc00);
                             }
-                        } else {
-                            s.push(nc);
+                            out.push(char::from_u32(cp).ok_or_else(|| self.error())?);
                         }
+                        _ => return Err(self.error()),
                     }
-                    tokens.push(format!("\"{}\"", s));
                 }
-                c if c.is_whitespace() => {
-                    it.next();
-                }
+                0..=31 => return Err(self.error()),
                 _ => {
-                    let mut s = String::new();
-                    while let Some(&nc) = it.peek() {
-                        if nc.is_alphanumeric() || nc == '.' || nc == '-' || nc == '_' {
-                            s.push(nc);
-                            it.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    if !s.is_empty() {
-                        tokens.push(s);
-                    } else {
-                        it.next();
-                    }
+                    self.pos -= 1;
+                    let text =
+                        std::str::from_utf8(&self.bytes[self.pos..]).map_err(|_| self.error())?;
+                    let c = text.chars().next().ok_or_else(|| self.error())?;
+                    out.push(c);
+                    self.pos += c.len_utf8();
                 }
             }
         }
-        tokens
+    }
+    fn hex(&mut self) -> Result<u32> {
+        let raw = self
+            .bytes
+            .get(self.pos..self.pos + 4)
+            .ok_or_else(|| self.error())?;
+        let text = std::str::from_utf8(raw).map_err(|_| self.error())?;
+        let n = u32::from_str_radix(text, 16).map_err(|_| self.error())?;
+        self.pos += 4;
+        Ok(n)
+    }
+    fn value(&mut self, depth: usize) -> Result<JsonNode> {
+        if depth > 128 {
+            return Err(self.error());
+        }
+        self.ws();
+        let b = *self.bytes.get(self.pos).ok_or_else(|| self.error())?;
+        match b {
+            b'"' => Ok(JsonNode::String(self.string()?)),
+            b'{' => {
+                self.pos += 1;
+                let mut m = BTreeMap::new();
+                if self.take(b'}') {
+                    return Ok(JsonNode::Object(m));
+                }
+                loop {
+                    let k = self.string()?;
+                    if !self.take(b':') {
+                        return Err(self.error());
+                    }
+                    let v = self.value(depth + 1)?;
+                    if m.insert(k, v).is_some() {
+                        return Err(self.error());
+                    }
+                    if self.take(b'}') {
+                        break;
+                    }
+                    if !self.take(b',') {
+                        return Err(self.error());
+                    }
+                }
+                Ok(JsonNode::Object(m))
+            }
+            b'[' => {
+                self.pos += 1;
+                let mut a = Vec::new();
+                if self.take(b']') {
+                    return Ok(JsonNode::Array(a));
+                }
+                loop {
+                    a.push(self.value(depth + 1)?);
+                    if self.take(b']') {
+                        break;
+                    }
+                    if !self.take(b',') {
+                        return Err(self.error());
+                    }
+                }
+                Ok(JsonNode::Array(a))
+            }
+            b't' | b'f' | b'n' => {
+                let (word, v) = match b {
+                    b't' => (b"true".as_slice(), JsonNode::Bool(true)),
+                    b'f' => (b"false".as_slice(), JsonNode::Bool(false)),
+                    _ => (b"null".as_slice(), JsonNode::Null),
+                };
+                if self.bytes.get(self.pos..self.pos + word.len()) != Some(word) {
+                    return Err(self.error());
+                }
+                self.pos += word.len();
+                Ok(v)
+            }
+            _ => {
+                let start = self.pos;
+                if self.bytes.get(self.pos) == Some(&b'-') {
+                    self.pos += 1;
+                }
+                match self.bytes.get(self.pos) {
+                    Some(b'0') => self.pos += 1,
+                    Some(b'1'..=b'9') => {
+                        self.pos += 1;
+                        while self.bytes.get(self.pos).is_some_and(u8::is_ascii_digit) {
+                            self.pos += 1;
+                        }
+                    }
+                    _ => return Err(self.error()),
+                }
+                if self.bytes.get(self.pos) == Some(&b'.') {
+                    self.pos += 1;
+                    let n = self.pos;
+                    while self.bytes.get(self.pos).is_some_and(u8::is_ascii_digit) {
+                        self.pos += 1;
+                    }
+                    if n == self.pos {
+                        return Err(self.error());
+                    }
+                }
+                if self
+                    .bytes
+                    .get(self.pos)
+                    .is_some_and(|b| matches!(b, b'e' | b'E'))
+                {
+                    self.pos += 1;
+                    if self
+                        .bytes
+                        .get(self.pos)
+                        .is_some_and(|b| matches!(b, b'+' | b'-'))
+                    {
+                        self.pos += 1;
+                    }
+                    let n = self.pos;
+                    while self.bytes.get(self.pos).is_some_and(u8::is_ascii_digit) {
+                        self.pos += 1;
+                    }
+                    if n == self.pos {
+                        return Err(self.error());
+                    }
+                }
+                let n = std::str::from_utf8(&self.bytes[start..self.pos])
+                    .map_err(|_| self.error())?
+                    .parse::<f64>()
+                    .map_err(|_| self.error())?;
+                if !n.is_finite() {
+                    return Err(self.error());
+                }
+                Ok(JsonNode::Number(n))
+            }
+        }
     }
 }
 
-struct JsonParser;
-impl JsonParser {
-    fn parse(tokens: &mut Vec<String>) -> Result<JsonNode> {
-        let token = tokens
-            .pop()
-            .ok_or_else(|| GateError::Generic("Empty JSON".to_string()))?;
-        match token.as_str() {
-            "{" => Self::parse_object(tokens),
-            "[" => Self::parse_array(tokens),
-            s if s.starts_with('"') => Ok(JsonNode::String(s[1..s.len() - 1].to_string())),
-            "true" => Ok(JsonNode::Bool(true)),
-            "false" => Ok(JsonNode::Bool(false)),
-            "null" => Ok(JsonNode::Null),
-            s => {
-                if let Ok(n) = s.parse::<f64>() {
-                    Ok(JsonNode::Number(n))
+pub fn json_string(s: &str) -> String {
+    let mut out = String::from("\"");
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c < ' ' => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+impl JsonNode {
+    pub fn to_json(&self) -> String {
+        match self {
+            Self::String(s) => json_string(s),
+            Self::Bool(b) => b.to_string(),
+            Self::Null => "null".into(),
+            Self::Number(n) => {
+                if n.is_finite() {
+                    n.to_string()
                 } else {
-                    Err(GateError::Generic(format!("Invalid JSON token: {}", s)))
+                    "null".into()
                 }
             }
+            Self::Array(a) => format!(
+                "[{}]",
+                a.iter().map(Self::to_json).collect::<Vec<_>>().join(",")
+            ),
+            Self::Object(m) => format!(
+                "{{{}}}",
+                m.iter()
+                    .map(|(k, v)| format!("{}:{}", json_string(k), v.to_json()))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
         }
-    }
-    fn parse_object(tokens: &mut Vec<String>) -> Result<JsonNode> {
-        let mut map = BTreeMap::new();
-        while let Some(peek) = tokens.last() {
-            if peek == "}" {
-                tokens.pop();
-                return Ok(JsonNode::Object(map));
-            }
-            let key_raw = tokens.pop().ok_or_else(|| {
-                GateError::Generic("Unexpected EOF in JSON object key".to_string())
-            })?;
-            let key = if key_raw.starts_with('"') {
-                key_raw[1..key_raw.len() - 1].to_string()
-            } else {
-                key_raw
-            };
-            if tokens.is_empty()
-                || tokens.pop().ok_or_else(|| {
-                    GateError::Generic("Unexpected EOF in JSON object colon".to_string())
-                })? != ":"
-            {
-                return Err(GateError::Generic(
-                    "Expected ':' in JSON object".to_string(),
-                ));
-            }
-            let val = Self::parse(tokens)?;
-            map.insert(key, val);
-            if tokens.is_empty() {
-                break;
-            }
-            if let Some(comma) = tokens.last() {
-                if comma == "," {
-                    tokens.pop();
-                }
-            }
-        }
-        Err(GateError::Generic("Unclosed JSON object".to_string()))
-    }
-    fn parse_array(tokens: &mut Vec<String>) -> Result<JsonNode> {
-        let mut arr = Vec::new();
-        while let Some(peek) = tokens.last() {
-            if peek == "]" {
-                tokens.pop();
-                return Ok(JsonNode::Array(arr));
-            }
-            arr.push(Self::parse(tokens)?);
-            if tokens.is_empty() {
-                break;
-            }
-            if let Some(comma) = tokens.last() {
-                if comma == "," {
-                    tokens.pop();
-                }
-            }
-        }
-        Err(GateError::Generic("Unclosed JSON array".to_string()))
     }
 }
 
@@ -393,5 +583,39 @@ snapshots:
                 .has_install_script
         );
         assert!(meta.snapshots.contains_key("/zod@3.22.0"));
+    }
+}
+
+#[cfg(test)]
+mod strict_regressions {
+    use super::*;
+    #[test]
+    fn unicode_and_roundtrip() {
+        let s = r#"{"\u0061":"é\ud83d\ude00\n\\\""}"#;
+        let j = MiniParser::parse_json(s).unwrap();
+        assert_eq!(j.get("a").and_then(JsonNode::as_str), Some("é😀\n\\\""));
+        assert_eq!(MiniParser::parse_json(&j.to_json()).unwrap(), j);
+    }
+    #[test]
+    fn malformed_rejected() {
+        for s in [
+            "{a:1}",
+            "[1 2]",
+            "[1,]",
+            "{}{}",
+            "{\"a\":1,\"a\":2}",
+            "01",
+            "1e",
+            "1e9999",
+            "\"\\x\"",
+            "\"\\ud800\"",
+            "\"\\udc00\"",
+            "\"raw\nline\"",
+        ] {
+            assert!(MiniParser::parse_json(s).is_err(), "{s}");
+        }
+        assert!(
+            MiniParser::parse_json(&format!("{}0{}", "[".repeat(130), "]".repeat(130))).is_err()
+        );
     }
 }

@@ -1,4 +1,7 @@
 #!/bin/bash
+# Historical unqualified prototype: deliberately disabled to avoid resolution/install side effects.
+echo "INCOMPLETE: retired prototype; use read-only npm review (README.md)" >&2
+exit 2
 cargo build --release
 
 echo "Fetching obscure repositories (Stars < 5, Recently Updated)..."

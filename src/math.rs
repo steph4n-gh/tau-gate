@@ -7,12 +7,15 @@ pub struct PartitionResult {
     pub partition_b: Vec<String>,
     /// The calculated bisection point (Max Spectral Gap).
     pub tau: f64,
-    /// V2.7 Hardening: The Algebraic Connectivity score (lambda_2).
+    /// A Rayleigh estimate; residual convergence does not certify the second eigenpair.
     /// Close to 0.0 indicates a severe structural bottleneck.
     pub connectivity_score: f64,
+    pub converged: bool,
+    pub residual: f64,
+    pub iterations: usize,
 }
 
-/// Computes the Fiedler Vector and bisects the graph using an O(E) Sparse Iterative Solver.
+/// Estimates a Fiedler vector with a bounded sparse iterative solver (O(E) per step).
 ///
 /// V2.6 Hardening:
 /// 1. Corrected alpha bound (2 * max_degree) for mathematical convergence.
@@ -20,7 +23,7 @@ pub struct PartitionResult {
 /// 3. Replaced median cut with Maximum Spectral Gap cut to isolate anomalies.
 pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let n = graph.node_count();
-    if n < 3 {
+    if n < 1 {
         return Err(GateError::Math(
             "Graph is too small for meaningful structural analysis.".to_string(),
         ));
@@ -31,6 +34,9 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let mut degrees = vec![0.0; n];
 
     for &(u, v) in graph.edges() {
+        if u >= n || v >= n {
+            return Err(GateError::Math("Invalid edge endpoint".into()));
+        }
         if u != v {
             adj[u].push(v);
             adj[v].push(u);
@@ -39,12 +45,49 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         }
     }
 
+    let mut seen = vec![false; n];
+    let mut components = Vec::new();
+    for root in 0..n {
+        if seen[root] {
+            continue;
+        }
+        let mut stack = vec![root];
+        seen[root] = true;
+        let mut component = Vec::new();
+        while let Some(u) = stack.pop() {
+            component.push(u);
+            for &v in &adj[u] {
+                if !seen[v] {
+                    seen[v] = true;
+                    stack.push(v);
+                }
+            }
+        }
+        components.push(component);
+    }
+    if components.len() > 1 || n == 1 {
+        components.sort_by_key(Vec::len);
+        return Ok(PartitionResult {
+            partition_b: components[0]
+                .iter()
+                .filter_map(|&i| graph.node_weight(i).cloned())
+                .collect(),
+            tau: 0.0,
+            connectivity_score: 0.0,
+            converged: true,
+            residual: 0.0,
+            iterations: 0,
+        });
+    }
     let max_degree = degrees.iter().copied().fold(0.0, f64::max);
     if max_degree == 0.0 {
         return Ok(PartitionResult {
             partition_b: Vec::new(),
             tau: 0.0,
             connectivity_score: 0.0,
+            converged: true,
+            residual: 0.0,
+            iterations: 0,
         });
     }
 
@@ -52,15 +95,20 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let alpha = 1.0 / (2.0 * max_degree + 1.1);
     let mut v = vec![0.0; n];
 
-    for i in 0..n {
-        v[i] = (i as f64).sin();
+    for (i, value) in v.iter_mut().enumerate() {
+        *value = (i as f64).sin();
     }
 
-    let iterations = 1000;
+    // Bound total sparse work as well as iterations on large caller-provided graphs.
+    let iterations = 5000.min((20_000_000usize / (n + graph.edges().len()).max(1)).max(1));
+    let mut used = 0;
+    let mut residual = f64::INFINITY;
+    let mut converged = false;
     let tolerance = 1e-9;
     let mut fiedler_value = 0.0;
 
-    for _ in 0..iterations {
+    for step in 0..iterations {
+        used = step + 1;
         let sum: f64 = v.iter().sum();
         let mean = sum / (n as f64);
         for x in &mut v {
@@ -96,8 +144,16 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         }
         fiedler_value = v_l_v;
 
+        residual = (0..n)
+            .map(|i| {
+                let lv = degrees[i] * v_next[i] - adj[i].iter().map(|&j| v_next[j]).sum::<f64>();
+                (lv - fiedler_value * v_next[i]).powi(2)
+            })
+            .sum::<f64>()
+            .sqrt();
         v = v_next;
-        if max_diff < tolerance {
+        if max_diff < tolerance && residual < tolerance {
+            converged = true;
             break;
         }
     }
@@ -138,12 +194,18 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
             partition_b: side_large,
             tau,
             connectivity_score: fiedler_value,
+            converged,
+            residual,
+            iterations: used,
         })
     } else {
         Ok(PartitionResult {
             partition_b: side_small,
             tau,
             connectivity_score: fiedler_value,
+            converged,
+            residual,
+            iterations: used,
         })
     }
 }
@@ -204,6 +266,44 @@ mod tests {
         graph.add_node("C".to_string());
 
         let result = analyze_graph(&graph).expect("Should handle no edges");
-        assert_eq!(result.partition_b.len(), 0);
+        assert_eq!(result.connectivity_score, 0.0);
+        assert_eq!(result.partition_b.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod convergence_regressions {
+    use super::*;
+    #[test]
+    fn analytical_two_nodes() {
+        let mut g = DiGraph::new();
+        g.add_node("a".into());
+        g.add_node("b".into());
+        g.add_edge(0, 1);
+        let r = analyze_graph(&g).unwrap();
+        assert!(r.converged);
+        assert!((r.connectivity_score - 2.0).abs() < 1e-9);
+        assert!(r.residual < 1e-9);
+    }
+    #[test]
+    fn long_path_discloses_nonconvergence() {
+        let mut g = DiGraph::new();
+        for i in 0..400 {
+            g.add_node(i.to_string());
+            if i > 0 {
+                g.add_edge(i - 1, i);
+            }
+        }
+        let r = analyze_graph(&g).unwrap();
+        assert!(!r.converged);
+        assert_eq!(r.iterations, 5000);
+        assert!(r.residual > 1e-9);
+    }
+    #[test]
+    fn invalid_self_edge_rejected() {
+        let mut g = DiGraph::new();
+        g.add_node("a".into());
+        g.add_edge(99, 99);
+        assert!(analyze_graph(&g).is_err());
     }
 }

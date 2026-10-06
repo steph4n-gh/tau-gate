@@ -26,7 +26,7 @@ jobs:
       - name: Build Daemon and Static Library
         run: |
           echo "[Build] Compiling tau-gate..."
-          cargo build --release
+          cargo build --release --offline
           
       - name: Verify Build Outputs
         run: |
@@ -41,4 +41,12 @@ jobs:
           echo "✅ Build verified."
 
       - name: Run Tests
-        run: cargo test --release
+        run: cargo test --release --offline --all-targets
+
+      - name: Check formatting and read-only review
+        run: |
+          cargo fmt -- --check
+          cargo clippy --offline --all-targets -- -D warnings
+          ./e2e_zero.sh
+          cc -Iinclude tests/ffi_smoke.c target/release/libtau_gate.a -ldl -lpthread -lm -o /tmp/tau-ffi-smoke
+          /tmp/tau-ffi-smoke
