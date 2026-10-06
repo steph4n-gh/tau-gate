@@ -1,4 +1,4 @@
-# Tau-Gate
+# Tau-Gate: Explainable dependency-change review
 
 Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
