@@ -87,3 +87,7 @@ cargo fmt -- --check
 Tests cover input preservation, missing/unsupported extraction, nested/workspace resolution, optional/peer/dev paths, strict Unicode JSON, configuration validation, root script and same-version artifact changes, all-candidate reporting, FFI ownership and solver nonconvergence. See [docs/review.md](docs/review.md) for the contract and next work. Older research/marketing documents and ecosystem scripts are historical, unverified prototypes, not current validation evidence.
 
 There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review. Next priorities are manifest-backed dependency capabilities across formats, host installation agreement, digest-pinned approvals and representative benign/adversarial workloads with simple baselines.
+
+## License
+
+This project is distributed under the [PolyForm Non-Commercial License 1.0.0](LICENSE). Read its terms before using or redistributing the software.
