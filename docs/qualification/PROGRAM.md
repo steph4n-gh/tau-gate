@@ -26,6 +26,14 @@ Independent design candidates precede implementation. Agreement proceeds without
 All numerical targets are proposed qualification criteria, not existing results.
 A milestone closes only with inspectable artifacts. An incomplete or unavailable result is never a pass.
 
+## Milestone status
+
+- [x] M1 measurement. All 90 unchanged baseline reviews are accounted for, with independently checked input/output hashes and corrected event scoring. The product baseline is unqualified. See [the baseline](baseline.md).
+- [ ] M2 repairs, differential controls, fuzzing, and resource qualification. The first buffer-reuse experiment is in progress.
+- [ ] M3 trusted approvals and consumer CI lifecycle.
+- [ ] M4 final Linux release payload and verification.
+- [ ] M5 two owned-repository self-pilots and a sustained-use record.
+
 ## Execution order
 
 1. Freeze selection rules, corpus input records, event taxonomy, and a holdout split.
