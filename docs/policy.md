@@ -1,4 +1,10 @@
-> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+> **Outdated — do not cite as the current product.** This file is kept as historical research. It is not a description of τ-Gate 4.0.0.
+>
+> **Supported now:** read-only review of npm v3, pnpm v9, and Yarn Classic v1 lockfiles. Bun, Yarn Berry, Go, and the Cargo CLI are unsupported. Cargo metadata parsing is an incomplete library preview. There is no immunity, formal verification, or safety proof.
+>
+> **License:** [Apache License 2.0](../LICENSE). Any argument below for the PolyForm Noncommercial License is withdrawn. Versions before 4.0.0 were released under PolyForm Noncommercial 1.0.0.
+>
+> Current scope: [README](../README.md) and [review contract](review.md).
 
 # Governance & Security Policy (v2.0.1)
 

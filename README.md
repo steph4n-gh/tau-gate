@@ -84,10 +84,14 @@ cargo fmt -- --check
 ./prove-it.sh
 ```
 
-Tests cover input preservation, missing/unsupported extraction, nested/workspace resolution, optional/peer/dev paths, strict Unicode JSON, configuration validation, root script and same-version artifact changes, all-candidate reporting, FFI ownership and solver nonconvergence. See [docs/review.md](docs/review.md) for the contract and next work. Older research/marketing documents and ecosystem scripts are historical, unverified prototypes, not current validation evidence.
+Tests cover input preservation, missing/unsupported extraction, nested/workspace resolution, optional/peer/dev paths, strict Unicode JSON, configuration validation, root script and same-version artifact changes, all-candidate reporting, FFI ownership and solver nonconvergence. See [docs/review.md](docs/review.md) for the contract and next work. Older research/marketing documents and ecosystem scripts are historical, unverified prototypes, not current validation evidence. Each of those documents is marked outdated at the top. Do not cite them for supported formats, safety, or the license.
 
 There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review. Next priorities are manifest-backed dependency capabilities across formats, host installation agreement, digest-pinned approvals and representative benign/adversarial workloads with simple baselines.
 
 ## License
 
-This project is distributed under the [PolyForm Non-Commercial License 1.0.0](LICENSE). Read its terms before using or redistributing the software.
+τ-Gate 4.0.0 and later are distributed under the [Apache License 2.0](LICENSE). Copyright 2026 Stephan Arrington / ORIOLETECH LLC. See [NOTICE](NOTICE).
+
+Versions released before 4.0.0, including the `v3.0.0` tag, were distributed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/). Those terms apply only to those earlier versions. This tree, and releases from 4.0.0 onward, are Apache-2.0.
+
+Report security issues as described in [SECURITY.md](SECURITY.md).

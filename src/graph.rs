@@ -280,10 +280,6 @@ impl DepGraph {
         crate::pnpm::parse(content, None)
     }
 
-    pub fn build_from_network() -> Result<Self> {
-        Err(GateError::Graph("INCOMPLETE: network resolver is retired until exact resolver/capability agreement is validated; provide a frozen npm v3 snapshot".into()))
-    }
-
     pub fn parse_cargo_metadata(stdout: &str) -> Result<Self> {
         let json_str = if let Some(idx) = stdout.find('{') {
             &stdout[idx..]

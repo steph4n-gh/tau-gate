@@ -1,11 +1,9 @@
 pub mod config;
-pub mod daemon;
 pub mod digest;
 pub mod error;
 pub mod graph;
 pub mod graph_impl;
 pub mod math;
-pub mod network;
 pub mod parser;
 pub mod pnpm;
 pub mod review;

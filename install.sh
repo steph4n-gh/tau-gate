@@ -48,9 +48,8 @@ if [ -n "$TEMP_DIR" ]; then
     rm -rf "$TEMP_DIR"
 fi
 
-echo -e "\n${BLUE}Supported Runtimes:${NC}"
-echo " - npm (package-lock.json)"
-echo " - pnpm (pnpm-lock.yaml)"
-echo " - Bun (bun.lockb)"
-echo " - Yarn Berry (yarn.lock)"
-echo " - Rust (Cargo.toml)"
+echo -e "\n${BLUE}Supported lockfiles:${NC}"
+echo " - npm v3 (package-lock.json)"
+echo " - pnpm v9 (pnpm-lock.yaml)"
+echo " - Yarn Classic v1 (yarn.lock)"
+echo "Bun, Yarn Berry, Go, and the Cargo CLI are not supported."
