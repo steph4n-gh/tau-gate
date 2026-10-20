@@ -476,6 +476,7 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
     }
     let mut position = 0;
     let mut paths = BTreeMap::new();
+    let mut root: Option<String> = None;
     let mut manifest = None;
     let mut binding = None;
     loop {
@@ -536,7 +537,18 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
             return Err("invalid tar entry size".into());
         }
         let name = tar_text(&header[..100])?;
-        let prefix = tar_text(&header[345..500])?;
+        let prefix = match tar_text(&header[345..500]) {
+            Ok(prefix) => prefix,
+            Err(_)
+                if header[345..476].iter().all(|byte| *byte == 0)
+                    && [&header[476..488], &header[488..500]].iter().all(|field| {
+                        field[..11].iter().all(|byte| matches!(byte, b'0'..=b'7')) && field[11] == 0
+                    }) =>
+            {
+                ""
+            }
+            Err(reason) => return Err(reason),
+        };
         let joined = if prefix.is_empty() {
             name.to_owned()
         } else {
@@ -553,8 +565,10 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
                 || part == "."
                 || part == ".."
                 || part.ends_with('.')
+                || part.ends_with(' ')
                 || !part.bytes().all(|b| {
-                    b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'@' | b'+')
+                    (b.is_ascii_graphic() || b == b' ')
+                        && !matches!(b, b'\\' | b':' | b'*' | b'?' | b'"' | b'<' | b'>' | b'|')
                 })
                 || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
                 || (base.len() == 4
@@ -563,17 +577,25 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         }) {
             return Err("unsupported nonportable tar path".into());
         }
-        if path != "package" && !path.starts_with("package/") || path == "package" && !directory {
-            return Err("tar path is outside package directory".into());
+        let (member_root, relative) = path.split_once('/').unwrap_or((path, ""));
+        if root
+            .as_deref()
+            .is_some_and(|expected| expected != member_root)
+        {
+            return Err("tar contains inconsistent archive roots".into());
         }
-        if directory && matches!(path, "package/package.json" | "package/binding.gyp") {
+        root.get_or_insert_with(|| member_root.to_owned());
+        if relative.is_empty() && !directory {
+            return Err("tar root is not a directory".into());
+        }
+        if directory && matches!(relative, "package.json" | "binding.gyp") {
             return Err("evidence path is not a regular tar file".into());
         }
         let folded = path.to_ascii_lowercase();
         if matches!(
-            folded.as_str(),
-            "package/package.json" | "package/binding.gyp"
-        ) && path != folded
+            relative.to_ascii_lowercase().as_str(),
+            "package.json" | "binding.gyp"
+        ) && !matches!(relative, "package.json" | "binding.gyp")
         {
             return Err("noncanonical lifecycle evidence tar path".into());
         }
@@ -589,14 +611,14 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         if padding.iter().any(|byte| *byte != 0) {
             return Err("nonzero tar entry padding".into());
         }
-        match path {
-            "package/package.json" => {
+        match relative {
+            "package.json" => {
                 if size > MAX_MANIFEST {
                     return Err("package manifest exceeds 1 MiB".into());
                 }
                 manifest = Some(data.to_vec());
             }
-            "package/binding.gyp" => binding = Some(sha256(data)),
+            "binding.gyp" => binding = Some(sha256(data)),
             _ => {}
         }
         position = start + padded;
@@ -862,7 +884,6 @@ mod tests {
             "package/./package.json",
             "package/C:manifest",
             "package/a\\b",
-            "other/package.json",
         ] {
             assert!(
                 inspect_tar(&tar(&[(path, b'0', b"{}")]), &mut Budget::new()).is_err(),
@@ -1037,5 +1058,59 @@ mod tests {
         )
         .unwrap_err()
         .contains("headers"));
+    }
+
+    #[test]
+    fn one_consistent_archive_root_and_safe_printable_names() {
+        let manifest = br#"{"name":"sample","version":"1"}"#;
+        for root in ["json5", "cacheable-request", "node v24.12"] {
+            let root_dir = format!("{root}/");
+            let root_manifest = format!("{root}/package.json");
+            let ordinary = format!("{root}/array/#/_compare-by-length.js");
+            let tilde = format!("{root}/README.md~");
+            let bytes = tar(&[
+                (&root_dir, b'5', b""),
+                (&root_manifest, b'0', manifest),
+                (&ordinary, b'0', b"body"),
+                (&tilde, b'0', b"old"),
+            ]);
+            assert_eq!(inspect_tar(&bytes, &mut Budget::new()).unwrap().0, manifest);
+        }
+        let rejected: [Vec<(&str, u8, &[u8])>; 4] = [
+            vec![
+                ("json5/package.json", b'0', manifest),
+                ("other/README", b'0', b"readme"),
+            ],
+            vec![
+                ("json5/package.json", b'0', manifest),
+                ("JSON5/README", b'0', b"readme"),
+            ],
+            vec![("json5", b'0', manifest)],
+            vec![("json5/Package.json", b'0', manifest)],
+        ];
+        for entries in rejected {
+            assert!(inspect_tar(&tar(&entries), &mut Budget::new()).is_err());
+        }
+    }
+
+    #[test]
+    fn legacy_timestamp_tail_accepts_only_valid_octals_after_zero_padding() {
+        let manifest = br#"{"name":"sample","version":"1"}"#;
+        let mut bytes = tar(&[("cacheable-request/package.json", b'0', manifest)]);
+        bytes[476..488].copy_from_slice(b"14332753065\0");
+        bytes[488..500].copy_from_slice(b"14332753065\0");
+        checksum(&mut bytes[..512]);
+        assert_eq!(inspect_tar(&bytes, &mut Budget::new()).unwrap().0, manifest);
+
+        for offset in [345, 346, 475] {
+            let mut nonzero_padding = bytes.clone();
+            nonzero_padding[offset] = b'x';
+            checksum(&mut nonzero_padding[..512]);
+            assert!(inspect_tar(&nonzero_padding, &mut Budget::new()).is_err());
+        }
+        let mut malformed_time = bytes;
+        malformed_time[476] = b'8';
+        checksum(&mut malformed_time[..512]);
+        assert!(inspect_tar(&malformed_time, &mut Budget::new()).is_err());
     }
 }
