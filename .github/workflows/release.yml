@@ -1,53 +1,101 @@
-name: Release & Dogfood
+name: Reproducible Linux release candidate
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  audit-and-release:
-    runs-on: ubuntu-latest
+  build-and-attest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
-      # Checkout with the Actions token in an extraheader, not the remote URL.
-      # A push of a tag matching v* runs this job and publishes a GitHub Release.
-      - name: Manual Checkout
+      - name: Check out the exact source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Build twice in isolated pinned containers
+        id: build
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ github.sha }}
         run: |
-          git init
-          git remote add origin "https://github.com/${{ github.repository }}.git"
-          auth=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
-          git -c http.extraheader="AUTHORIZATION: basic ${auth}" fetch --depth 1 origin "${{ github.sha }}"
-          git checkout FETCH_HEAD
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          for label in a b; do
+            source="$RUNNER_TEMP/source-$label"
+            output="$RUNNER_TEMP/build-$label"
+            git clone --quiet --no-local "$GITHUB_WORKSPACE" "$source"
+            git -C "$source" checkout --quiet --detach "$SOURCE_COMMIT"
+            mkdir "$output"
+            docker run --rm --platform linux/amd64 --network none \
+              --cpus 2 --memory 2g --pids-limit 256 --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --mount "type=bind,src=$source,dst=/source-$label,readonly" \
+              --mount "type=bind,src=$output,dst=/output-$label" \
+              --workdir "/source-$label" \
+              --env "TAU_GATE_SOURCE_COMMIT=$SOURCE_COMMIT" \
+              --env "CARGO_TARGET_DIR=/output-$label/target" \
+              --env "RELEASE_OUTPUT_DIR=/output-$label/release" \
+              --env GIT_CONFIG_COUNT=1 \
+              --env GIT_CONFIG_KEY_0=safe.directory \
+              --env "GIT_CONFIG_VALUE_0=/source-$label" \
+              rust@sha256:16a7f242108de02f10fe4a392991679bafa7694e59f5b40a54d5af1be9b40d03 \
+              sh tools/release/build.sh
+          done
+          cmp "$RUNNER_TEMP/build-a/release/dist/SHA256SUMS" "$RUNNER_TEMP/build-b/release/dist/SHA256SUMS"
+          for file in "$RUNNER_TEMP/build-a/release/dist/"*; do
+            cmp "$file" "$RUNNER_TEMP/build-b/release/dist/$(basename "$file")"
+          done
+          cmp "$RUNNER_TEMP/build-a/release/stage/tau-gate" "$RUNNER_TEMP/build-b/release/stage/tau-gate"
+          archive=$(find "$RUNNER_TEMP/build-a/release/dist" -maxdepth 1 -name 'tau-gate-v*-linux-x86_64.tar.gz' -type f)
+          test -n "$archive"
+          test "$(printf '%s\n' "$archive" | wc -l)" -eq 1
+          {
+            echo "archive=$archive"
+            echo "sbom=${archive%.tar.gz}.cdx.json"
+            echo "dist=$RUNNER_TEMP/build-a/release/dist"
+          } >> "$GITHUB_OUTPUT"
 
+      - name: Sign build provenance
+        id: provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: |
+            ${{ steps.build.outputs.archive }}
+            ${{ steps.build.outputs.sbom }}
 
-      - name: Setup Rust Environment
-        run: |
-          # Use pre-installed rustup to ensure correct toolchain
-          rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
+      - name: Sign the SBOM assertion
+        id: sbom
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: ${{ steps.build.outputs.archive }}
+          sbom-path: ${{ steps.build.outputs.sbom }}
 
-      - name: Build and validate qualified review
-        run: |
-          cargo build --release --offline
-          cargo test --release --offline --all-targets
-          ./e2e_zero.sh
-
-      - name: Manual Release via GH CLI
-        run: |
-          echo "[Release] Creating or Updating GitHub Release using native CLI..."
-          if gh release view ${{ github.ref_name }} > /dev/null 2>&1; then
-            echo "Release ${{ github.ref_name }} already exists. Uploading artifact..."
-            gh release upload ${{ github.ref_name }} target/release/tau-gate --clobber
-          else
-            gh release create ${{ github.ref_name }} \
-              target/release/tau-gate \
-              --title "Release ${{ github.ref_name }}" \
-              --generate-notes \
-              $( [[ "${{ github.ref_name }}" == *"-pre"* ]] && echo "--prerelease" )
-          fi
+      - name: Preserve candidate and offline signature bundles
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIST: ${{ steps.build.outputs.dist }}
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$PROVENANCE_BUNDLE" "$DIST/provenance.sigstore.json"
+          cp "$SBOM_BUNDLE" "$DIST/sbom.sigstore.json"
+          (cd "$DIST" && sha256sum --check SHA256SUMS)
+
+      - name: Upload the qualified candidate
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tau-gate-linux-x86_64
+          path: ${{ steps.build.outputs.dist }}/*
+          if-no-files-found: error

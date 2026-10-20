@@ -2,7 +2,7 @@
 
 Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.1 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
+A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.2 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
 ## Try the review
 
