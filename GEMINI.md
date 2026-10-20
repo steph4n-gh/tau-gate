@@ -1,3 +1,5 @@
+> **Outdated — do not cite as the current product.** This note is kept because `Cargo.toml` and `docs/policy.md` still point at it for the standard-library-only rule. The TSP, daemon, and dry-run-as-default instructions below are retired. Current support is read-only review of npm v3, pnpm v9, and Yarn Classic v1. There is no immunity claim. The license is Apache-2.0; see [LICENSE](LICENSE) and [README](README.md).
+
 # Gemini CLI: Developer Guide for $\tau$-Gate (v3.0.0)
 
 This guide establishes the architectural standards for the **Absolute Zero** security primitive. Maintain these patterns to ensure mathematical stability and zero-dependency integrity.

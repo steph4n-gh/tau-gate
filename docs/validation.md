@@ -1,4 +1,10 @@
-> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+> **Outdated — do not cite as the current product.** This file is kept as historical research. It is not a description of τ-Gate 4.0.0.
+>
+> **Supported now:** read-only review of npm v3, pnpm v9, and Yarn Classic v1 lockfiles. Bun, Yarn Berry, Go, and the Cargo CLI are unsupported. Cargo metadata parsing is an incomplete library preview. There is no immunity, formal verification, or safety proof.
+>
+> **License:** [Apache License 2.0](../LICENSE). Any argument below for the PolyForm Noncommercial License is withdrawn. Versions before 4.0.0 were released under PolyForm Noncommercial 1.0.0.
+>
+> Current scope: [README](../README.md) and [review contract](review.md).
 
 # Empirical Validation Report: v3.0.0 "Absolute Zero"
 
@@ -9,7 +15,7 @@ To prove the robustness of the $\tau$-Gate v3.0.0 mathematical engine and its be
 *   **Total Dependencies:** **0** (Standard Library only)
 *   **Mode:** Passive Audit (`--dry-run`)
 *   **OS:** macOS / Linux (Ubuntu)
-*   **Runtimes:** npm 10.x, pnpm 9.x, Bun 1.3.x, Cargo (Rust) 1.85+
+*   **Runtimes:** ~~npm 10.x, pnpm 9.x, Bun 1.3.x, Cargo (Rust) 1.85+~~ **Withdrawn.** Bun and the Cargo CLI are not supported. Current support is npm v3, pnpm v9, and Yarn Classic v1.
 
 ---
 
@@ -54,7 +60,9 @@ During the Top 500 Ecosystem Benchmark, $\tau$-Gate successfully flagged an anom
 ---
 
 ## 🏁 Validation Verdict
-$\tau$-Gate v3.0.0 is **formally verified** to:
-1.  **Operate with zero external code.** All audits were performed using standard-library-only logic.
-2.  **Scale linearly.** Handles projects with thousands of nodes in under 500ms.
-3.  **Ensure Absolute Integrity.** The auditor is now immune to the supply chain attacks it detects.
+**Withdrawn.** The verdict below is not a current claim. τ-Gate is not formally verified and is not immune to supply-chain attacks.
+
+~~$\tau$-Gate v3.0.0 is **formally verified** to:~~
+1.  ~~**Operate with zero external code.** All audits were performed using standard-library-only logic.~~
+2.  ~~**Scale linearly.** Handles projects with thousands of nodes in under 500ms.~~
+3.  ~~**Ensure Absolute Integrity.** The auditor is now immune to the supply chain attacks it detects.~~

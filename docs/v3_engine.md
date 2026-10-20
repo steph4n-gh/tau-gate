@@ -1,4 +1,10 @@
-> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+> **Outdated — do not cite as the current product.** This file is kept as historical research. It is not a description of τ-Gate 4.0.0.
+>
+> **Supported now:** read-only review of npm v3, pnpm v9, and Yarn Classic v1 lockfiles. Bun, Yarn Berry, Go, and the Cargo CLI are unsupported. Cargo metadata parsing is an incomplete library preview. There is no immunity, formal verification, or safety proof.
+>
+> **License:** [Apache License 2.0](../LICENSE). Any argument below for the PolyForm Noncommercial License is withdrawn. Versions before 4.0.0 were released under PolyForm Noncommercial 1.0.0.
+>
+> Current scope: [README](../README.md) and [review contract](review.md).
 
 # $\tau$-Gate v3.0: The Network-Level Resolution Engine
 
@@ -18,11 +24,15 @@ To maintain the "Absolute Zero" mandate (0 external crates), the engine utilizes
 The engine includes a lightweight, standard-library-only Semantic Versioning (Semver) solver to parse version requirements (`^`, `~`) and dynamically resolve the highest valid package version directly from the registry metadata.
 
 ### Phase 3: The Complete Bypass
-By constructing the Graph Laplacian directly from the in-memory resolution and executing the Spectral Bisection math prior to any local file manipulation, $\tau$-Gate acts as an impenetrable, mathematically verified firewall that stands completely independent of the tools it is guarding. If the network gate opens, *then and only then* does the system hand control over to the local `npm` or `cargo` binary.
+~~By constructing the Graph Laplacian directly from the in-memory resolution and executing the Spectral Bisection math prior to any local file manipulation, $\tau$-Gate acts as an impenetrable, mathematically verified firewall that stands completely independent of the tools it is guarding. If the network gate opens, *then and only then* does the system hand control over to the local `npm` or `cargo` binary.~~
+
+**Withdrawn.** Network resolution is retired. The current tool does not fetch registries, does not act as a firewall, and is not mathematically verified.
 
 ---
 
 ## 🛡️ Philosophical Imperative: The Defense of `curl`
+
+**Withdrawn.** The current reviewer does not invoke `curl` or contact a registry. The argument below is historical.
 
 The decision to invoke an OS-native `curl` subprocess instead of using a native Rust HTTP client is not a hack; it is a **philosophical imperative**. It is the absolute purest manifestation of $\tau$-Gate’s core mandate: **Zero Trust, and Absolute Zero Dependencies.**
 
@@ -31,7 +41,7 @@ Here is why `curl` is mathematically and architecturally *required* for this sec
 ### 1. The Auditor's Paradox
 If you are building a tool designed to detect supply chain attacks in dependencies, *you cannot have dependencies.* 
 
-If we used `reqwest` or `hyper` to make HTTP calls in Rust, we would immediately inherit over **100+ transitive crates**: `tokio` for async runtimes, `rustls` or `native-tls` for cryptography, `httparse`, `mio`, `socket2`, etc. What happens if an attacker compromises a deep sub-dependency of `rustls`? They compromise the very firewall designed to stop them. By refusing to import crates, we mathematically guarantee that $\tau$-Gate's extraction layer cannot be poisoned via the Rust ecosystem.
+If we used `reqwest` or `hyper` to make HTTP calls in Rust, we would immediately inherit over **100+ transitive crates**: `tokio` for async runtimes, `rustls` or `native-tls` for cryptography, `httparse`, `mio`, `socket2`, etc. What happens if an attacker compromises a deep sub-dependency of `rustls`? They compromise the very firewall designed to stop them. ~~By refusing to import crates, we mathematically guarantee that $\tau$-Gate's extraction layer cannot be poisoned via the Rust ecosystem.~~ **Withdrawn.** No external crates is a build constraint, not a guarantee against compromise.
 
 ### 2. The Nightmare of Cryptography
 To query package registries, we must use HTTPS. Implementing a TLS cryptographic handshake (AES encryption, certificate authority validation, elliptic-curve key exchange) from scratch in pure, standard-library Rust would require tens of thousands of lines of highly complex code. **Cryptography is not something you write yourself.** You delegate it to the most battle-tested, scrutinized, and universally trusted tools on the planet.
@@ -43,4 +53,6 @@ To query package registries, we must use HTTPS. Implementing a TLS cryptographic
 The mass ecosystem audit proved why this architecture is necessary. Relying on local executables like `npm` and `yarn` to build the graph resulted in bloated, unstandardized output filled with ANSI color codes or garbage update warnings. By using `curl` to hit the registry APIs directly, we surgically bypass the unreliability of third-party JS tooling and secure a pristine, pure JSON data stream.
 
 ### Conclusion
-We do not trade integrity for milliseconds. By leveraging the `std::thread::scope` pool to launch concurrent `curl` commands, we achieved massive throughput while keeping our Rust binary completely pristine, un-hackable, and fully compliant with the Absolute Zero mandate.
+~~We do not trade integrity for milliseconds. By leveraging the `std::thread::scope` pool to launch concurrent `curl` commands, we achieved massive throughput while keeping our Rust binary completely pristine, un-hackable, and fully compliant with the Absolute Zero mandate.~~
+
+**Withdrawn.** There is no claim that the binary is un-hackable. The current reviewer does not shell out to `curl`.

@@ -1,4 +1,10 @@
-> Historical research/prototype document. Claims and benchmark results below are unverified and do not describe the current qualified CLI. See [current scope and limitations](../README.md) and [review contract](review.md). No formal safety proof, immunity, XZ coverage or TSP workload benefit is established.
+> **Outdated — do not cite as the current product.** This file is kept as historical research. It is not a description of τ-Gate 4.0.0.
+>
+> **Supported now:** read-only review of npm v3, pnpm v9, and Yarn Classic v1 lockfiles. Bun, Yarn Berry, Go, and the Cargo CLI are unsupported. Cargo metadata parsing is an incomplete library preview. There is no immunity, formal verification, or safety proof.
+>
+> **License:** [Apache License 2.0](../LICENSE). Any argument below for the PolyForm Noncommercial License is withdrawn. Versions before 4.0.0 were released under PolyForm Noncommercial 1.0.0.
+>
+> Current scope: [README](../README.md) and [review contract](review.md).
 
 # Whitepaper: The Spectral Bisection of Supply Chains (v3.0.0)
 **Mathematical Foundations of the $\tau$-Gate Security Model**
@@ -37,7 +43,7 @@ Trusted software creates a dense "continent" with high algebraic connectivity ($
 An isolated malicious package results in $\lambda_2 \approx 0$. The **Maximum Spectral Gap** algorithm identifies the numerical "cliff" between the island and the core mainland.
 
 ### Scenario C: The Bloated Trojan (Evasion Resistance)
-If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ remains extremely low. v3.0.0 uses this **Algebraic Connectivity Score** as an absolute trigger for isolation detection, even if the partition is large.
+If an attacker adds fake dependencies to bypass size thresholds, $\lambda_2$ remains extremely low. ~~v3.0.0 uses this **Algebraic Connectivity Score** as an absolute trigger for isolation detection, even if the partition is large.~~ **Withdrawn as an absolute claim.** The current reviewer reports a connectivity estimate. It is not an absolute isolation trigger and it does not block installs.
 
 ---
 
@@ -47,11 +53,13 @@ In v3.0.0, $\tau$-Gate achieves **Architectural Self-Sufficiency**. Every line o
 
 To ensure absolute mathematical determinism across all executions, the engine strictly utilizes `BTreeMap` and `BTreeSet` over Hash-based collections. This guarantees a consistent alphabetical topological sorting of the adjacency matrix, resulting in byte-for-byte identical Fiedler Vector calculations.
 
-This eliminates the "Auditor's Paradox"—ensuring the tool cannot be compromised by the same supply chain attacks it is designed to audit.
+~~This eliminates the "Auditor's Paradox"—ensuring the tool cannot be compromised by the same supply chain attacks it is designed to audit.~~ **Withdrawn.** A standard-library-only build reduces dependency surface. It does not make the tool immune.
 
 ---
 
 ## 5. The Immutable Agent: Integrating with Neuro-Symbolic Memory (TSP)
+
+**Withdrawn.** No TSP integration, install blocking, or hypervisor behavior is in the current tool. The notes below are historical.
 
 While $\tau$-Gate serves as a standalone auditor for human-led development, its ultimate realization is found in the **Immutable Agent** architecture. By integrating with the **$\tau$-Spectral Pruner (TSP)** memory engine, $\tau$-Gate acts as a high-integrity security hypervisor for autonomous AI agents.
 
