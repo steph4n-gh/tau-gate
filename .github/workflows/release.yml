@@ -40,9 +40,12 @@ jobs:
             docker run --rm --platform linux/amd64 --network none \
               --cpus 2 --memory 2g --pids-limit 256 --cap-drop ALL \
               --security-opt no-new-privileges \
+              --user "$(id -u):$(id -g)" \
               --mount "type=bind,src=$source,dst=/source-$label,readonly" \
               --mount "type=bind,src=$output,dst=/output-$label" \
               --workdir "/source-$label" \
+              --env HOME=/tmp \
+              --env CARGO_HOME=/tmp/cargo \
               --env "TAU_GATE_SOURCE_COMMIT=$SOURCE_COMMIT" \
               --env "CARGO_TARGET_DIR=/output-$label/target" \
               --env "RELEASE_OUTPUT_DIR=/output-$label/release" \

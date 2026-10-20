@@ -33,9 +33,12 @@ mkdir "$work/output"
 docker run --rm --platform linux/amd64 --network none \
   --cpus 2 --memory 2g --pids-limit 256 --cap-drop ALL \
   --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$work/source,dst=/source,readonly" \
   --mount "type=bind,src=$work/output,dst=/output" \
   --workdir /source \
+  --env HOME=/tmp \
+  --env CARGO_HOME=/tmp/cargo \
   --env "TAU_GATE_SOURCE_COMMIT=$COMMIT" \
   --env CARGO_TARGET_DIR=/output/target \
   --env RELEASE_OUTPUT_DIR=/output/release \
@@ -48,6 +51,8 @@ docker run --rm --platform linux/amd64 --network none \
 
 The build script selects the installed Rust 1.85.0 toolchain explicitly, so
 the repository's `rustfmt` component request cannot trigger a network lookup.
+The container uses the caller's user and group IDs so it can write the output
+mount without extra capabilities, and the caller can read the resulting files.
 It rejects a dirty checkout, a wrong explicit commit, a missing Cargo lockfile,
 and output inside the source. It tests and builds with Cargo's frozen offline
 mode. Compare every file in `$work/output/release/dist` to the
