@@ -1,0 +1,77 @@
+[package]
+name = "tau-gate-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+tau-gate = { path = ".." }
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
+flate2 = "1.1"
+tar = "0.4"
+sha2 = "0.10"
+base64 = "0.22"
+tempfile = "3"
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "json"
+path = "fuzz_targets/json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gzip"
+path = "fuzz_targets/gzip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "deflate"
+path = "fuzz_targets/deflate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tar"
+path = "fuzz_targets/tar.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "artifact"
+path = "fuzz_targets/artifact.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lockfiles"
+path = "fuzz_targets/lockfiles.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ffi"
+path = "fuzz_targets/ffi.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "review"
+path = "fuzz_targets/review.rs"
+test = false
+doc = false
+bench = false
