@@ -50,9 +50,10 @@ fi
 
 binary_sha=$(sha256sum "$binary" | cut -d ' ' -f 1)
 created=$(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y-%m-%dT%H:%M:%SZ')
+serial=$(python3 -c 'import sys, uuid; print("urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, "https://github.com/steph4n-gh/tau-gate/commit/" + sys.argv[1])))' "$TAU_GATE_SOURCE_COMMIT")
 sbom="$dist/tau-gate-v$version-linux-x86_64.cdx.json"
 {
-  printf '{"bomFormat":"CycloneDX","specVersion":"1.5","version":1,'
+  printf '{"bomFormat":"CycloneDX","specVersion":"1.5","serialNumber":"%s","version":1,' "$serial"
   printf '"metadata":{"timestamp":"%s","component":{' "$created"
   printf '"type":"application","bom-ref":"tau-gate@%s","name":"tau-gate","version":"%s",' "$version" "$version"
   printf '"hashes":[{"alg":"SHA-256","content":"%s"}],"licenses":[{"license":{"id":"Apache-2.0"}}],' "$binary_sha"

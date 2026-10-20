@@ -5,9 +5,9 @@ inside the pinned Linux amd64 image
 `rust@sha256:16a7f242108de02f10fe4a392991679bafa7694e59f5b40a54d5af1be9b40d03`.
 The core has no third-party Rust runtime crates. The archive contains the
 executable, license, README, CycloneDX 1.5 SBOM, and its direct ELF library
-inventory. The SBOM records the binary SHA256 and direct system library names;
-it does not inventory an entire Debian installation or assign versions to
-system libraries that the release does not ship.
+inventory. The SBOM records the binary SHA256, a commit-derived UUID, and direct
+system library names. It does not inventory an entire Debian installation or
+assign versions to system libraries that the release does not ship.
 
 The [release-candidate workflow](../.github/workflows/release.yml) runs only by
 manual dispatch. It builds the exact commit twice from separate clean clones
@@ -33,9 +33,12 @@ mkdir "$work/output"
 docker run --rm --platform linux/amd64 --network none \
   --cpus 2 --memory 2g --pids-limit 256 --cap-drop ALL \
   --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$work/source,dst=/source,readonly" \
   --mount "type=bind,src=$work/output,dst=/output" \
   --workdir /source \
+  --env HOME=/tmp \
+  --env CARGO_HOME=/tmp/cargo \
   --env "TAU_GATE_SOURCE_COMMIT=$COMMIT" \
   --env CARGO_TARGET_DIR=/output/target \
   --env RELEASE_OUTPUT_DIR=/output/release \
@@ -48,6 +51,8 @@ docker run --rm --platform linux/amd64 --network none \
 
 The build script selects the installed Rust 1.85.0 toolchain explicitly, so
 the repository's `rustfmt` component request cannot trigger a network lookup.
+The container uses the caller's user and group IDs so it can write the output
+mount without extra capabilities, and the caller can read the resulting files.
 It rejects a dirty checkout, a wrong explicit commit, a missing Cargo lockfile,
 and output inside the source. It tests and builds with Cargo's frozen offline
 mode. Compare every file in `$work/output/release/dist` to the
