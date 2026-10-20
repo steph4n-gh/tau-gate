@@ -125,6 +125,16 @@ def archive_source(url):
     return parsed
 
 
+def tar_text(field):
+    text, _, tail = field.partition(b"\0")
+    if any(tail):
+        raise EvidenceError("ambiguous tar text field")
+    try:
+        return text.decode("utf-8")
+    except UnicodeError as exc:
+        raise EvidenceError("non-UTF8 tar path") from exc
+
+
 def archive_facts(archive, integrity):
     if len(archive) > MAX_FILE:
         raise EvidenceError("archive exceeds compressed limit")
@@ -144,14 +154,19 @@ def archive_facts(archive, integrity):
         raise EvidenceError(f"invalid gzip: {exc}") from exc
     offset = 0
     seen = {}
+    root_name = None
+    manifest_bytes = None
+    binding_hash = None
     while offset + 512 <= len(tar_data):
         header = tar_data[offset:offset + 512]
         if not any(header):
             if len(tar_data) - offset < 1024 or any(tar_data[offset:]):
                 raise EvidenceError("invalid tar terminator")
             break
-        if header[257:263] != b"ustar\0":
+        if header[257:265] != b"ustar\0" + b"00":
             raise EvidenceError("unsupported tar format; requires ustar")
+        if any(header[157:257]) or any(header[500:]):
+            raise EvidenceError("unsupported tar link or reserved metadata")
         for start, width in ((100, 8), (108, 8), (116, 8), (124, 12), (136, 12), (148, 8), (329, 8), (337, 8)):
             numeric = header[start:start + width].strip(b" \0")
             if any(byte < ord("0") or byte > ord("7") for byte in numeric):
@@ -162,36 +177,61 @@ def archive_facts(archive, integrity):
             raise EvidenceError(f"invalid tar header: {exc}") from exc
         if info is None or info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
             raise EvidenceError("unsupported tar entry type")
-        name = info.name.rstrip("/") if info.isdir() else info.name
+        if info.devmajor or info.devminor:
+            raise EvidenceError("tar regular entry has device metadata")
+        prefix_field = header[345:500]
+        try:
+            prefix = tar_text(prefix_field)
+        except EvidenceError:
+            if (any(header[345:476])
+                    or not all(re.fullmatch(rb"[0-7]{11}\0", field)
+                               for field in (header[476:488], header[488:500]))):
+                raise
+            prefix = ""
+        raw_name = tar_text(header[:100])
+        joined = f"{prefix}/{raw_name}" if prefix else raw_name
+        name = joined.removesuffix("/") if info.isdir() else joined
         safe_relative(name)
         parts = name.split("/")
-        if any(not re.fullmatch(r"[A-Za-z0-9._@+-]+", part) or part.endswith(".") or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])", part.split(".", 1)[0], re.IGNORECASE) for part in parts):
+        if any(part.endswith((".", " ")) or any(not (32 <= ord(char) <= 126) or char in '\\:*?"<>|' for char in part)
+               or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])", part.split(".", 1)[0], re.IGNORECASE)
+               for part in parts):
             raise EvidenceError("nonportable tar path")
+        member_root = parts[0]
+        if root_name is not None and member_root != root_name:
+            raise EvidenceError("tar contains inconsistent archive roots")
+        root_name = member_root
+        relative = "/".join(parts[1:])
+        if not relative and not info.isdir():
+            raise EvidenceError("tar root is not a directory")
         canonical = name.lower()
-        if canonical in ("package/package.json", "package/binding.gyp") and name != canonical:
+        if relative.lower() in ("package.json", "binding.gyp") and relative not in ("package.json", "binding.gyp"):
             raise EvidenceError("noncanonical lifecycle input path")
+        if info.isdir() and relative in ("package.json", "binding.gyp"):
+            raise EvidenceError("evidence path is not a regular tar file")
         if canonical in seen or len(seen) >= 10000:
             raise EvidenceError("duplicate tar path or excessive entry count")
         if any(seen.get("/".join(parts[:n]).lower()) == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
             raise EvidenceError("tar file and parent path conflict")
         seen[canonical] = "directory" if info.isdir() else "file"
-        if info.size < 0 or offset + 512 + info.size > len(tar_data):
+        if info.size < 0 or info.size > MAX_FILE or (info.isdir() and info.size) or offset + 512 + info.size > len(tar_data):
             raise EvidenceError("invalid tar size")
-        offset += 512 + ((info.size + 511) // 512) * 512
+        start = offset + 512
+        end = start + info.size
+        padded_end = start + ((info.size + 511) // 512) * 512
+        if padded_end > len(tar_data) or any(tar_data[end:padded_end]):
+            raise EvidenceError("invalid tar padding")
+        if relative == "package.json":
+            if info.size > MAX_MANIFEST:
+                raise EvidenceError("invalid archived package.json")
+            manifest_bytes = tar_data[start:end]
+        elif relative == "binding.gyp":
+            binding_hash = sha256(tar_data[start:end])
+        offset = padded_end
     else:
         raise EvidenceError("missing tar terminator")
-    try:
-        with tarfile.open(fileobj=io.BytesIO(tar_data), mode="r:") as archive_file:
-            manifest_info = archive_file.getmember("package/package.json")
-            if not manifest_info.isfile() or manifest_info.size > MAX_MANIFEST:
-                raise EvidenceError("invalid archived package.json")
-            manifest_bytes = archive_file.extractfile(manifest_info).read(MAX_MANIFEST + 1)
-            binding_info = archive_file.getmember("package/binding.gyp") if "package/binding.gyp" in seen else None
-            if binding_info is not None and not binding_info.isfile():
-                raise EvidenceError("binding.gyp must be a regular file")
-            binding_hash = sha256(archive_file.extractfile(binding_info).read(MAX_FILE + 1)) if binding_info is not None else None
-    except (KeyError, tarfile.TarError) as exc:
-        raise EvidenceError(f"missing or invalid archived package.json: {exc}") from exc
+    if manifest_bytes is None:
+        raise EvidenceError("tar is missing package.json")
     manifest = strict_json(manifest_bytes)
     if not isinstance(manifest, dict):
         raise EvidenceError("manifest must be an object")
