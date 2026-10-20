@@ -1,0 +1,48 @@
+{
+  "npm_version": "11.19.1",
+  "node_version": "v26.9.0",
+  "method": "Read source from an explicit absolute npm-cli.js and execute it through an explicit absolute Node binary. No PATH lookup is used.",
+  "root_ci_events": [
+    "preinstall",
+    "install",
+    "postinstall",
+    "prepublish",
+    "preprepare",
+    "prepare",
+    "postprepare"
+  ],
+  "archive_dependency_events": [
+    "preinstall",
+    "install",
+    "postinstall"
+  ],
+  "workspace_link_events": [
+    "preinstall",
+    "prepare",
+    "install",
+    "postinstall"
+  ],
+  "implicit_native_build": "binding.gyp present, gypfile is not false, and preinstall and install are both absent or empty",
+  "source_files": [
+    {
+      "path": "lib/commands/ci.js",
+      "sha256": "fb9ed5eb26d841dfcdf8cffaa3c33be3edda6ee27797b5db5ccbfbaba86e4315"
+    },
+    {
+      "path": "node_modules/@npmcli/arborist/lib/arborist/rebuild.js",
+      "sha256": "31cff57da873a9b2ce1fd16fbb6ce7d68108ce2bae628ca43b5772ab5ee5336c"
+    },
+    {
+      "path": "node_modules/@npmcli/arborist/lib/node.js",
+      "sha256": "2df02801c449ad50bbf1196b82c0fd7ae61039bfc612ba7269b960a252c33269"
+    },
+    {
+      "path": "node_modules/@npmcli/run-script/lib/run-script-pkg.js",
+      "sha256": "94dea9ff50028869f4f88c4ec5e520d56fa7c2f6cc03422a9f06c44d291a0c34"
+    },
+    {
+      "path": "node_modules/@npmcli/node-gyp/lib/index.js",
+      "sha256": "0208905f53bda93670e98e3ee145ad9f87469d9375001f7f913c99b8ef25c228"
+    }
+  ]
+}

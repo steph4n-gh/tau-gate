@@ -1,0 +1,117 @@
+{
+  "milestone": 1,
+  "status": "VERIFIED",
+  "baseline": "e052ac03517286f2f56dfac46aa19770358ccbe8",
+  "versions": {
+    "node": "v26.9.0",
+    "npm": "11.19.1"
+  },
+  "verified_nonlink_records": 13,
+  "selected_instances": [
+    "node_modules/alias-leaf",
+    "node_modules/tau-ref-hooks",
+    "node_modules/tau-ref-leaf",
+    "node_modules/tau-ref-native",
+    "node_modules/tau-ref-native-disabled",
+    "node_modules/tau-ref-native-override",
+    "node_modules/tau-ref-parent",
+    "node_modules/tau-ref-parent/node_modules/tau-ref-leaf",
+    "node_modules/tau-ref-plain",
+    "node_modules/tau-ref-selected"
+  ],
+  "excluded_instances": [
+    "node_modules/tau-ref-excluded"
+  ],
+  "checks": [
+    "fixture_inventory_exact",
+    "artifact_sri_verified",
+    "installed_manifests_byte_equal_to_original_artifacts",
+    "alias_real_identity",
+    "nested_versions_distinct",
+    "workspace_link_target_and_manifest",
+    "selected_and_platform_excluded_optionals",
+    "absent_optional_peer",
+    "implicit_native_and_explicit_install_override",
+    "gypfile_false_suppresses_implicit_build",
+    "script_free_package",
+    "seven_root_lifecycle_events",
+    "no_lifecycle_canary_executed"
+  ],
+  "baseline_cli_checks": [
+    "exact_locked_inventory",
+    "alias_actual_identity",
+    "nested_version_identity",
+    "exact_typed_edges",
+    "marker_candidates",
+    "no_required_edge_issues"
+  ],
+  "negative_controls": [
+    {
+      "control": "corrupt_archive",
+      "outcome": "rejected",
+      "reason": "archive SHA512 SRI mismatch"
+    },
+    {
+      "control": "same_identity_substitution",
+      "outcome": "rejected",
+      "reason": "archive SHA512 SRI mismatch"
+    },
+    {
+      "control": "wrong_version",
+      "outcome": "rejected",
+      "reason": "manifest version does not match lock instance 'node_modules/tau-ref-leaf'"
+    },
+    {
+      "control": "duplicate_instance",
+      "outcome": "rejected",
+      "reason": "duplicate or unknown index instance"
+    },
+    {
+      "control": "wrong_lock_hash",
+      "outcome": "rejected",
+      "reason": "index lock hash mismatch"
+    },
+    {
+      "control": "missing_evidence",
+      "outcome": "rejected",
+      "reason": "missing evidence instances: ['node_modules/tau-ref-hooks']"
+    },
+    {
+      "control": "supplied_manifest_substitution",
+      "outcome": "rejected",
+      "reason": "supplied manifest cannot establish registry artifact binding"
+    },
+    {
+      "control": "wrong_workspace_identity",
+      "outcome": "rejected",
+      "reason": "manifest name does not match lock instance 'packages/local'"
+    },
+    {
+      "control": "unsafe_locator",
+      "outcome": "rejected",
+      "reason": "unsafe path '../outside.tgz'"
+    },
+    {
+      "control": "unknown_assertion",
+      "outcome": "rejected",
+      "reason": "locator entry requires path and one supported evidence source"
+    },
+    {
+      "control": "false_install_marker",
+      "outcome": "conflict_observed"
+    }
+  ],
+  "source_sha256": {
+    "tools/npm_evidence.py": "d91fecdc8091f3e241eb2865c42b9b646c11909adc744b9550031f1a9f7d3c20",
+    "tools/npm_reference.py": "d61debcd4360289d40d2b57b1773fbaa2732e542b95b58278541d48d14aafd14",
+    "tests/fixtures/npm-reference/matrix.json": "c05f9b041bae5918b33b5bac2c261b74d1b152afadcc714efed27467408a6c7e"
+  },
+  "lock_sha256": "569de26407163bce5d4950d13cd77213d8450ae1b9aee0dea0bebfcc1eb98896",
+  "root_manifest_sha256": "a0c4ececdc91d1bc947a01b1fb7d20a2c06b48702f23c35795afc2f514990b6b",
+  "oracle_sha256": "b3e3a866426ef14f42f0ba3dcaede2fa11ca3df742ac03dc1762da7f11a28ff9",
+  "offline_collect_and_validate": "passed",
+  "npm_pack_compatibility_sample": "npm-pack.json",
+  "rerun": "python3 tools/npm_reference.py --node /path/to/node --npm /path/to/npm-cli.js --tau-gate /path/to/tau-gate --output /empty/reference-output",
+  "scope": "Controlled npm v3 installation correspondence. No script execution, arbitrary publisher safety claim, or npm-wide format qualification.",
+  "correction": "Wrong-version control uses a separate archive locator so another alias cannot fail integrity before the target identity check."
+}

@@ -1,0 +1,83 @@
+Checkout path normalized for publication. Test output is otherwise unchanged.
+   Compiling tau-gate v4.0.0 (<checkout>)
+    Finished `release` profile [optimized] target(s) in 3.65s
+     Running unittests src/lib.rs (target/release/deps/tau_gate-581cf13c97af6c3c)
+
+running 36 tests
+test digest::tests::known_answers ... ok
+test graph_impl::tests::test_digraph_basic ... ok
+test math::convergence_regressions::invalid_self_edge_rejected ... ok
+test math::convergence_regressions::analytical_two_nodes ... ok
+test graph::tests::test_cargo_extraction ... ok
+test graph::tests::test_pnpm_extraction ... ok
+test graph::exact_regressions::cargo_proc_macros_execution ... ok
+test graph::tests::test_npm_extraction ... ok
+test graph::exact_regressions::no_duplicate_topology_weights ... ok
+test graph::exact_regressions::nested_versions_workspaces_and_kinds ... ok
+test graph::exact_regressions::pnpm_exact_versions_peer_context_and_document_reset ... ok
+test math::tests::test_no_edges_graceful ... ok
+test math::tests::test_anomaly_isolation ... ok
+test math::tests::test_dumbbell_bisection ... ok
+test ffi_tests::null_bounds_zero_edges_and_ownership ... ok
+test parser::strict_regressions::malformed_rejected ... ok
+test parser::strict_regressions::unicode_and_roundtrip ... ok
+test parser::tests::test_mini_parser_config ... ok
+test parser::tests::test_mini_parser_json_basic ... ok
+test parser::tests::test_pnpm_yaml_extractor ... ok
+test pnpm::tests::exact_multiple_versions_never_match_by_name_only ... ok
+test pnpm::tests::exact_peer_alias_workspace_and_metadata ... ok
+test pnpm::tests::missing_optional_and_required_refs_are_incomplete ... ok
+test pnpm::tests::rejects_unsupported_version_structure_and_duplicates ... ok
+test semver::tests::exact_only ... ok
+test pnpm::tests::root_manifest_specs_are_checked ... ok
+test pnpm::tests::two_documents_preserve_both_root_scopes ... ok
+test yarn::tests::aliases_preserve_descriptor_and_actual_package_identity ... ok
+test yarn::tests::berry_conflicts_duplicates_and_unknown_structures_are_rejected ... ok
+test yarn::tests::comments_and_escaped_strings_preserve_artifact_metadata ... ok
+test yarn::tests::grouped_scoped_selectors_and_nested_versions_are_exact ... ok
+test yarn::tests::missing_manifest_and_unknown_scripts_do_not_mean_no_execution ... ok
+test yarn::tests::optional_absence_is_explicit_and_required_absence_is_incomplete ... ok
+test yarn::tests::same_name_version_different_resolutions_do_not_collapse ... ok
+test parser::large_string_regression::long_ascii_and_multibyte_strings ... ok
+test math::convergence_regressions::long_path_discloses_nonconvergence ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/release/deps/tau_gate-794b430a80d5fb33)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/integration_test.rs (target/release/deps/integration_test-fa2df7df6e2f1c02)
+
+running 8 tests
+test incomplete_base_human_report_explains_reason ... ok
+test review_same_version_digest_and_capability_changes ... ok
+test root_script_only_change ... ok
+test every_consumed_input_unchanged ... ok
+test all_candidates_read_only_policy_and_determinism ... ok
+test missing_and_unsupported_never_invoke_manager ... ok
+test usage_and_help_no_effects ... ok
+test config_invalid_cannot_fail_open ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/package_manager_cli.rs (target/release/deps/package_manager_cli-700ff7839310f0bd)
+
+running 6 tests
+test pnpm_other_importer_is_an_actual_introducer_root ... ok
+test yarn_without_manifest_has_no_invented_attribution ... ok
+test default_discovery_is_read_only_and_rejects_ambiguity ... ok
+test cross_format_comparison_refuses_incomparable_identity_keys ... ok
+test supported_resolution_graphs_never_allow_unknown_execution ... ok
+test resolution_lock_comparisons_remain_useful_when_capabilities_unknown ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/real_lockfiles.rs (target/release/deps/real_lockfiles-de2dc9710d8e2f9c)
+
+running 1 test
+test frozen_resolution_locks_match_independent_oracles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
