@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.1.0 (unreleased)
+
+- Added an independent npm reference check using original archives and scripts-disabled installs. It covers aliases, nested versions, workspaces, optional omissions, native defaults, and substituted evidence.
+- Added offline, bounded SHA512, gzip/DEFLATE, and strict ustar verification to the standard-library-only Rust core. The core derives lifecycle and native-build facts from original archives and explicitly trusted source snapshots.
+- Added exact-instance approval fingerprints and execution-evidence diffs. Source, integrity, artifact, manifest, lifecycle, and native-input changes invalidate approvals.
+- Added a separate PR helper that captures exact Git objects, uses base-only approvals, and emits deterministic JSON and Markdown with allowed, blocked, and incomplete outcomes. Added real-Git behavioral tests and a read-only CI example with an explicit trusted-tool bootstrap.
+- Tightened `--enforce` to require explicit evidence and bound approvals. Legacy coordinate whitelists no longer authorize execution. Missing or conflicting evidence remains incomplete, ahead of blocked policy.
+- Qualified a conservative direct-archive URL and portable ASCII tar profile. Git preparation, unsupported archives, and filesystem aliases remain incomplete. pnpm/Yarn execution qualification and the native graph ABI are unchanged.
+
 ## 4.0.0
 
 τ-Gate 4.0.0 is the first release under the Apache License 2.0. The dependency-review behavior is the behavior already on `main` after the `v3.0.0` tag. The crate version was still `3.0.0` until this release. Git tags `v3.1.0` and `v3.2.0` point at older commits and are not this version. After merge, tag **`v4.0.0`**.

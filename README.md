@@ -2,7 +2,7 @@
 
 Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. Installation markers are review evidence, not malware findings. Downloaded artifacts, dependency script bodies and runtime behavior are not inspected; an absent marker does not prove absence of execution. All lockfile records are included, including dev and optional packages; host installation selection is not simulated.
+A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.1 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
 ## Try the review
 
@@ -28,7 +28,7 @@ Audit is read-only: it never resolves, installs, deletes inputs or writes logs. 
 
 | Format | Identity and supported topology | Execution metadata |
 | --- | --- | --- |
-| npm v3 | Installed lockfile instances, nearest node_modules targets, workspace links | Declared install markers; supplied root lifecycle bodies |
+| npm v3 | Installed lockfile instances, nearest node_modules targets, workspace links | Original archive and source-snapshot evidence when supplied; otherwise advisory markers |
 | pnpm v9 | Namespaced environment/project documents, importer/workspace links, exact snapshot versions, aliases, peer/patch contexts and observed resolution metadata | Transitive scripts unknown; positive build markers retained |
 | Yarn Classic v1 | Exact descriptor groups, aliases, version/resolved/integrity and dependency/optional maps; supplied root manifest gives root edges | Transitive scripts unknown |
 
@@ -49,31 +49,47 @@ Handle that exit code when capturing a report in a `set -e` script; inspect the 
 
 Pinned real fixtures and independently computed node/edge/artifact hashes are checked into [tests/fixtures/real](tests/fixtures/real/README.md): Hono has 1,100 records and 1,545 typed edges; Yarn Classic 1.22.22 has 1,063 records and 2,074 typed edges. The tests never install dependencies or run fixture scripts.
 
-## Optional marker policy
+## npm evidence and bound approvals
 
-```toml
-# tau-gate.toml; no wildcard matching or automatic trust list
-whitelist = ["test-tool@1.0.0"]
-```
+Collect original archives and source manifests with the separate Python helper. The Rust auditor independently verifies their binding to the lock and derives execution facts. It runs offline and never installs, extracts, invokes programs, or writes files.
 
 ```sh
-./target/release/tau-gate audit --lock examples/review/head.json --enforce --json
+python3 tools/npm_evidence.py collect \
+  --lock package-lock.json --project . --output /tmp/tau-gate-evidence
+/path/to/tau-gate audit --lock package-lock.json --manifest package.json \
+  --evidence /tmp/tau-gate-evidence/index.json --json
 ```
 
-Explicit `--enforce` blocks unapproved execution **markers**, checking every candidate independently of the spectral cut. Exact `name@version` approvals do not pin artifact digests. JSON states the outcome and unapproved coordinates. This is a limited marker policy, not a malware or artifact verification gate. Legacy `mode` and `threshold_percentage` configuration values are validated for compatibility but no longer select/block a topology policy; enforcement requires the flag.
+Review the candidate fingerprints before recording approvals in the [explicit approval schema](docs/execution-evidence.md#approval-schema-and-outcomes). Then enforce that policy.
+
+```sh
+/path/to/tau-gate audit --lock package-lock.json --manifest package.json \
+  --evidence /tmp/tau-gate-evidence/index.json \
+  --approvals .tau-gate/approvals.json --enforce --json
+```
+
+Approvals bind the exact instance, source, integrity, original archive, manifest bytes, lifecycle bodies, and native metadata. Changed evidence needs approval again. Workspace targets require one approval, while their structural links remain visible. Missing, conflicting, or unsupported evidence takes precedence over approvals. Legacy coordinate whitelists cannot authorize v4.1 enforcement. Existing configuration values are still validated for compatibility.
+
+The qualified archive profile is deliberately narrow. It requires SHA512 SRI, direct HTTP(S) archive sources, a single gzip member, and portable ASCII ustar paths. Unsupported source kinds, archive extensions, or ambiguous paths remain incomplete. Source manifests retain caller trust. Integrity does not authenticate a publisher or establish artifact safety. See the [execution contract](docs/execution-evidence.md) and [collection and independent checks](docs/npm-reference.md).
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | Completed advisory report, or explicit marker policy allowed |
-| 1 | Explicit marker policy blocked |
-| 2 | Incomplete extraction or invalid input/configuration |
+| 0 | Completed advisory report, or all qualified candidates approved |
+| 1 | Complete evidence with an unapproved execution candidate |
+| 2 | Incomplete extraction/evidence, missing enforcement inputs, or invalid input/configuration |
 | 64 | Invalid command/options |
+
+## Review exact Git revisions
+
+The separate [PR helper](docs/pr-review.md) captures lockfiles, source manifests, and native inputs directly from base and head Git objects. Dirty working files cannot change the captured bytes. The approval file always comes from the trusted base revision. A head-side approval edit cannot approve its own new fingerprints.
+
+The helper writes deterministic `report.json` and `summary.md` into an explicit output directory outside the repository. It preserves allowed, blocked, and incomplete outcomes. [The CI example](docs/examples/npm-pr-review.yml) uses read-only permissions and trusted base tools. It requires a supplied checker binary with a pinned hash and a trusted workflow configuration. It is an example for npm applications, not an active npm job in this Rust repository.
 
 ## Topology and native interface
 
 The sparse solver returns a bounded **Rayleigh estimate**, residual, convergence flag and iteration count. Residual convergence does not certify the second eigenpair. A disconnected graph's zero connectivity is handled exactly. Topology cannot distinguish benign and malicious code with the same dependency shape and is never used to hide execution candidates or certify safety.
 
-The C ABI is documented in [include/tau_gate.h](include/tau_gate.h). NULL names and invalid endpoints/counts are rejected; a NULL edge pointer is accepted for zero edges. Result ownership is explicit. The existing four-field result prefix is retained and diagnostics are appended. Rebuild bindings for the new fields. Valid pointers remain the caller's responsibility. The former index-based daemon pruning policy is retired; no TSP/MLX workload benefit is claimed or validated by these tests.
+The C ABI is documented in [include/tau_gate.h](include/tau_gate.h). NULL names and invalid endpoints/counts are rejected; a NULL edge pointer is accepted for zero edges. Result ownership is explicit. The existing four-field result prefix and appended diagnostics are retained. v4.1 does not change this interface or the solver. Valid pointers remain the caller's responsibility. The former index-based daemon pruning policy is retired; no TSP/MLX workload benefit is claimed or validated by these tests.
 
 ## Validation and scope
 
@@ -82,11 +98,12 @@ cargo test --release --offline --all-targets
 cargo fmt -- --check
 ./e2e_zero.sh
 ./prove-it.sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_pr_review.py' -v
 ```
 
-Tests cover input preservation, missing/unsupported extraction, nested/workspace resolution, optional/peer/dev paths, strict Unicode JSON, configuration validation, root script and same-version artifact changes, all-candidate reporting, FFI ownership and solver nonconvergence. See [docs/review.md](docs/review.md) for the contract and next work. Older research/marketing documents and ecosystem scripts are historical, unverified prototypes, not current validation evidence. Each of those documents is marked outdated at the top. Do not cite them for supported formats, safety, or the license.
+Tests cover input preservation, missing/unsupported extraction, nested/workspace resolution, optional/peer/dev paths, strict Unicode JSON, configuration validation, archive verification, evidence-bound approval invalidation, all-candidate reporting, FFI ownership and solver nonconvergence. [The independent npm reference and core corpus](docs/npm-reference.md) provide separate replay commands. See [docs/review.md](docs/review.md) for the contract. Older research/marketing documents and ecosystem scripts are historical, unverified prototypes, not current validation evidence. Each of those documents is marked outdated at the top. Do not cite them for supported formats, safety, or the license.
 
-There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review. Next priorities are manifest-backed dependency capabilities across formats, host installation agreement, digest-pinned approvals and representative benign/adversarial workloads with simple baselines.
+There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review. Further qualification needs representative projects, host installation agreement, and benign/adversarial controls with simple baselines. pnpm and Yarn execution evidence remains unqualified.
 
 ## License
 

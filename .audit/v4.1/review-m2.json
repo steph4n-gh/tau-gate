@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "reviewed_baseline": "39a6a183a78068994053dc89546feed4f6474f0b",
+  "reviewers": 2,
+  "role_configuration": "inherit-parent",
+  "findings": [
+    {
+      "finding": "Git sources accepted under direct archive rules",
+      "severity": "critical",
+      "decision": "accepted",
+      "reproduced_by_root": true,
+      "before": {
+        "exit": 0,
+        "outcome": "allowed",
+        "candidates": 0
+      },
+      "repair_status": "verified",
+      "after": {
+        "exit": 2,
+        "outcome": "incomplete",
+        "unqualified_fingerprint": null
+      }
+    },
+    {
+      "finding": "case-aliased binding.gyp omitted from evidence",
+      "severity": "critical",
+      "decision": "accepted",
+      "evidence": "npm 11.19.1 tar extraction and node-gyp detector found the aliased file on case-insensitive macOS; scripts did not run",
+      "before": {
+        "exit": 0,
+        "outcome": "allowed",
+        "candidates": 0
+      },
+      "repair_status": "verified",
+      "after": {
+        "exit": 2,
+        "outcome": "incomplete",
+        "unqualified_fingerprint": null
+      }
+    }
+  ]
+}

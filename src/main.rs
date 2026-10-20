@@ -5,11 +5,12 @@ use tau_gate::{
     review::{self, Snapshot},
 };
 const HELP:&str="tau-gate: read-only dependency review\n\
-Usage: tau-gate [audit] [--lock package-lock.json] [--manifest package.json] [--json] [--enforce]\n\
-       tau-gate review --base BASE_LOCK --head HEAD_LOCK [--base-manifest FILE] [--head-manifest FILE] [--json]\n\
+Usage: tau-gate [audit] [--lock package-lock.json] [--manifest package.json] [--evidence INDEX] [--approvals FILE] [--json] [--enforce]\n\
+       tau-gate review --base BASE_LOCK --head HEAD_LOCK [--base-manifest FILE] [--head-manifest FILE] [--base-evidence INDEX] [--head-evidence INDEX] [--approvals FILE] [--enforce] [--json]\n\
        tau-gate --verify | --help\n\
 Audit never resolves, installs, deletes inputs, or writes logs. Supported topology: npm v3, pnpm v9, Yarn Classic v1; pnpm/Yarn script metadata stays unknown.\n\
 Exit: 0 completed advisory report; 1 explicit enforcement finding; 2 incomplete/invalid; 64 usage.\n\
+Enforcement requires explicit evidence and bound approvals. Legacy coordinate whitelists are advisory only.\n\
 --dry-run/-d is a compatibility alias for read-only audit. Network and legacy daemon are unsupported.";
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -81,41 +82,59 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
     let mut i = usize::from(args.first().is_some_and(|s| !s.starts_with('-')));
     while i < args.len() {
         let key = args[i].as_str();
-        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide a supported frozen lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
+        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide a supported frozen lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"|"--evidence"|"--base-evidence"|"--head-evidence"|"--approvals"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
         i += 1;
     }
-    let load = |lock: &str, manifest: Option<&str>| {
-        Snapshot::load(Path::new(lock), manifest.map(Path::new)).map_err(|e| (e.to_string(), 2))
+    let load = |lock: &str, manifest: Option<&str>, evidence: Option<&str>| {
+        let result = match evidence {
+            Some(index) => Snapshot::load_with_evidence(
+                Path::new(lock),
+                manifest.map(Path::new),
+                Path::new(index),
+            ),
+            None => Snapshot::load(Path::new(lock), manifest.map(Path::new)),
+        };
+        result.map_err(|e| (e.to_string(), 2))
     };
     if mode == "review" {
-        if opts.contains_key("--lock") || opts.contains_key("--manifest") {
+        if opts.contains_key("--lock")
+            || opts.contains_key("--manifest")
+            || opts.contains_key("--evidence")
+        {
             return Err(("lock/manifest options require audit".into(), 64));
-        }
-        if enforce {
-            return Err((
-                "Review is advisory; --enforce is available only for audit".into(),
-                64,
-            ));
         }
         let base = load(
             opts.get("--base")
                 .copied()
                 .ok_or_else(|| ("review requires --base".into(), 64))?,
             opts.get("--base-manifest").copied(),
+            opts.get("--base-evidence").copied(),
         )?;
         let head = load(
             opts.get("--head")
                 .copied()
                 .ok_or_else(|| ("review requires --head".into(), 64))?,
             opts.get("--head-manifest").copied(),
+            opts.get("--head-evidence").copied(),
         )?;
         let report = review::compare(&base, &head);
-        let code = if report.get("status").and_then(J::as_str) == Some("incomplete") {
-            2
-        } else {
-            0
-        };
-        return Ok((report, code));
+        let mut policy = head
+            .policy(opts.get("--approvals").map(Path::new), enforce)
+            .map_err(|e| (e.to_string(), 2))?;
+        if enforce
+            && (!opts.contains_key("--base-evidence") || !base.is_complete() || !head.is_complete())
+        {
+            if let J::Object(ref mut fields) = policy {
+                fields.insert("outcome".into(), review::string("incomplete"));
+                fields.insert(
+                    "review_input_issue".into(),
+                    review::string(
+                        "both base and head require complete explicit evidence for enforcement",
+                    ),
+                );
+            }
+        }
+        return Ok(finish_policy(report, policy));
     }
     if opts
         .keys()
@@ -141,44 +160,32 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
             None
         }
     });
-    let snapshot = load(lock, manifest)?;
-    let config = SentinelConfig::load("tau-gate.toml").map_err(|e| (e.to_string(), 2))?;
-    let mut report = snapshot.report();
-    let violations: Vec<J> = snapshot
-        .graph
-        .execution_packages
-        .iter()
-        .filter_map(|n| {
-            let p = &snapshot.graph.packages[n];
-            let coord = format!("{}@{}", p.name, p.version);
-            if config.whitelist.contains(&coord) {
-                None
-            } else {
-                Some(review::object([
-                    ("path", review::string(&p.path)),
-                    ("coordinate", review::string(coord)),
-                ]))
-            }
-        })
-        .collect();
-    let outcome = if !snapshot.graph.issues.is_empty() {
-        "incomplete"
-    } else if !enforce {
-        "advisory"
-    } else if !violations.is_empty() {
-        "blocked"
+    let snapshot = load(lock, manifest, opts.get("--evidence").copied())?;
+    SentinelConfig::load("tau-gate.toml").map_err(|e| (e.to_string(), 2))?;
+    let report = snapshot.report();
+    let policy = snapshot
+        .policy(opts.get("--approvals").map(Path::new), enforce)
+        .map_err(|e| (e.to_string(), 2))?;
+    Ok(finish_policy(report, policy))
+}
+fn finish_policy(mut report: J, policy: J) -> (J, u8) {
+    let outcome = policy.get("outcome").and_then(J::as_str).unwrap();
+    let code = if report.get("status").and_then(J::as_str) == Some("incomplete")
+        || outcome == "incomplete"
+    {
+        2
+    } else if outcome == "blocked" {
+        1
     } else {
-        "allowed"
+        0
     };
-    let code = match outcome {
-        "incomplete" => 2,
-        "blocked" => 1,
-        _ => 0,
-    };
-    if let J::Object(ref mut fields) = report {
-        fields.insert("policy".into(),review::object([("outcome",review::string(outcome)),("enforcement_requested",J::Bool(enforce)),("approval_scope",review::string("exact name@version; artifact digest is not pinned; missing markers do not prove absence of execution")),("unapproved_execution_candidates",J::Array(violations))]));
+    if let J::Object(fields) = &mut report {
+        if code == 2 {
+            fields.insert("status".into(), review::string("incomplete"));
+        }
+        fields.insert("policy".into(), policy);
     }
-    Ok((report, code))
+    (report, code)
 }
 
 fn human(r: &J) {
@@ -202,6 +209,18 @@ fn human(r: &J) {
                 base.get("status").and_then(J::as_str).unwrap_or("unknown")
             );
             human_issues(base, "base");
+        }
+        if let Some(policy) = r.get("policy") {
+            println!(
+                "Review policy: {}",
+                policy
+                    .get("outcome")
+                    .and_then(J::as_str)
+                    .unwrap_or("unknown")
+            );
+        }
+        if let Some(changes) = r.get("execution_evidence_changes").and_then(J::as_array) {
+            println!("{} execution evidence changes", changes.len());
         }
         if let Some(h) = r.get("head") {
             println!(
@@ -242,8 +261,26 @@ fn human(r: &J) {
             );
         }
     }
+    if let Some(items) = r.get("execution_evidence").and_then(J::as_array) {
+        for item in items {
+            if item.get("state").and_then(J::as_str) != Some("qualified") {
+                println!(
+                    "INCOMPLETE evidence {}: {}",
+                    item.get("path").and_then(J::as_str).unwrap_or(""),
+                    item.get("reason").and_then(J::as_str).unwrap_or("unknown")
+                );
+            }
+        }
+    }
     human_issues(r, "snapshot");
     if let Some(policy) = r.get("policy") {
+        if let Some(issues) = policy.get("issues").and_then(J::as_array) {
+            for issue in issues {
+                if let Some(message) = issue.as_str() {
+                    println!("INCOMPLETE policy: {message}");
+                }
+            }
+        }
         println!(
             "Policy: {}",
             policy

@@ -1,0 +1,146 @@
+{
+  "base_commit": "39a6a183a78068994053dc89546feed4f6474f0b",
+  "binary_sha256": "7096e0bf26c94cbe144262591997f9d29dd0fb554b46fc74c1a735a4dc88ca76",
+  "e2e": "pass",
+  "format": "pass",
+  "independent_counts": {
+    "complete": 113,
+    "fail": 0,
+    "incomplete": 182,
+    "pass": 306,
+    "total": 306
+  },
+  "independent_receipt_sha256": "7414be11228db5aba2e1921f8ac74d79d5211fa5eb029e382746ef43c12a46df",
+  "inputs_unchanged": true,
+  "limits": "Finite compression/archive corpus and controlled npm correspondence; no artifact-safety, publisher-authenticity, or lifecycle scheduling proof.",
+  "milestone": 2,
+  "native_c_smoke": "pass",
+  "prove_it": "pass",
+  "repair_controls": [
+    {
+      "case": "portable_canonical_native_blocked",
+      "exit": 1,
+      "pass": true,
+      "policy": "blocked",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_native_case_alias",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_manifest_case_overwrite",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_ancestor_file_first",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_ancestor_child_first",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_duplicate_casefold",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_trailing_dot",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_trailing_space",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "portable_unicode_filename",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "unsupported_source_git_prepare",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "unsupported_source_hosted_https_git",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    },
+    {
+      "case": "unsupported_source_file_directory",
+      "exit": 2,
+      "pass": true,
+      "policy": "incomplete",
+      "reason_proven": true
+    }
+  ],
+  "rust_tests": 68,
+  "schema_version": 1,
+  "source_hashes": {
+    "src/artifact.rs": "49d7d279991f728fb3a289bab70fe31fc6dd448e7f56085d5779406ec5f02f6b",
+    "src/config.rs": "53f969888c0257609fe66a1f1229f35d718f9eadcaabfb6bd7ed84c8b0c04597",
+    "src/digest.rs": "36312267475e4614eff64cb0d20265c32e02f00934450ee75ee3149882c2698d",
+    "src/error.rs": "207dfcf750c802629159c1f42c6ddee459fc4bf62bd071cca4cad14228dd3051",
+    "src/evidence.rs": "aeb367d0a3f7b41359a11e898a136a34cde616e417e9eef943f9a49e229e964a",
+    "src/graph.rs": "d5a316f7bff3648bb0cfe20175f6bd5bbf49afffa773dba275b8ab4a1dc36b6f",
+    "src/graph_impl.rs": "008639c876bff08b7bec6f3124ecf819448730c62d5b14588bf50030d726fd99",
+    "src/lib.rs": "ea847b8f25238a62bfba1b2fbb91743a32a5d21e7d00b6c7b2df03a38ea460da",
+    "src/main.rs": "4c01c4888388da3e4de24c66d7f1a4da3254de55162ba71170046195314d73cc",
+    "src/math.rs": "9cbc4555351f149f3ecfc0981e585624192501f7d0355fd392cffba60627e725",
+    "src/parser.rs": "62ea65dc7bc39dae8b9efeed66564fd5258d957695b226a59a06f6313e6b682d",
+    "src/pnpm.rs": "6898492605dbe53cde28effb3c2e8dd2cb092214e79c018be2553cb479c5a14b",
+    "src/policy.rs": "ca020ae726ea6a66c00463c7b04852b445e2b738375f68632b52351e07d90755",
+    "src/review.rs": "eca9c8c896dd59e86aefa777e2c396e89402eb9d7cd20b23f31b73215539233a",
+    "src/semver.rs": "c0017950e396142f67a968053a1956cb609b4a2290d04cd41ce7030132b616b1",
+    "src/telemetry.rs": "75f6c9b049312a33db1dbbdfd6d6463b7cbcc5e205b39621fb4c53ec4e1bb279",
+    "src/yarn.rs": "51681b1242fb5d4a20f7a7a945baf6885c39628cbac42890c7378000b60ac147",
+    "tests/execution_evidence.rs": "7be52da2dbb974d24b3adfa2e7c2e5dfb0d0eaa1db92e5149c8de89a13d2fcea",
+    "tests/ffi_smoke.c": "412891dfc89a4142e1b0c196f130c119960a8bcb0e5d00bf8b67ff654c1b99c0",
+    "tests/fixtures/npm-reference/matrix.json": "c05f9b041bae5918b33b5bac2c261b74d1b152afadcc714efed27467408a6c7e",
+    "tests/fixtures/real/LICENSE.hono": "a6ab98e5c77b9070c443eaff2ff81034a6f8cc05a7524d5098eb0f24defa0115",
+    "tests/fixtures/real/LICENSE.yarn": "ae09761b5d27e237571245437653b483bbb85de3cc64b802e8ef47d03aabec1e",
+    "tests/fixtures/real/README.md": "4f03bbbc811b86f70a4323f5dc33ed5bda7873d6da372f39bb80f69cd6def940",
+    "tests/fixtures/real/pnpm-hono-v9.yaml": "3bbe772c131585b3e138d0a48b7f229069c1533dc63225629beb3039a5fcac86",
+    "tests/fixtures/real/pnpm-hono.package.json": "169a02072e32d85aacb089ad14b62b027d975479d811f741771fbd0f559fb5c9",
+    "tests/fixtures/real/provenance.json": "1ff6c277a794a9a208edbff8435aa2d2be5616c992f15aa68cd7a9c94b1b1beb",
+    "tests/fixtures/real/yarn-classic-v1.lock": "80653a1a393d3747fc6aefe19d3feafc2a9f8249ba843d25c26273020b721cd9",
+    "tests/fixtures/real/yarn-classic.package.json": "549eae42b2e80f56784b7fb5ea1ec991ee1a91680845557e2e337e52a192a544",
+    "tests/integration_test.rs": "56e2dd899d1f1cb0c799d133748e02d9fccf912091ad5a7f1e5499921a9fe716",
+    "tests/package_manager_cli.rs": "4a24da17cab8a9e6ce26072d7057c9cf49648ddefd3068d2f06185841d697e1d",
+    "tests/real_lockfiles.rs": "adb26a8d92b470ae41ecbddc435e039addc23ff50cdc2185b534cc3aa769f7aa",
+    "tools/npm_evidence.py": "893879e13ddfe02879144c3d148863ac82aa5344e34a892086b2274ae5c7a271",
+    "tools/npm_reference.py": "d61debcd4360289d40d2b57b1773fbaa2732e542b95b58278541d48d14aafd14",
+    "tools/verify_npm_evidence.py": "ed430910dcb3d5aa12e6fa8cb8896ceb057c3ac1077e8a66c167eedb1891ac40"
+  },
+  "status": "VERIFIED",
+  "strict_clippy": "pass",
+  "verifier_sha256": "ed430910dcb3d5aa12e6fa8cb8896ceb057c3ac1077e8a66c167eedb1891ac40"
+}

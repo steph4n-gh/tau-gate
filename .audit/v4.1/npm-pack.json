@@ -1,0 +1,32 @@
+{
+  "npm_version": "11.19.1",
+  "node_version": "v26.9.0",
+  "operation": "npm pack --ignore-scripts --json --no-audit --no-fund",
+  "status": "passed",
+  "artifact_sha256": "15d085730ff9e36abf9e454b0efe51c2f3a3204624fd50abf6e2d29a38d622f6",
+  "integrity": "sha512-/1ITRUxQ3H+97CrDufrqu2ovZlzpt4+KHMjipz0iUfvGqSlA3pNd/Y50e/WIFxayxfrya5eWhjwUCXVZ9QmZ3g==",
+  "members": [
+    {
+      "name": "package/binding.gyp",
+      "type": "0",
+      "size": 16
+    },
+    {
+      "name": "package/package.json",
+      "type": "0",
+      "size": 178
+    },
+    {
+      "name": "package/README.md",
+      "type": "0",
+      "size": 30
+    }
+  ],
+  "all_regular_ustar": true,
+  "claim": "One ordinary npm-produced artifact has regular ustar members. Package lifecycle scripts were disabled. This is a compatibility sample, not broad registry qualification.",
+  "ustar_magic_hex": [
+    "757374617200",
+    "757374617200",
+    "757374617200"
+  ]
+}

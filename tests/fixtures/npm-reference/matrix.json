@@ -1,0 +1,30 @@
+{
+  "root_events": ["preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare"],
+  "packages": [
+    {"name": "tau-ref-hooks", "version": "1.0.0", "events": ["preinstall", "install", "postinstall", "prepare"]},
+    {"name": "tau-ref-leaf", "version": "1.0.0"},
+    {"name": "tau-ref-leaf", "version": "2.0.0", "events": ["postinstall"]},
+    {"name": "tau-ref-parent", "version": "1.0.0", "dependencies": {"tau-ref-leaf": "2.0.0"}, "peerDependencies": {"tau-ref-absent": "^1.0.0"}, "peerDependenciesMeta": {"tau-ref-absent": {"optional": true}}},
+    {"name": "tau-ref-plain", "version": "1.0.0"},
+    {"name": "tau-ref-selected", "version": "1.0.0", "events": ["preinstall"]},
+    {"name": "tau-ref-excluded", "version": "1.0.0", "os": ["tau_gate_unsupported_os"], "events": ["postinstall"]},
+    {"name": "tau-ref-native", "version": "1.0.0", "binding_gyp": true},
+    {"name": "tau-ref-native-override", "version": "1.0.0", "binding_gyp": true, "events": ["install"]},
+    {"name": "tau-ref-native-disabled", "version": "1.0.0", "binding_gyp": true, "gypfile": false}
+  ],
+  "instances": {
+    "node_modules/alias-leaf": "tau-ref-leaf@1.0.0",
+    "node_modules/tau-ref-hooks": "tau-ref-hooks@1.0.0",
+    "node_modules/tau-ref-leaf": "tau-ref-leaf@1.0.0",
+    "node_modules/tau-ref-parent": "tau-ref-parent@1.0.0",
+    "node_modules/tau-ref-parent/node_modules/tau-ref-leaf": "tau-ref-leaf@2.0.0",
+    "node_modules/tau-ref-plain": "tau-ref-plain@1.0.0",
+    "node_modules/tau-ref-selected": "tau-ref-selected@1.0.0",
+    "node_modules/tau-ref-excluded": "tau-ref-excluded@1.0.0",
+    "node_modules/tau-ref-native": "tau-ref-native@1.0.0",
+    "node_modules/tau-ref-native-override": "tau-ref-native-override@1.0.0",
+    "node_modules/tau-ref-native-disabled": "tau-ref-native-disabled@1.0.0"
+  },
+  "workspace": {"path": "packages/local", "name": "tau-ref-workspace", "version": "1.0.0"},
+  "excluded": ["node_modules/tau-ref-excluded"]
+}

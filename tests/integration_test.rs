@@ -61,20 +61,20 @@ fn all_candidates_read_only_policy_and_determinism() {
     );
     assert_eq!(a.stdout, f.run(&["audit", "--json"]).stdout);
     let b = f.run(&["--enforce", "--json"]);
-    assert_eq!(b.status.code(), Some(1));
+    assert_eq!(b.status.code(), Some(2));
     let r = json(&b);
     assert_eq!(
         r.get("policy").unwrap().get("outcome").and_then(J::as_str),
-        Some("blocked")
+        Some("incomplete")
     );
     assert_eq!(
         r.get("policy")
             .unwrap()
-            .get("unapproved_execution_candidates")
+            .get("issues")
             .and_then(J::as_array)
             .unwrap()
             .len(),
-        1
+        2
     );
     assert_eq!(
         before,

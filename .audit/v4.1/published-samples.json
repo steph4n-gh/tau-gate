@@ -1,0 +1,70 @@
+{
+  "packages": [
+    {
+      "integrity": "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==",
+      "metadata_sha256": "42288c4971286c252ea16450b0777e67a710a698446faa99e2d8d2344a087c25",
+      "name": "is-number",
+      "source": "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz",
+      "version": "7.0.0"
+    },
+    {
+      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
+      "metadata_sha256": "b9f892b7d399e73de65849e3647094e648ff91c0a03e4460ac0fdcd335df2704",
+      "name": "fsevents",
+      "source": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+      "version": "2.3.3"
+    }
+  ],
+  "scope": "Original published registry artifacts with an independently constructed lock fixture. No package installation or lifecycle execution. Not an npm-generated installation snapshot.",
+  "status": "collected",
+  "artifact_facts": [
+    {
+      "name": "tau-published-reference",
+      "version": "1.0.0",
+      "manifest_sha256": "006f94be5550cc319bc4ac33f4ccda7408ff194bbd94bb794d2ba7a4426d8700",
+      "lifecycle": {},
+      "binding_gyp": false,
+      "binding_gyp_sha256": null,
+      "gypfile_false": false,
+      "implicit_node_gyp": false,
+      "kind": "source_project",
+      "path": ""
+    },
+    {
+      "name": "fsevents",
+      "version": "2.3.3",
+      "manifest_sha256": "500839fcc76f6c5efcb454e6614b23c26775e75e1140619fff9ca64c291aec2b",
+      "lifecycle": {},
+      "binding_gyp": false,
+      "binding_gyp_sha256": null,
+      "gypfile_false": false,
+      "implicit_node_gyp": false,
+      "kind": "artifact",
+      "artifact_sha256": "c77e7a5d5ff31dd7acea7c44d4a0455e0528cdacbd24a8cb6c82b66d239b587e",
+      "artifact_sha512": "e71a037d7f9f2fb7da0139da82658fa5b16dc21fd1efb5a630caaa1c64bae42defbc1d181eb805f81d58999df8e35b4c8f99fade4d36d765cda09c339617df43",
+      "source": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
+      "locked_install_marker": null,
+      "marker_conflict": false,
+      "path": "node_modules/fsevents"
+    },
+    {
+      "name": "is-number",
+      "version": "7.0.0",
+      "manifest_sha256": "51c133f4e41df982aef69027249ff9d7262645029f437d079adc7c83328fb620",
+      "lifecycle": {},
+      "binding_gyp": false,
+      "binding_gyp_sha256": null,
+      "gypfile_false": false,
+      "implicit_node_gyp": false,
+      "kind": "artifact",
+      "artifact_sha256": "7b75c1057198cf97696909a9bee176c9c5e9bcb5b03bf3ecef2f484defadd51e",
+      "artifact_sha512": "e350a27e483a7bc4f2952a5db53a5e2d532abd20445734edb47bc4443ef8d7ea6767c00dbf4d34e0c44be3740a3c394af5c1af369e8d6566540656c65d8c719e",
+      "source": "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz",
+      "integrity": "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==",
+      "locked_install_marker": null,
+      "marker_conflict": false,
+      "path": "node_modules/is-number"
+    }
+  ]
+}
