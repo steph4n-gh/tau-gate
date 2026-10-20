@@ -103,6 +103,28 @@ def sri_digest(integrity):
     return digest
 
 
+def archive_source(url):
+    if not isinstance(url, str) or any(ord(c) <= 32 or ord(c) >= 127 for c in url) or any(c in url for c in "\\%?#"):
+        raise EvidenceError("unsupported artifact source; requires a plain HTTP(S) archive URL")
+    if not url.startswith(("http://", "https://")):
+        raise EvidenceError("unsupported artifact source; requires a plain HTTP(S) archive URL")
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise EvidenceError("unsupported artifact source; invalid archive URL") from exc
+    authority = parsed.netloc
+    host = parsed.hostname
+    if not host or not re.fullmatch(r"[A-Za-z0-9.-]+(?::[0-9]+)?", authority) or port == 0 or any(not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) for label in host.split(".")):
+        raise EvidenceError("unsupported artifact source; invalid archive host")
+    git_hosts = ("github.com", "gist.github.com", "gitlab.com", "bitbucket.org", "git.sr.ht")
+    if any(host == git_host or host.endswith("." + git_host) for git_host in git_hosts) or not parsed.path.endswith((".tgz", ".tar.gz")):
+        raise EvidenceError("unsupported artifact source; Git and directory sources are outside the archive profile")
+    if not re.fullmatch(r"/[A-Za-z0-9/._@+-]+", parsed.path) or any(part in ("", ".", "..") for part in parsed.path[1:].split("/")):
+        raise EvidenceError("unsupported artifact source; invalid archive path")
+    return parsed
+
+
 def archive_facts(archive, integrity):
     if len(archive) > MAX_FILE:
         raise EvidenceError("archive exceeds compressed limit")
@@ -121,7 +143,7 @@ def archive_facts(archive, integrity):
     except (OSError, EOFError, zlib.error) as exc:
         raise EvidenceError(f"invalid gzip: {exc}") from exc
     offset = 0
-    seen = set()
+    seen = {}
     while offset + 512 <= len(tar_data):
         header = tar_data[offset:offset + 512]
         if not any(header):
@@ -142,9 +164,17 @@ def archive_facts(archive, integrity):
             raise EvidenceError("unsupported tar entry type")
         name = info.name.rstrip("/") if info.isdir() else info.name
         safe_relative(name)
-        if name in seen or len(seen) >= 10000:
+        parts = name.split("/")
+        if any(not re.fullmatch(r"[A-Za-z0-9._@+-]+", part) or part.endswith(".") or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])", part.split(".", 1)[0], re.IGNORECASE) for part in parts):
+            raise EvidenceError("nonportable tar path")
+        canonical = name.lower()
+        if canonical in ("package/package.json", "package/binding.gyp") and name != canonical:
+            raise EvidenceError("noncanonical lifecycle input path")
+        if canonical in seen or len(seen) >= 10000:
             raise EvidenceError("duplicate tar path or excessive entry count")
-        seen.add(name)
+        if any(seen.get("/".join(parts[:n]).lower()) == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
+            raise EvidenceError("tar file and parent path conflict")
+        seen[canonical] = "directory" if info.isdir() else "file"
         if info.size < 0 or offset + 512 + info.size > len(tar_data):
             raise EvidenceError("invalid tar size")
         offset += 512 + ((info.size + 511) // 512) * 512
@@ -244,6 +274,7 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
         if "artifact" in item:
             if not is_registry_path(path):
                 raise EvidenceError("project instance cannot use registry artifact evidence")
+            archive_source(record.get("resolved"))
             archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]))
             data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"))
             facts = manifest_facts(data, binding_gyp, binding_hash=binding_hash)
@@ -280,12 +311,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def fetch_archive(url, allow_loopback=False):
-    if not isinstance(url, str) or any(ord(c) < 33 for c in url) or "\\" in url:
-        raise EvidenceError("invalid artifact URL")
-    try:
-        parsed = urllib.parse.urlsplit(url)
-    except ValueError as exc:
-        raise EvidenceError("invalid artifact URL") from exc
+    parsed = archive_source(url)
     if parsed.username is not None or parsed.password is not None or parsed.fragment or not parsed.hostname:
         raise EvidenceError("credentials, fragments, or missing host in artifact URL")
     loopback = parsed.scheme == "http" and parsed.hostname == "127.0.0.1" and allow_loopback
@@ -321,6 +347,7 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
         if record.get("link", False):
             continue
         if is_registry_path(path):
+            archive_source(record.get("resolved"))
             digest = sri_digest(record.get("integrity"))
             cache_name = digest.hex() + ".tgz"
             if archive_cache is not None:

@@ -1,0 +1,13 @@
+{
+  "manifest_utf8": "{\"name\": \"tau-reference-packed\", \"version\": \"1.0.0\", \"scripts\": {\"prepack\": \"node -e \\\"throw Error(\\\"must not run\\\")\\\"\", \"install\": \"node -e \\\"throw Error(\\\"must not run\\\")\\\"\"}}\n",
+  "manifest": {
+    "name": "tau-reference-packed",
+    "version": "1.0.0",
+    "scripts": {
+      "prepack": "node -e \"throw Error(\"must not run\")\"",
+      "install": "node -e \"throw Error(\"must not run\")\""
+    }
+  },
+  "binding_gyp": true,
+  "scope": "Original npm-packed artifact supplied by milestone1. No scripts executed by these controls."
+}

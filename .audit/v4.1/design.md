@@ -29,3 +29,7 @@ Archive integrity binds bytes to the supplied lock. It does not authenticate a p
 ## Enforcement decision
 
 The independent judge identified implicit legacy fallback as avoidable risk. v4.1 --enforce requires the evidence index and an explicit bound-approval file. Coordinate whitelists remain advisory compatibility metadata and cannot produce an allowed enforcement result. This is a deliberate tightening of the old weak policy. Missing evidence or approvals returns incomplete. Review can enforce the head against the explicit supplied policy, with incomplete base/head input taking precedence. The PR helper always supplies the policy captured from the base revision.
+
+## Qualified source and filesystem profile
+
+Independent review reproduced false-allow outcomes for npm Git preparation and case-aliased native inputs. The archive boundary now qualifies a narrow direct HTTP(S) archive URL profile and portable ASCII tar names. Git, directories, ambiguous hosted Git URLs and nonportable archive paths remain incomplete. Case-folded collisions and lifecycle filename aliases fail. This preserves dependency-free verification without recreating npm resolution or filesystem Unicode normalization. The execution contract lists the exact supported profile.

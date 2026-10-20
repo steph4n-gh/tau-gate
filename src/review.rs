@@ -91,6 +91,8 @@ pub struct Snapshot {
     pub format: SnapshotFormat,
     pub hash: String,
     pub manifest_hash: Option<String>,
+    pub(crate) evidence: Option<crate::evidence::Evidence>,
+    evidence_hash: Option<String>,
 }
 impl Snapshot {
     pub fn load(lock: &Path, manifest: Option<&Path>) -> Result<Self> {
@@ -143,7 +145,13 @@ impl Snapshot {
                 for (name, body) in scripts {
                     if matches!(
                         name.as_str(),
-                        "preinstall" | "install" | "postinstall" | "prepare"
+                        "preinstall"
+                            | "install"
+                            | "postinstall"
+                            | "prepublish"
+                            | "preprepare"
+                            | "prepare"
+                            | "postprepare"
                     ) {
                         let body = body
                             .as_str()
@@ -164,7 +172,57 @@ impl Snapshot {
             graph,
             hash: sha256(&bytes),
             manifest_hash,
+            evidence: None,
+            evidence_hash: None,
         })
+    }
+    /// Verify a locator bundle without extraction, installation, network access or writes.
+    pub fn load_with_evidence(lock: &Path, manifest: Option<&Path>, index: &Path) -> Result<Self> {
+        let mut snapshot = Self::load(lock, manifest)?;
+        if snapshot.format != SnapshotFormat::Npm {
+            return Err(GateError::Graph(
+                "Execution evidence is qualified only for npm v3".into(),
+            ));
+        }
+        let bytes = read_input(lock)?;
+        if sha256(&bytes) != snapshot.hash {
+            return Err(GateError::Graph(
+                "Lockfile changed while loading evidence".into(),
+            ));
+        }
+        let root = MiniParser::parse_json(
+            std::str::from_utf8(&bytes)
+                .map_err(|_| GateError::Graph("Lockfile must be UTF-8".into()))?,
+        )?;
+        let (evidence, index_hash) = crate::evidence::load(
+            &root,
+            &snapshot.hash,
+            index,
+            snapshot.manifest_hash.as_deref(),
+        )
+        .map_err(GateError::Graph)?;
+        crate::evidence::apply(&evidence, &mut snapshot.graph);
+        if snapshot.manifest_hash.is_none() {
+            snapshot.manifest_hash = evidence
+                .get("")
+                .and_then(crate::evidence::ExecutionEvidence::manifest_hash)
+                .map(str::to_owned);
+        }
+        snapshot.evidence_hash = Some(index_hash);
+        snapshot.evidence = Some(evidence);
+        Ok(snapshot)
+    }
+    pub fn is_complete(&self) -> bool {
+        self.graph.issues.is_empty()
+            && self.evidence.as_ref().is_none_or(|items| {
+                items
+                    .values()
+                    .all(crate::evidence::ExecutionEvidence::qualified)
+            })
+    }
+    /// Evaluate explicit bound approvals. Legacy coordinate whitelists cannot authorize execution.
+    pub fn policy(&self, approvals: Option<&Path>, enforce: bool) -> Result<J> {
+        crate::policy::evaluate(self, approvals, enforce).map_err(GateError::Graph)
     }
     pub fn report(&self) -> J {
         let d = &self.graph;
@@ -240,6 +298,15 @@ impl Snapshot {
                             .unwrap_or(J::Null),
                     ),
                     (
+                        "approval_fingerprint",
+                        self.evidence
+                            .as_ref()
+                            .and_then(|items| items.get(if label == "root" { "" } else { label }))
+                            .and_then(crate::evidence::ExecutionEvidence::fingerprint)
+                            .map(string)
+                            .unwrap_or(J::Null),
+                    ),
+                    (
                         "undirected_degree",
                         J::Number(i.map(|i| degree[i]).unwrap_or(0) as f64),
                     ),
@@ -266,23 +333,131 @@ impl Snapshot {
             .iter()
             .map(|&(u, v)| edge(self, u, v))
             .collect();
-        object([("schema_version",J::Number(1.0)),
-            ("format",string(self.format.label())),
-            ("identity_kind",string(self.format.identity_kind())),("introducer_roots",strings(known_roots(self).into_iter().map(|i|d.graph.node_weight(i).unwrap().clone()))),("introducer_path_scope",string(if self.format==SnapshotFormat::Pnpm{"all_known_importers"}else{"project_root"})),
-            ("topology_status",string(if d.issues.iter().any(|s|!s.starts_with("Execution capabilities unknown:")&&!s.starts_with("Root attribution incomplete:")){"incomplete"}else{"complete"})),
-            ("root_attribution_status",string(if root.is_some()&&!d.issues.iter().any(|s|s.starts_with("Root attribution incomplete:")){"available"}else{"incomplete"})),
-            ("execution_metadata_status",string(if self.format==SnapshotFormat::Npm{if self.manifest_hash.is_some(){"declared_lock_markers_and_root_lifecycle_bodies"}else{"declared_lock_markers_only"}}else{"unknown_transitive_scripts"})),
-            ("status",string(if d.issues.is_empty(){"complete"}else{"incomplete"})),
-            ("scope",string(format!("{}_{}",self.format.label(),if self.manifest_hash.is_some(){"lock_and_root_manifest"}else{"lock_snapshot_only"}))),
-            ("lock_sha256",string(&self.hash)),
-            ("manifest_sha256",self.manifest_hash.as_ref().map(string).unwrap_or(J::Null)),
-            ("limitations",strings(["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential".into(),"Topology cannot distinguish same-shape benign and malicious code".into(),"All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated".into(),"Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn".into(),"Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution".into()])),
-            ("issues",strings(d.issues.clone())),
-            ("optional_omissions",strings(d.optional_omissions.clone())),
-            ("packages",J::Array(d.packages.values().map(|p|package(p,self.format)).collect())),
-            ("edges",J::Array(edges)),
-            ("execution_candidates",J::Array(candidates)),
-            ("topology",math)])
+        object([
+            ("schema_version", J::Number(1.0)),
+            ("format", string(self.format.label())),
+            ("identity_kind", string(self.format.identity_kind())),
+            (
+                "introducer_roots",
+                strings(
+                    known_roots(self)
+                        .into_iter()
+                        .map(|i| d.graph.node_weight(i).unwrap().clone()),
+                ),
+            ),
+            (
+                "introducer_path_scope",
+                string(if self.format == SnapshotFormat::Pnpm {
+                    "all_known_importers"
+                } else {
+                    "project_root"
+                }),
+            ),
+            (
+                "topology_status",
+                string(
+                    if d.issues.iter().any(|s| {
+                        !s.starts_with("Execution capabilities unknown:")
+                            && !s.starts_with("Root attribution incomplete:")
+                    }) {
+                        "incomplete"
+                    } else {
+                        "complete"
+                    },
+                ),
+            ),
+            (
+                "root_attribution_status",
+                string(
+                    if root.is_some()
+                        && !d
+                            .issues
+                            .iter()
+                            .any(|s| s.starts_with("Root attribution incomplete:"))
+                    {
+                        "available"
+                    } else {
+                        "incomplete"
+                    },
+                ),
+            ),
+            (
+                "execution_evidence",
+                self.evidence
+                    .as_ref()
+                    .map(|items| J::Array(items.iter().map(|(path, e)| e.json(path)).collect()))
+                    .unwrap_or(J::Null),
+            ),
+            (
+                "execution_metadata_status",
+                string(if self.evidence.is_some() {
+                    "inspected_npm_artifacts_and_source_snapshots"
+                } else if self.format == SnapshotFormat::Npm {
+                    if self.manifest_hash.is_some() {
+                        "declared_lock_markers_and_root_lifecycle_bodies"
+                    } else {
+                        "declared_lock_markers_only"
+                    }
+                } else {
+                    "unknown_transitive_scripts"
+                }),
+            ),
+            (
+                "status",
+                string(if self.is_complete() {
+                    "complete"
+                } else {
+                    "incomplete"
+                }),
+            ),
+            (
+                "scope",
+                string(if self.evidence.is_some() {
+                    "npm_v3_artifacts_and_source_snapshots".to_owned()
+                } else {
+                    format!(
+                        "{}_{}",
+                        self.format.label(),
+                        if self.manifest_hash.is_some() {
+                            "lock_and_root_manifest"
+                        } else {
+                            "lock_snapshot_only"
+                        }
+                    )
+                }),
+            ),
+            ("lock_sha256", string(&self.hash)),
+            (
+                "evidence_index_sha256",
+                self.evidence_hash.as_ref().map(string).unwrap_or(J::Null),
+            ),
+            (
+                "manifest_sha256",
+                self.manifest_hash.as_ref().map(string).unwrap_or(J::Null),
+            ),
+            (
+                "limitations",
+                if self.evidence.is_some() {
+                    strings(["Archive integrity binds bytes to the supplied lock, not publisher authenticity or code safety".into(),"Source project manifests and sibling binding.gyp presence or absence are caller-trusted supplied scope".into(),"All lock records remain in policy scope, including disconnected and platform-omitted optionals; host execution selection is not predicted".into(),"Lifecycle inventory follows npm 11.19.1 ci rules; binary entrypoints are separate from automatic lifecycle execution".into()])
+                } else {
+                    strings(["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential".into(),"Topology cannot distinguish same-shape benign and malicious code".into(),"All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated".into(),"Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn".into(),"Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution".into()])
+                },
+            ),
+            ("issues", strings(d.issues.clone())),
+            ("optional_omissions", strings(d.optional_omissions.clone())),
+            (
+                "packages",
+                J::Array(
+                    d.packages
+                        .values()
+                        .map(|p| package(p, self.format))
+                        .collect(),
+                ),
+            ),
+            ("edges", J::Array(edges)),
+            ("execution_candidates", J::Array(candidates)),
+            ("topology", math),
+        ])
     }
 }
 pub fn compare(base: &Snapshot, head: &Snapshot) -> J {
@@ -381,17 +556,19 @@ pub fn compare(base: &Snapshot, head: &Snapshot) -> J {
         ("schema_version", J::Number(1.0)),
         (
             "status",
-            string(
-                if base.graph.issues.is_empty() && head.graph.issues.is_empty() {
-                    "complete"
-                } else {
-                    "incomplete"
-                },
-            ),
+            string(if base.is_complete() && head.is_complete() {
+                "complete"
+            } else {
+                "incomplete"
+            }),
         ),
         ("base", base.report()),
         ("head", head.report()),
         ("package_changes", J::Array(changes)),
+        (
+            "execution_evidence_changes",
+            evidence_changes(base, head, &ap, &bp),
+        ),
         (
             "added_edges",
             edge_json(&eb.difference(&ea).cloned().collect()),
@@ -401,6 +578,32 @@ pub fn compare(base: &Snapshot, head: &Snapshot) -> J {
             edge_json(&ea.difference(&eb).cloned().collect()),
         ),
     ])
+}
+
+fn evidence_changes(base: &Snapshot, head: &Snapshot, ap: &Ancestry, bp: &Ancestry) -> J {
+    let empty = BTreeMap::new();
+    let a = base.evidence.as_ref().unwrap_or(&empty);
+    let b = head.evidence.as_ref().unwrap_or(&empty);
+    let keys = a.keys().chain(b.keys()).collect::<BTreeSet<_>>();
+    J::Array(
+        keys.into_iter()
+            .filter_map(|path| {
+                let before = a.get(path);
+                let after = b.get(path);
+                if before == after {
+                    return None;
+                }
+                let label = if path.is_empty() { "root" } else { path };
+                Some(object([
+                    ("path", string(path)),
+                    ("before", before.map(|e| e.json(path)).unwrap_or(J::Null)),
+                    ("after", after.map(|e| e.json(path)).unwrap_or(J::Null)),
+                    ("before_introducer_path", path_for(base, ap, label)),
+                    ("after_introducer_path", path_for(head, bp, label)),
+                ]))
+            })
+            .collect(),
+    )
 }
 
 fn edge(s: &Snapshot, u: usize, v: usize) -> J {
@@ -422,6 +625,12 @@ fn edge(s: &Snapshot, u: usize, v: usize) -> J {
 }
 
 fn read_input(path: &Path) -> Result<Vec<u8>> {
+    if !fs::symlink_metadata(path)?.file_type().is_file() {
+        return Err(GateError::Graph(format!(
+            "Input must be a regular file: {}",
+            path.display()
+        )));
+    }
     let mut bytes = Vec::new();
     fs::File::open(path)?
         .take(64 * 1024 * 1024 + 1)
