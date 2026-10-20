@@ -81,6 +81,23 @@ The denominator includes every frozen pair, including missing receipts, unsuppor
 
 Review-decision counts are mechanical proxies. They are not human review minutes. The simple-diff baseline counts independently known changed instances and events. It does not simulate a maintainer or claim equivalent security outcomes. Historical cohort results do not establish malware detection, sustained adoption, or representative random-sample coverage.
 
+## Rescore a preserved replay
+
+Use `rescore` after a comparison correction when the original observations remain valid. Keep the original replay unchanged and choose a fresh output directory outside the original replay.
+
+```sh
+python3 tools/qualification.py rescore \
+	--corpus docs/qualification/corpus.json \
+	--receipts /Volumes/Storage/taugate-qualification/baseline-replay-v2 \
+	--output /Volumes/Storage/taugate-qualification/baseline-rescored-v2
+```
+
+The command requires every frozen case, a stable original implementation, valid JSON core exit protocols, and matching original output and oracle fact hashes. It refuses partial runs and changed inputs before creating the output directory. It does not rerun acquisition, the collector, the core, or snapshot fact extraction.
+
+Read the new `summary.json` and `implementation-after.json`. New case receipts preserve original observations and bind the revised comparison to the original receipt and current scoring helpers. The new `expected.json` is regenerated from preserved, hash-verified facts. The command ignores the original `expected.json`.
+
+Scoring semantics version 2 normalizes absent optional source and integrity metadata and compares exact artifact SHA512 values. See [the scoring contract](scoring.md) for the validation rules and limits. A rescore is a revised measurement of preserved outputs. It is not a fresh qualification of the current binary or changed inputs.
+
 ## Verify the replay tool
 
 ```sh
@@ -88,4 +105,4 @@ python3 -m unittest discover -s tests -p test_qualification.py -v
 python3 -m py_compile tools/qualification.py tools/qualification_oracle.py
 ```
 
-The tests cover hash substitution, unavailable artifacts, source hash failures, known misses under incomplete reports, unknown truth, script-free source changes, missing receipts, and subprocess timeouts.
+The tests cover hash substitution, unavailable artifacts, source hash failures, known misses under incomplete reports, unknown truth, exact artifact identities, absent metadata, missing receipts, subprocess timeouts, and rescore tampering.

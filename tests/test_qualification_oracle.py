@@ -209,8 +209,12 @@ class OracleTests(unittest.TestCase):
         manifest = {"name": "pkg", "version": "1.0.0", "scripts": {"install": "same"}}
         before, _ = self.snapshot(manifest, archive_bytes=archive(manifest, mtime=1))
         after, _ = self.snapshot(manifest, archive_bytes=archive(manifest, mtime=2))
-        kinds = {event["kind"] for event in oracle.events(before, after)}
+        events = oracle.events(before, after)
+        kinds = {event["kind"] for event in events}
         self.assertEqual(kinds, {"artifact_changed", "integrity_changed"})
+        event = next(event for event in events if event["kind"] == "artifact_changed")
+        self.assertEqual(event["before"], before["packages"]["node_modules/pkg"]["artifact_sha512"])
+        self.assertEqual(event["after"], after["packages"]["node_modules/pkg"]["artifact_sha512"])
 
     def test_invalid_index_and_changed_root_bytes_do_not_supply_facts(self):
         _, directory = self.snapshot()

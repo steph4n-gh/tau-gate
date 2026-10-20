@@ -70,6 +70,8 @@ The oracle verifies SRI against original compressed bytes. It accepts SHA1, SHA2
 
 Execution-change comparisons require known facts on both sides. Missing evidence does not invent a lifecycle removal. Available source and integrity changes remain visible when execution metadata is unknown. Byte changes from JSON formatting or gzip recompression remain visible even when lifecycle bodies are unchanged.
 
+`artifact_changed` carries the independently computed `artifact_sha512` values. Manifest and binding events carry SHA256 values. The comparator requires the exact before and after digest for each event. A transition between missing facts and a known digest does not establish both sides of a known byte change. See [the scoring contract](scoring.md).
+
 These labels define narrow change events. They do not label all runtime payload changes as malware or claim general malware detection. Lock install markers are metadata and do not override independently observed manifest facts. Comparison of marker conflicts belongs to the core result and qualification report.
 
 ## Verification

@@ -22,6 +22,7 @@ import npm_evidence
 
 MAX_FILE = 64 * 1024 * 1024
 MAX_OUTPUT = 64 * 1024 * 1024
+SCORING_SEMANTICS_VERSION = 2
 
 
 def digest(data, algorithm="sha256"):
@@ -505,8 +506,9 @@ def compare_events(expected, report, oracle_status):
             elif kind in package_fields:
                 field = package_fields[kind]
                 observed = bool(change and field in change.get("changed_fields", []) and
-                                (change.get("before") or {}).get(field) == event["before"] and
-                                (change.get("after") or {}).get(field) == event["after"])
+                                all(field in (change.get(side) or {}) and change[side][field] ==
+                                    ("" if field in ("source", "integrity") and event[side] is None else event[side])
+                                    for side in ("before", "after")))
             else:
                 unknown.append({**event, "comparison_reason": "unknown package event kind"})
                 continue
@@ -524,7 +526,7 @@ def compare_events(expected, report, oracle_status):
                 if kind.startswith("lifecycle_"):
                     hook = event["after"]["event"]
                     observed = observed and before.get(field, {}).get(hook) == script_hash(event["before"]["body"]) and after.get(field, {}).get(hook) == script_hash(event["after"]["body"])
-                elif kind != "artifact_changed":
+                else:
                     observed = observed and before.get(field) == event["before"] and after.get(field) == event["after"]
             else:
                 unknown.append({**event, "comparison_reason": "unknown execution event kind"})
@@ -558,6 +560,20 @@ def compare_facts(facts, report):
                     mismatches.append({"side": side, "path": path, "field": source,
                                        "expected": value, "actual": actual.get(target)})
     return mismatches
+
+
+def score_case(facts, report):
+    import qualification_oracle
+    expected = qualification_oracle.events(facts["base"], facts["head"])
+    oracle_status = "complete" if all(value["status"] == "complete" for value in facts.values()) else "partial"
+    comparison = compare_events(expected, report, oracle_status)
+    comparison["fact_mismatches"] = compare_facts(facts, report)
+    if comparison["fact_mismatches"]:
+        comparison["status"] = "partial"
+    return expected, {"comparison": comparison,
+                      "simple_diff_baseline": {"known_changed_instances": len({item["path"] for item in expected if item.get("kind") != "unknown"}),
+                                               "expected_events": len(expected), "human_review_minutes": None}}
+
 
 def replay_case(pair, args, output):
     import qualification_oracle
@@ -637,15 +653,9 @@ def replay_case(pair, args, output):
         core["review_decision_count_proxy"] = len({item["path"] for item in report.get("execution_evidence_changes", [])})
         receipt["core"] = core
         if set(facts) == {"base", "head"}:
-            expected = qualification_oracle.events(facts["base"], facts["head"])
+            expected, scores = score_case(facts, report)
             save(destination / "expected.json", expected)
-            oracle_status = "complete" if all(value["status"] == "complete" for value in facts.values()) else "partial"
-            receipt["comparison"] = compare_events(expected, report, oracle_status)
-            receipt["comparison"]["fact_mismatches"] = compare_facts(facts, report)
-            if receipt["comparison"]["fact_mismatches"]:
-                receipt["comparison"]["status"] = "partial"
-            receipt["simple_diff_baseline"] = {"known_changed_instances": len({item["path"] for item in expected if item.get("kind") != "unknown"}),
-                                                "expected_events": len(expected), "human_review_minutes": None}
+            receipt.update(scores)
     save(destination / "receipt.json", receipt)
     return receipt
 
@@ -667,6 +677,7 @@ def replay(args):
     verification = run_bounded([args.binary, "--verify"], args.output / "binary-verify", args.timeout)
     save(args.output / "implementation.json", {"binary_sha256": actual, "binary_verification": verification,
                                                 "helper_sha256": helpers, "corpus_sha256": digest(read(args.corpus)),
+                                                "scoring_semantics_version": SCORING_SEMANTICS_VERSION,
                                                 "python": sys.version, "split": args.split, "offline": True,
                                                 "jobs": args.jobs, "timeout_seconds": args.timeout})
     selected_ids = set(getattr(args, "case", None) or [])
@@ -683,6 +694,94 @@ def replay(args):
     save(args.output / "summary.json", summarize_data(data, args.output))
     if not implementation_unchanged:
         raise ValueError("implementation bytes changed during replay; receipts are not a single implementation qualification")
+
+
+def scoring_helpers():
+    return {path.name: digest(read(path)) for path in (Path(__file__), Path(__file__).with_name("qualification_oracle.py"))}
+
+
+def verified_replay_case(pair, root):
+    destination = root / "cases" / pair["id"]
+    raw_receipt = read(destination / "receipt.json")
+    receipt = json.loads(raw_receipt)
+    if any(receipt.get(field) != pair[field] for field in ("repository", "split")) or receipt.get("case_id") != pair["id"]:
+        raise ValueError("original receipt case identity mismatch")
+    facts = {}
+    for side in ("base", "head"):
+        capture = receipt["capture"][side]
+        if capture["status"] != "verified" or any(capture["input_sha256"].get("project/" + item["path"]) != item["sha256"] for item in pair["files"][pair[side]]):
+            raise ValueError("original capture differs from frozen source hashes")
+        oracle = receipt["oracle"][side]
+        raw = read(destination / (side + "-oracle.json"))
+        if digest(raw) != oracle["facts_sha256"]:
+            raise ValueError("original oracle facts hash mismatch")
+        facts[side] = json.loads(raw)
+        if (facts[side]["status"] not in ("complete", "partial") or facts[side]["status"] != oracle["status"] or
+                len(facts[side]["packages"]) != oracle["packages_total"] or
+                sum(item["status"] == "known" for item in facts[side]["packages"].values()) != oracle["packages_known"]):
+            raise ValueError("original oracle facts contradict receipt")
+    core = receipt["core"]
+    for stream in ("stdout", "stderr"):
+        raw = read(destination / "core" / (stream + ".bin"), MAX_OUTPUT)
+        if digest(raw) != core["output_sha256"][stream] or len(raw) != core["output_bytes"][stream]:
+            raise ValueError("original core output hash or length mismatch")
+        if stream == "stdout":
+            report = json.loads(raw)
+    if report != json.loads(read(destination / "core.json")):
+        raise ValueError("original core JSON differs from raw stdout")
+    if (core["termination"] != "exited" or type(core["exit_code"]) is not int or report.get("status") != core["status"] or
+            (core["status"], core["exit_code"]) not in (("complete", 0), ("incomplete", 2))):
+        raise ValueError("original core exit protocol is invalid for rescoring")
+    return receipt, facts, report, digest(raw_receipt)
+
+
+def rescore(args):
+    raw_corpus = read(args.corpus)
+    data, _ = corpus(args.corpus)
+    if args.output.exists():
+        raise ValueError("rescore output must be fresh")
+    source = args.receipts.resolve()
+    if args.output.resolve().is_relative_to(source):
+        raise ValueError("rescore output must be outside the original replay")
+    metadata = {name: read(source / name) for name in ("implementation.json", "implementation-after.json")}
+    implementation = json.loads(metadata["implementation.json"])
+    after = json.loads(metadata["implementation-after.json"])
+    if implementation.get("operation") == "rescore" or implementation.get("split") != "all":
+        raise ValueError("rescore requires an original full replay")
+    if implementation["corpus_sha256"] != digest(raw_corpus) or json.loads(raw_corpus) != data:
+        raise ValueError("original replay corpus hash mismatch")
+    helpers = implementation["helper_sha256"]
+    if (set(helpers) != {"qualification.py", "qualification_oracle.py", "npm_evidence.py"} or
+            any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in [implementation["binary_sha256"], *helpers.values()]) or
+            after.get("implementation_unchanged") is not True or
+            after.get("binary_sha256") != implementation["binary_sha256"] or after.get("helper_sha256") != helpers):
+        raise ValueError("original replay implementation was not unchanged")
+    if {path.name for path in (source / "cases").iterdir()} != {pair["id"] for pair in data["pairs"]}:
+        raise ValueError("original replay case set differs from frozen corpus")
+    receipt_hashes = {pair["id"]: verified_replay_case(pair, source)[3] for pair in data["pairs"]}
+    scoring = {"semantics_version": SCORING_SEMANTICS_VERSION, "helper_sha256": scoring_helpers(),
+               "source_replay": str(source), "original_metadata_sha256": {name: digest(raw) for name, raw in metadata.items()}}
+    args.output.mkdir(parents=True)
+    save(args.output / "implementation.json", {"operation": "rescore", "offline": True, "processes_executed": False,
+                                              "corpus_sha256": implementation["corpus_sha256"], "scoring": scoring,
+                                              "original_implementation": implementation, "original_implementation_after": after})
+    for pair in data["pairs"]:
+        receipt, facts, report, original_hash = verified_replay_case(pair, source)
+        if original_hash != receipt_hashes[pair["id"]]:
+            raise ValueError("original receipt changed during rescoring")
+        expected, scores = score_case(facts, report)
+        destination = args.output / "cases" / pair["id"]
+        save(destination / "expected.json", expected)
+        receipt.update(scores)
+        receipt["scoring"] = {**scoring, "original_receipt_sha256": original_hash,
+                              "expected_sha256": digest(read(destination / "expected.json"))}
+        save(destination / "receipt.json", receipt)
+    unchanged = (scoring_helpers() == scoring["helper_sha256"] and read(args.corpus) == raw_corpus and
+                 all(read(source / name) == raw for name, raw in metadata.items()))
+    if not unchanged:
+        raise ValueError("source metadata or scoring implementation changed during rescoring")
+    save(args.output / "implementation-after.json", {"implementation_unchanged": True, "scoring": scoring})
+    save(args.output / "summary.json", summarize_data(data, args.output))
 
 
 def summarize_data(data, receipts):
@@ -757,9 +856,13 @@ def main(argv=None):
     summary_parser.add_argument("--corpus", type=Path, required=True)
     summary_parser.add_argument("--receipts", type=Path, required=True)
     summary_parser.add_argument("--output", type=Path, required=True)
+    rescore_parser = commands.add_parser("rescore", help="offline scoring of a complete, unchanged original replay")
+    rescore_parser.add_argument("--corpus", type=Path, required=True)
+    rescore_parser.add_argument("--receipts", type=Path, required=True)
+    rescore_parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        {"acquire": acquire, "replay": replay, "summarize": summarize}[args.command](args)
+        {"acquire": acquire, "replay": replay, "rescore": rescore, "summarize": summarize}[args.command](args)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print(f"qualification: {exc}", file=sys.stderr)
         return 2

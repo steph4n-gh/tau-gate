@@ -105,6 +105,47 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(result["status"], "complete")
         self.assertEqual(len(result["matched"]), 1)
 
+    def test_absent_optional_metadata_matches_explicit_empty_report_value(self):
+        for field in ("source", "integrity"):
+            for before, after in ((None, "new"), ("old", None)):
+                with self.subTest(field=field, before=before):
+                    event = {"path": "node_modules/example", "kind": field + "_changed", "before": before,
+                             "after": after, "obligation": "package_change", "approval_relevant": False}
+                    change = {"path": event["path"], "changed_fields": [field],
+                              "before": {field: "" if before is None else before},
+                              "after": {field: "" if after is None else after}}
+                    report = {"status": "incomplete", "package_changes": [change]}
+                    self.assertEqual(q.compare_events([event], report, "partial")["misses"], 0)
+                    for side in ("before", "after"):
+                        original = change[side]
+                        for wrong in ({}, {field: None}, {field: "wrong"}):
+                            change[side] = wrong
+                            self.assertEqual(q.compare_events([event], report, "partial")["misses"], 1)
+                        change[side] = original
+
+    def test_absent_name_and_version_do_not_match_empty_strings(self):
+        for field in ("name", "version"):
+            event = {"path": "node_modules/example", "kind": field + "_changed", "before": None,
+                     "after": "new", "obligation": "package_change", "approval_relevant": False}
+            report = {"status": "incomplete", "package_changes": [{"path": event["path"], "changed_fields": [field],
+                      "before": {field: ""}, "after": {field: "new"}}]}
+            self.assertEqual(q.compare_events([event], report, "partial")["misses"], 1)
+
+    def test_artifact_change_requires_exact_independently_known_sha512(self):
+        event = {"path": "node_modules/example", "kind": "artifact_changed", "before": "a" * 128,
+                 "after": "b" * 128, "obligation": "package_change", "approval_relevant": False}
+        change = {"path": event["path"], "before": {"facts": {"artifact_sha512": event["before"]}},
+                  "after": {"facts": {"artifact_sha512": event["after"]}}}
+        report = {"status": "complete", "execution_evidence_changes": [change]}
+        self.assertEqual(q.compare_events([event], report, "complete")["misses"], 0)
+        for side in ("before", "after"):
+            change[side]["facts"]["artifact_sha512"] = "c" * 128
+            self.assertEqual(q.compare_events([event], report, "complete")["misses"], 1)
+            change[side]["facts"] = None
+            self.assertEqual(q.compare_events([event], report, "complete")["misses"], 1)
+            change[side]["facts"] = {}
+            change[side]["facts"]["artifact_sha512"] = event[side]
+
     def test_link_alias_does_not_duplicate_target_execution_facts(self):
         facts = {"head": {"packages": {"node_modules/workspace": {"status": "known", "scope": "link", "scripts": {}, "implicit_native": False},
                                            "workspace": {"status": "known", "scope": "workspace", "scripts": {"prepare": "echo ready"}, "implicit_native": False}}}}
@@ -225,6 +266,105 @@ class QualificationTests(unittest.TestCase):
             _, _, source = q.capture_revision(pair["repository"], pair["base"], pair["files"][pair["base"]], self.root / "sources", self.root / "discovery", budget)
         self.assertEqual(source["status"], "partial")
         self.assertTrue(any("hash mismatch" in item["reason"] for item in source["issues"]))
+
+    def completed_replay(self):
+        acquired, pair = self.acquire()
+        binary = self.root / "controlled-core"
+        binary.write_text("#!/usr/bin/env python3\nimport sys\nprint('{\"status\": \"incomplete\"}')\nsys.exit(0 if '--verify' in sys.argv else 2)\n")
+        binary.chmod(0o755)
+        output = self.root / "original-replay"
+        q.replay(argparse.Namespace(corpus=acquired.corpus, sources=acquired.sources, binary=binary,
+                                   expected_binary_sha256=q.digest(binary.read_bytes()), output=output,
+                                   split="all", case=None, jobs=1, timeout=120))
+        return argparse.Namespace(corpus=acquired.corpus, receipts=output, output=self.root / "rescored"), pair
+
+    def test_rescore_matches_fresh_replay_without_executing_or_changing_originals(self):
+        args, pair = self.completed_replay()
+        case = args.receipts / "cases" / pair["id"]
+        q.save(case / "expected.json", [{"unbound": "must not be trusted"}])
+        original = {str(path.relative_to(args.receipts)): q.digest(path.read_bytes())
+                    for path in args.receipts.rglob("*") if path.is_file()}
+        with patch.object(q, "run_bounded", side_effect=AssertionError("rescore executed a process")), \
+             patch.object(q, "verify_snapshot", side_effect=AssertionError("rescore opened source snapshots")):
+            q.rescore(args)
+        rescored = q.load(args.output / "cases" / pair["id"] / "receipt.json")
+        receipt = q.load(case / "receipt.json")
+        self.assertEqual(rescored["comparison"], receipt["comparison"])
+        self.assertEqual(rescored["core"], receipt["core"])
+        self.assertEqual(rescored["scoring"]["original_receipt_sha256"], original["cases/controlled/receipt.json"])
+        self.assertEqual(rescored["scoring"]["semantics_version"], q.SCORING_SEMANTICS_VERSION)
+        self.assertEqual(rescored["scoring"]["source_replay"], str(args.receipts.resolve()))
+        self.assertEqual(q.load(args.output / "summary.json")["counts"]["frozen_pairs"], 1)
+        self.assertEqual(q.load(args.output / "implementation.json")["original_implementation"], q.load(args.receipts / "implementation.json"))
+        self.assertTrue(q.load(args.output / "implementation-after.json")["implementation_unchanged"])
+        self.assertEqual(original, {str(path.relative_to(args.receipts)): q.digest(path.read_bytes())
+                                    for path in args.receipts.rglob("*") if path.is_file()})
+        self.assertNotEqual(q.load(args.output / "cases" / pair["id"] / "expected.json"), [{"unbound": "must not be trusted"}])
+
+    def test_rescore_rejects_tampered_or_incomplete_replay_before_writing(self):
+        args, pair = self.completed_replay()
+        case = args.receipts / "cases" / pair["id"]
+
+        def altered(path, change):
+            value = q.load(path)
+            change(value)
+            return (json.dumps(value) + "\n").encode()
+
+        receipt_path = case / "receipt.json"
+        implementation = args.receipts / "implementation.json"
+        after = args.receipts / "implementation-after.json"
+        mutations = [
+            (after, None),
+            (after, altered(after, lambda value: value.update(implementation_unchanged=False))),
+            (after, altered(after, lambda value: value.update(binary_sha256="0" * 64))),
+            (after, altered(after, lambda value: value["helper_sha256"].update({"qualification.py": "0" * 64}))),
+            (implementation, altered(implementation, lambda value: value.update(split="development"))),
+            (args.corpus, args.corpus.read_bytes() + b" "),
+            (receipt_path, None),
+            (receipt_path, altered(receipt_path, lambda value: value.update(case_id="wrong"))),
+            (receipt_path, altered(receipt_path, lambda value: value.update(repository="other/project"))),
+            (receipt_path, altered(receipt_path, lambda value: value.update(split="holdout"))),
+            (receipt_path, altered(receipt_path, lambda value: value["core"].update(exit_code=0))),
+            (receipt_path, altered(receipt_path, lambda value: value["core"].update(termination="timeout"))),
+            (receipt_path, altered(receipt_path, lambda value: value["core"]["output_bytes"].update(stdout=0))),
+            (receipt_path, altered(receipt_path, lambda value: value["capture"]["base"]["input_sha256"].update({"project/package-lock.json": "0" * 64}))),
+            (case / "core/stdout.bin", (case / "core/stdout.bin").read_bytes() + b" "),
+            (case / "core/stderr.bin", b"tampered"),
+            (case / "core.json", b'{"status":"incomplete","substituted":true}'),
+            (case / "base-oracle.json", (case / "base-oracle.json").read_bytes() + b" "),
+        ]
+        for number, (path, replacement) in enumerate(mutations):
+            with self.subTest(number=number, path=path):
+                saved = path.read_bytes()
+                if replacement is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(replacement)
+                try:
+                    with self.assertRaises((OSError, ValueError)):
+                        q.rescore(args)
+                    self.assertFalse(args.output.exists())
+                finally:
+                    path.write_bytes(saved)
+
+    def test_rescore_requires_fresh_output_and_exact_case_set(self):
+        args, pair = self.completed_replay()
+        extra = args.receipts / "cases/extra"
+        extra.mkdir()
+        with self.assertRaisesRegex(ValueError, "case"):
+            q.rescore(args)
+        self.assertFalse(args.output.exists())
+        extra.rmdir()
+        args.output.mkdir()
+        with self.assertRaisesRegex(ValueError, "fresh"):
+            q.rescore(args)
+
+    def test_rescore_cannot_write_inside_original_replay(self):
+        args, _ = self.completed_replay()
+        args.output = args.receipts / "nested-rescore"
+        with self.assertRaisesRegex(ValueError, "outside"):
+            q.rescore(args)
+        self.assertFalse(args.output.exists())
 
 
 if __name__ == "__main__":

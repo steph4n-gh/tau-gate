@@ -21,7 +21,7 @@ ROOT_EVENTS = ("preinstall", "install", "postinstall", "prepublish", "preprepare
 INSTALL_EVENTS = ("preinstall", "install", "postinstall")
 SCOPED_EVENTS = {"root": ROOT_EVENTS, "workspace": INSTALL_EVENTS + ("prepare",), "archive": INSTALL_EVENTS}
 IDENTITY_FIELDS = ("name", "version", "source", "integrity")
-BYTE_FIELDS = (("manifest_sha256", "manifest_changed"), ("artifact_sha256", "artifact_changed"), ("binding_sha256", "binding_changed"))
+BYTE_FIELDS = (("manifest_sha256", "manifest_changed"), ("artifact_sha512", "artifact_changed"), ("binding_sha256", "binding_changed"))
 
 
 class OracleError(ValueError):
