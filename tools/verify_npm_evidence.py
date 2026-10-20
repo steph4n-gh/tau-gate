@@ -668,16 +668,18 @@ def reference_controls(binary, bundle, output, logs, timeout, results):
         results.append({'case': 'm1_reference_missing', 'pass': False, 'error': 'Required M1 bundle is absent. This is a coverage gap, not a pass.'})
         return
     oracle = json.loads((bundle / 'oracle.json').read_bytes())
+    working_directory = output / 'reference-cwd'
+    working_directory.mkdir()
     scans = [('m1_reference_oracle', bundle / 'project/package-lock.json', bundle / 'evidence/index.json', 'complete')]
     scans += [('m1_negative_' + path.name, path / 'package-lock.json', path / 'index.json', 'incomplete') for path in sorted((bundle / 'negative-controls').iterdir()) if path.is_dir()]
     for name, lock, index, expected in scans:
         before = inventory(bundle)
-        output_paths_before = {str(path.relative_to(output)) for path in output.rglob('*')}
+        output_paths_before = {str(path.relative_to(working_directory)) for path in working_directory.rglob('*')}
         command = [str(binary), 'audit', '--lock', str(lock), '--manifest', str(bundle / 'project/package.json'), '--evidence', str(index), '--json']
         result = {'case': name, 'method': 'Direct CLI comparison with sealed M1 npm installation oracle and original negative locator bundles.', 'expected': expected, 'command': command, 'input_tree_sha256': sha256(encoded(before))}
         report = None
         try:
-            process = subprocess.run(command, cwd=output, stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout)
+            process = subprocess.run(command, cwd=working_directory, stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout)
             stdout, stderr = process.stdout, process.stderr
             result['exit'] = process.returncode
             report = json.loads(stdout)
@@ -688,8 +690,10 @@ def reference_controls(binary, bundle, output, logs, timeout, results):
         except (json.JSONDecodeError, UnicodeDecodeError):
             result['json_error'] = True
         result['inputs_unchanged'] = before == inventory(bundle)
-        output_paths_after = {str(path.relative_to(output)) for path in output.rglob('*')}
+        output_paths_after = {str(path.relative_to(working_directory)) for path in working_directory.rglob('*')}
         result['no_new_working_directory_files'] = output_paths_before == output_paths_after
+        result['new_working_directory_paths'] = sorted(output_paths_after - output_paths_before)
+        result['removed_working_directory_paths'] = sorted(output_paths_before - output_paths_after)
         result['stdout_sha256'], result['stderr_sha256'] = sha256(stdout), sha256(stderr)
         (logs / f'{name}.stdout').write_bytes(stdout)
         (logs / f'{name}.stderr').write_bytes(stderr)

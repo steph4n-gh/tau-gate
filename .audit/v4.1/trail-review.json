@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "reviewer": "configured inherited parent model",
+  "status": "reviewed",
+  "implementation_defects_unresolved": 0,
+  "traceability_correction": {
+    "row": 19,
+    "issue": "Verifier source did not prove the recorded failed replay",
+    "resolution": "Superseding receipt pointer and durable selected failure proof added",
+    "evidence": ".audit/v4.1/replay-correction.json"
+  },
+  "checks": [
+    "Historical Gate1/Gate2 source hashes agree with their commits",
+    "Gate3 source hashes, binary hash and receipt digests agree",
+    "68 Rust tests, 13 Python tests, 306 core controls and 19 Git controls are supported",
+    "Two critical findings and one report warning have verified repairs"
+  ],
+  "attention": [
+    "Source snapshots retain caller trust",
+    "Narrow archive profile and pnpm/Yarn incompleteness remain",
+    "The GitHub-hosted npm example workflow was not executed and needs trusted bootstrap"
+  ]
+}

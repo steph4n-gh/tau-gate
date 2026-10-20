@@ -1,0 +1,147 @@
+Local path prefixes normalized to <checkout> and <scratch>.
+["cargo", "build", "--release", "--offline"]
+   Compiling tau-gate v4.1.0 (<checkout>)
+    Finished `release` profile [optimized] target(s) in 3.09s
+EXIT 0
+["cargo", "test", "--release", "--offline", "--all-targets"]
+   Compiling tau-gate v4.1.0 (<checkout>)
+    Finished `release` profile [optimized] target(s) in 2.85s
+     Running unittests src/lib.rs (target/release/deps/tau_gate-e9150880d937d99f)
+
+running 44 tests
+test artifact::tests::gzip_optional_fields_require_valid_bounds_and_header_checksum ... ok
+test artifact::tests::gzip_rejects_crc_size_reserved_flags_junk_and_multiple_members ... ok
+test artifact::tests::huffman_rejects_oversubscribed_incomplete_and_impossible_trees ... ok
+test digest::tests::known_answers ... ok
+test artifact::tests::stored_fixed_and_dynamic_deflate_match_external_zlib_vectors ... ok
+test graph::tests::test_cargo_extraction ... ok
+test graph::exact_regressions::cargo_proc_macros_execution ... ok
+test graph::exact_regressions::no_duplicate_topology_weights ... ok
+test artifact::tests::manifest_size_limit_is_enforced_after_integrity_validation ... ok
+test graph::tests::test_npm_extraction ... ok
+test artifact::tests::tar_requires_unique_regular_manifest_and_safe_complete_archive ... ok
+test graph_impl::tests::test_digraph_basic ... ok
+test graph::tests::test_pnpm_extraction ... ok
+test graph::exact_regressions::pnpm_exact_versions_peer_context_and_document_reset ... ok
+test artifact::tests::artifact_content_is_bound_to_original_gzip_bytes ... ok
+test graph::exact_regressions::nested_versions_workspaces_and_kinds ... ok
+test math::convergence_regressions::analytical_two_nodes ... ok
+test math::convergence_regressions::invalid_self_edge_rejected ... ok
+test ffi_tests::null_bounds_zero_edges_and_ownership ... ok
+test math::tests::test_dumbbell_bisection ... ok
+test math::tests::test_no_edges_graceful ... ok
+test math::tests::test_anomaly_isolation ... ok
+test parser::strict_regressions::malformed_rejected ... ok
+test parser::strict_regressions::unicode_and_roundtrip ... ok
+test parser::tests::test_mini_parser_config ... ok
+test parser::tests::test_mini_parser_json_basic ... ok
+test parser::tests::test_pnpm_yaml_extractor ... ok
+test pnpm::tests::exact_multiple_versions_never_match_by_name_only ... ok
+test pnpm::tests::exact_peer_alias_workspace_and_metadata ... ok
+test pnpm::tests::missing_optional_and_required_refs_are_incomplete ... ok
+test semver::tests::exact_only ... ok
+test pnpm::tests::rejects_unsupported_version_structure_and_duplicates ... ok
+test yarn::tests::aliases_preserve_descriptor_and_actual_package_identity ... ok
+test pnpm::tests::root_manifest_specs_are_checked ... ok
+test pnpm::tests::two_documents_preserve_both_root_scopes ... ok
+test yarn::tests::berry_conflicts_duplicates_and_unknown_structures_are_rejected ... ok
+test yarn::tests::comments_and_escaped_strings_preserve_artifact_metadata ... ok
+test yarn::tests::grouped_scoped_selectors_and_nested_versions_are_exact ... ok
+test yarn::tests::missing_manifest_and_unknown_scripts_do_not_mean_no_execution ... ok
+test yarn::tests::optional_absence_is_explicit_and_required_absence_is_incomplete ... ok
+test yarn::tests::same_name_version_different_resolutions_do_not_collapse ... ok
+test digest::tests::sha512_known_answers ... ok
+test parser::large_string_regression::long_ascii_and_multibyte_strings ... ok
+test math::convergence_regressions::long_path_discloses_nonconvergence ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/release/deps/tau_gate-8c98a9c82eff74fc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/execution_evidence.rs (target/release/deps/execution_evidence-acb3b98dfeea832e)
+
+running 9 tests
+test supplied_files_are_unchanged_and_no_files_are_written ... ok
+test workspace_links_and_disconnected_instances_keep_separate_approvals ... ok
+test missing_conflicting_and_untrusted_inputs_precede_approvals ... ok
+test review_reports_evidence_changes_and_requires_both_evidence_inputs ... ok
+test strict_index_and_approval_schemas_reject_duplicate_fields_and_symlinks ... ok
+test native_default_and_empty_scripts_are_distinct_from_binary_entrypoints ... ok
+test approvals_bind_source_bytes_lifecycle_and_identity ... ok
+test portable_archive_paths_cannot_hide_native_or_manifest_inputs ... ok
+test matching_archive_integrity_does_not_qualify_git_or_directory_sources ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/integration_test.rs (target/release/deps/integration_test-33d2e0c6a43d6e60)
+
+running 8 tests
+test incomplete_base_human_report_explains_reason ... ok
+test root_script_only_change ... ok
+test review_same_version_digest_and_capability_changes ... ok
+test every_consumed_input_unchanged ... ok
+test all_candidates_read_only_policy_and_determinism ... ok
+test missing_and_unsupported_never_invoke_manager ... ok
+test usage_and_help_no_effects ... ok
+test config_invalid_cannot_fail_open ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/package_manager_cli.rs (target/release/deps/package_manager_cli-1dfa819275127225)
+
+running 6 tests
+test pnpm_other_importer_is_an_actual_introducer_root ... ok
+test yarn_without_manifest_has_no_invented_attribution ... ok
+test default_discovery_is_read_only_and_rejects_ambiguity ... ok
+test cross_format_comparison_refuses_incomparable_identity_keys ... ok
+test supported_resolution_graphs_never_allow_unknown_execution ... ok
+test resolution_lock_comparisons_remain_useful_when_capabilities_unknown ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/real_lockfiles.rs (target/release/deps/real_lockfiles-c6e7271dd3968db7)
+
+running 1 test
+test frozen_resolution_locks_match_independent_oracles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+EXIT 0
+["cargo", "fmt", "--check"]
+EXIT 0
+["cargo", "clippy", "--offline", "--all-targets", "--", "-D", "warnings"]
+   Compiling tau-gate v4.1.0 (<checkout>)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.76s
+EXIT 0
+["bash", "e2e_zero.sh"]
+{"added_edges":[],"base":{"edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"evidence_index_sha256":null,"execution_candidates":[{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"}],"introducer_path":["root","node_modules/test-tool"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},"undirected_degree":1}],"execution_evidence":null,"execution_metadata_status":"declared_lock_markers_only","format":"npm_v3","identity_kind":"installed_package_instance","introducer_path_scope":"project_root","introducer_roots":["root"],"issues":[],"limitations":["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential","Topology cannot distinguish same-shape benign and malicious code","All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated","Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn","Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution"],"lock_sha256":"8cf083bbf0ca5e85fe0d8d5f8e1f17a3de551d3af15b865ad051981bfee718eb","manifest_sha256":null,"optional_omissions":[],"packages":[{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/bridge","integrity":"sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","name":"bridge","path":"node_modules/bridge","source":"https://registry.example/bridge-1.0.0.tgz","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/decoy","integrity":"","name":"decoy","path":"node_modules/decoy","source":"","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"","integrity":"","name":"review-demo","path":"","source":"","version":"1.0.0"}],"root_attribution_status":"available","schema_version":1,"scope":"npm_v3_lock_snapshot_only","status":"complete","topology":{"iterations":0,"kind":"connectivity_estimate_not_security_certificate","partition":["node_modules/decoy"],"residual":0,"residual_converged":true,"score":0},"topology_status":"complete"},"execution_evidence_changes":[],"head":{"edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"evidence_index_sha256":null,"execution_candidates":[{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"introducer_path":["root","node_modules/bridge","node_modules/leaf"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},"undirected_degree":1},{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"}],"introducer_path":["root","node_modules/test-tool"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},"undirected_degree":1}],"execution_evidence":null,"execution_metadata_status":"declared_lock_markers_only","format":"npm_v3","identity_kind":"installed_package_instance","introducer_path_scope":"project_root","introducer_roots":["root"],"issues":[],"limitations":["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential","Topology cannot distinguish same-shape benign and malicious code","All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated","Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn","Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution"],"lock_sha256":"6734874d714fe17afb85eaae04b8470e1196a4b0f4e15ad3e6d0c6327f2c97b3","manifest_sha256":null,"optional_omissions":[],"packages":[{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/bridge","integrity":"sha512-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB==","name":"bridge","path":"node_modules/bridge","source":"https://registry.example/bridge-1.0.0.tgz","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/decoy","integrity":"","name":"decoy","path":"node_modules/decoy","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"","integrity":"","name":"review-demo","path":"","source":"","version":"1.0.0"}],"root_attribution_status":"available","schema_version":1,"scope":"npm_v3_lock_snapshot_only","status":"complete","topology":{"iterations":0,"kind":"connectivity_estimate_not_security_certificate","partition":["node_modules/decoy"],"residual":0,"residual_converged":true,"score":0},"topology_status":"complete"},"package_changes":[{"after":{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/bridge","integrity":"sha512-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB==","name":"bridge","path":"node_modules/bridge","source":"https://registry.example/bridge-1.0.0.tgz","version":"1.0.0"},"after_introducer_path":["root","node_modules/bridge"],"before":{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/bridge","integrity":"sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","name":"bridge","path":"node_modules/bridge","source":"https://registry.example/bridge-1.0.0.tgz","version":"1.0.0"},"before_introducer_path":["root","node_modules/bridge"],"change":"changed","changed_fields":["integrity"],"path":"node_modules/bridge"},{"after":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},"after_introducer_path":["root","node_modules/bridge","node_modules/leaf"],"before":{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},"before_introducer_path":["root","node_modules/bridge","node_modules/leaf"],"change":"changed","changed_fields":["capabilities"],"path":"node_modules/leaf"}],"policy":{"approval_scope":"exact npm instance, source/integrity, original archive, manifest bytes, lifecycle bodies and native facts; supplied source snapshots retain caller trust","enforcement_requested":false,"issues":[],"outcome":"advisory","unapproved_execution_candidates":[]},"removed_edges":[],"schema_version":1,"status":"complete"}
+{"edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"evidence_index_sha256":null,"execution_candidates":[{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"introducer_path":["root","node_modules/bridge","node_modules/leaf"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},"undirected_degree":1},{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"}],"introducer_path":["root","node_modules/test-tool"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},"undirected_degree":1}],"execution_evidence":null,"execution_metadata_status":"declared_lock_markers_only","format":"npm_v3","identity_kind":"installed_package_instance","introducer_path_scope":"project_root","introducer_roots":["root"],"issues":[],"limitations":["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential","Topology cannot distinguish same-shape benign and malicious code","All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated","Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn","Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution"],"lock_sha256":"6734874d714fe17afb85eaae04b8470e1196a4b0f4e15ad3e6d0c6327f2c97b3","manifest_sha256":null,"optional_omissions":[],"packages":[{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/bridge","integrity":"sha512-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB==","name":"bridge","path":"node_modules/bridge","source":"https://registry.example/bridge-1.0.0.tgz","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/decoy","integrity":"","name":"decoy","path":"node_modules/decoy","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"","integrity":"","name":"review-demo","path":"","source":"","version":"1.0.0"}],"policy":{"approval_scope":"exact npm instance, source/integrity, original archive, manifest bytes, lifecycle bodies and native facts; supplied source snapshots retain caller trust","enforcement_requested":false,"issues":[],"outcome":"advisory","unapproved_execution_candidates":[]},"root_attribution_status":"available","schema_version":1,"scope":"npm_v3_lock_snapshot_only","status":"complete","topology":{"iterations":0,"kind":"connectivity_estimate_not_security_certificate","partition":["node_modules/decoy"],"residual":0,"residual_converged":true,"score":0},"topology_status":"complete"}
+{"edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"evidence_index_sha256":null,"execution_candidates":[{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["dependencies"],"to":"node_modules/bridge"},{"from":"node_modules/bridge","kinds":["dependencies"],"to":"node_modules/leaf"}],"introducer_path":["root","node_modules/bridge","node_modules/leaf"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},"undirected_degree":1},{"approval_fingerprint":null,"introducer_edges":[{"from":"root","kinds":["devDependencies"],"to":"node_modules/test-tool"}],"introducer_path":["root","node_modules/test-tool"],"package":{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},"undirected_degree":1}],"execution_evidence":null,"execution_metadata_status":"declared_lock_markers_only","format":"npm_v3","identity_kind":"installed_package_instance","introducer_path_scope":"project_root","introducer_roots":["root"],"issues":[],"limitations":["Dependency script bodies and runtime behavior are not inspected; markers describe execution potential","Topology cannot distinguish same-shape benign and malicious code","All lockfile records are included; host platform, dev, optional and lifecycle selection are not evaluated","Resolution lock records are not an installed node_modules tree; installed_path is unknown for pnpm/Yarn","Integrity/source fields are recorded, not verified against downloaded artifacts; missing install markers are not proof of no execution"],"lock_sha256":"6734874d714fe17afb85eaae04b8470e1196a4b0f4e15ad3e6d0c6327f2c97b3","manifest_sha256":null,"optional_omissions":[],"packages":[{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/bridge","integrity":"sha512-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB==","name":"bridge","path":"node_modules/bridge","source":"https://registry.example/bridge-1.0.0.tgz","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"node_modules/decoy","integrity":"","name":"decoy","path":"node_modules/decoy","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/leaf","integrity":"","name":"leaf","path":"node_modules/leaf","source":"","version":"1.0.0"},{"capabilities":["install-lifecycle-script (body not inspected)"],"identity_kind":"installed_package_instance","installed_path":"node_modules/test-tool","integrity":"","name":"test-tool","path":"node_modules/test-tool","source":"","version":"1.0.0"},{"capabilities":[],"identity_kind":"installed_package_instance","installed_path":"","integrity":"","name":"review-demo","path":"","source":"","version":"1.0.0"}],"policy":{"approval_scope":"exact npm instance, source/integrity, original archive, manifest bytes, lifecycle bodies and native facts; supplied source snapshots retain caller trust","enforcement_requested":true,"issues":["explicit execution evidence is required for enforcement","an explicit bound-approval file is required for enforcement"],"outcome":"incomplete","unapproved_execution_candidates":[]},"root_attribution_status":"available","schema_version":1,"scope":"npm_v3_lock_snapshot_only","status":"incomplete","topology":{"iterations":0,"kind":"connectivity_estimate_not_security_certificate","partition":["node_modules/decoy"],"residual":0,"residual_converged":true,"score":0},"topology_status":"complete"}
+Bounded npm fixture validation passed; artifact safety is not inferred.
+Pinned pnpm/Yarn topology emitted; unknown execution capability correctly remains incomplete.
+EXIT 0
+["bash", "prove-it.sh"]
+Read-only dependency review: complete
+2 package changes
+  changed node_modules/bridge (["integrity"])
+  changed node_modules/leaf (["capabilities"])
+Base snapshot: complete
+Review policy: advisory
+0 execution evidence changes
+Head snapshot: complete
+Scope: npm_v3_lock_snapshot_only
+Identity: installed_package_instance; execution metadata: declared_lock_markers_only
+All lockfile records; host installation selection is not evaluated. pnpm/Yarn records are not installed paths.
+2 execution candidates (markers, not malicious-code findings)
+  leaf@1.0.0 [node_modules/leaf] via ["root","node_modules/bridge","node_modules/leaf"]
+  test-tool@1.0.0 [node_modules/test-tool] via ["root","node_modules/test-tool"]
+Use --json for input hashes, artifact identities, typed edges and convergence evidence.
+EXIT 0
+["cc", "-Iinclude", "tests/ffi_smoke.c", "target/release/libtau_gate.a", "-o", "<scratch>/ffi-smoke-v41"]
+EXIT 0
+["<scratch>/ffi-smoke-v41"]
+EXIT 0

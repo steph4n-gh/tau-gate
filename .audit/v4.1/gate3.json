@@ -1,0 +1,1804 @@
+{
+  "binary_sha256": "ba349c8645954b4cb39574d3961b57a71ae56bf90a85dddb922a3fe70022edec",
+  "build_git_provenance": "998d9dcdac32dc7999894c401fc3b8712b5c48ad",
+  "checks": {
+    "actionlint": "pass",
+    "e2e": "pass",
+    "format": "pass",
+    "native_c_smoke": "pass",
+    "prove_it": "pass",
+    "release_build": "pass",
+    "strict_clippy": "pass"
+  },
+  "core_cases": [
+    {
+      "case": "valid_default",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_stored_deflate",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_fixed_deflate",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_dynamic_deflate",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_multiblock_stored",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_multiblock_mixed",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_ustar_prefix",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_directory",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_nul_regular_type",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_000",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_001",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_002",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_003",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_004",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_005",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_006",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_007",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_008",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_009",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_010",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_011",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_012",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_013",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_014",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_015",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_016",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_017",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_018",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_019",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_020",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_021",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_022",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_023",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_024",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_025",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_026",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_027",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_028",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_029",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_030",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_031",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_032",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_033",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_034",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_035",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_036",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_037",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_038",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_039",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_040",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_041",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_042",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_043",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_044",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_045",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_046",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_047",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_048",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_049",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_050",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_051",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_052",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_053",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_054",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_055",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_056",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_057",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_058",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_059",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_060",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_061",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_062",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_063",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_064",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_065",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_066",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_067",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_068",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_069",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_070",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_071",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_072",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_073",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_074",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_075",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_076",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_077",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_078",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_079",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_080",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_081",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_082",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_083",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_084",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_085",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_086",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_087",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_088",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_089",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_090",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_091",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_092",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_093",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_094",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_095",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_096",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_097",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_098",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "valid_seeded_099",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "gzip_bad_magic",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_unknown_method",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_reserved_flags",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_crc_mismatch",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_isize_mismatch",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_header_truncated",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_body_truncated",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_trailer_truncated",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_second_member",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_trailing_junk",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_trailing_zero",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_unterminated_filename",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_truncated_extra",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "gzip_bad_header_crc",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "deflate_reserved_block",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "deflate_stored_bad_nlen",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "deflate_dynamic_truncated",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "deflate_empty_payload",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_bad_checksum",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_invalid_size_octal",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_size_overflow",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_base256_size",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_payload_truncated",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_header_truncated",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_missing_terminator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_one_terminator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_trailing_nonzero",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_nonzero_after_terminator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_wrong_magic",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_wrong_version",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_duplicate",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_dot_alias",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_slash_alias",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_dot_prefix_alias",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_parent_alias",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_absolute",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_parent_escape",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_path_backslash",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_symlink",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_hardlink",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_fifo",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_character",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_block",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_pax",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_pax_global",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_gnu_longname",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_gnu_longlink",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_type_unknown_type",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_duplicate_prefix_path",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "tar_missing_manifest",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "manifest_invalid_json",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "manifest_wrong_name",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "manifest_wrong_version",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_000",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_001",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_002",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_003",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_004",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_005",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_006",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_007",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_008",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_009",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_010",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_011",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_012",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_013",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_014",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_015",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_016",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_017",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_018",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_019",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_020",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_021",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_022",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_023",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_024",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_025",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_026",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_027",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_028",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_029",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_030",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_031",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_032",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_033",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_034",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_035",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_036",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_037",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_038",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_trailer_039",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_000",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_001",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_002",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_003",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_004",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_005",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_006",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_007",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_008",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_009",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_010",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_011",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_012",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_013",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_014",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_015",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_016",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_017",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_018",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_019",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_020",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_021",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_022",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_023",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_024",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_025",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_026",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_027",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_028",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_029",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_030",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "mutation_deflate_031",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_unknown_verified_flag",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_package_verified_flag",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_duplicate_instance",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_unknown_instance",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_missing_dependency",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_missing_root",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_registry_manifest_only",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_both_locators",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_absolute_locator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_parent_locator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_dot_locator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_backslash_locator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_wrong_schema",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_packages_wrong_type",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_wrong_lock_hash",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_duplicate_json_key",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_malformed_json",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "source_manifest_invalid_json",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "missing_evidence_index",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_source_symlink_escape",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_internal_symlink",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_symlink_file_escape",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "index_symlink_directory_escape",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "sri_missing_padding",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "sri_multiple_digests",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "sri_sha256_only",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "sri_wrong_digest",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "marker_false_conflict",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_canonical_native_blocked",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "portable_native_case_alias",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_manifest_case_overwrite",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_ancestor_file_first",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_ancestor_child_first",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_duplicate_casefold",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_trailing_dot",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_trailing_space",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "portable_unicode_filename",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "unsupported_source_git_prepare",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "unsupported_source_hosted_https_git",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "unsupported_source_file_directory",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "valid_actual_npm_packed",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "limit_archive_manifest",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "limit_source_manifest",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "limit_entry_count",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "limit_compressed",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "limit_expanded",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "approval_bound_allowed",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "approval_empty_blocked",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "approval_legacy_coordinate_blocked",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "approval_source_invalidated",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "approval_integrity_invalidated",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "approval_lifecycle_invalidated",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "approval_missing_evidence_incomplete",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "approval_conflict_incomplete",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "approval_root_lifecycle_reference",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "approval_root_lifecycle_allowed",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "approval_root_lifecycle_invalidated",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "approval_root_binding_gyp_reference",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "approval_root_binding_gyp_allowed",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "approval_root_binding_gyp_invalidated",
+      "exit": 1,
+      "pass": true
+    },
+    {
+      "case": "m1_reference_oracle",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_corrupt_archive",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_duplicate_instance",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_false_install_marker",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_missing_evidence",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_same_identity_substitution",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_supplied_manifest_substitution",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_unknown_assertion",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_unsafe_locator",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_wrong_lock_hash",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_wrong_version",
+      "exit": 2,
+      "pass": true
+    },
+    {
+      "case": "m1_negative_wrong_workspace_identity",
+      "exit": 2,
+      "pass": true
+    }
+  ],
+  "independent_core_counts": {
+    "complete": 113,
+    "fail": 0,
+    "incomplete": 182,
+    "pass": 306,
+    "total": 306
+  },
+  "independent_pr_cases": 19,
+  "limits": [
+    "Finite controlled npm and Git matrices; no publisher authenticity or arbitrary code safety proof.",
+    "Source snapshots retain caller trust. pnpm/Yarn execution remains incomplete.",
+    "CI example needs a supplied qualified binary and trusted unchanged workflow/runtime. No GitHub-hosted npm workflow was run."
+  ],
+  "milestone": 3,
+  "npm_reference": {
+    "negative_controls": 11,
+    "status": "pass",
+    "verified_instances": 13,
+    "versions": {
+      "node": "v26.9.0",
+      "npm": "11.19.1"
+    }
+  },
+  "package_version": "4.1.0",
+  "pr_cases": [
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "allowed-nested-exact-capture",
+      "exit_code": 0,
+      "input_repo_after_sha256": "e9aac16b65f4a6689a1dbdac24266c12652421741952cfea58bd3c54e24faa1b",
+      "input_repo_before_sha256": "e9aac16b65f4a6689a1dbdac24266c12652421741952cfea58bd3c54e24faa1b",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "unapproved-baseline-blocked",
+      "exit_code": 1,
+      "input_repo_after_sha256": "e9aac16b65f4a6689a1dbdac24266c12652421741952cfea58bd3c54e24faa1b",
+      "input_repo_before_sha256": "e9aac16b65f4a6689a1dbdac24266c12652421741952cfea58bd3c54e24faa1b",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "dirty-tree-ignored",
+      "exit_code": 0,
+      "input_repo_after_sha256": "c2ccb5dd7dc46633ec57c497892cd2ab3267bec8bed6ac0e659c07c612da75f1",
+      "input_repo_before_sha256": "c2ccb5dd7dc46633ec57c497892cd2ab3267bec8bed6ac0e659c07c612da75f1",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "deterministic-second-output",
+      "exit_code": 0,
+      "input_repo_after_sha256": "c2ccb5dd7dc46633ec57c497892cd2ab3267bec8bed6ac0e659c07c612da75f1",
+      "input_repo_before_sha256": "c2ccb5dd7dc46633ec57c497892cd2ab3267bec8bed6ac0e659c07c612da75f1",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "head-policy-cannot-self-authorize",
+      "exit_code": 1,
+      "input_repo_after_sha256": "96653c1652ee54ba5fbc0ec40713a28978385e3100f0a795899374bf9a4e40a9",
+      "input_repo_before_sha256": "96653c1652ee54ba5fbc0ec40713a28978385e3100f0a795899374bf9a4e40a9",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "head-policy-deletion-ignored",
+      "exit_code": 0,
+      "input_repo_after_sha256": "9df8c7868a6eeb31b84122517da0bc95209c5e0c04355bffbdadca5072f6cb72",
+      "input_repo_before_sha256": "9df8c7868a6eeb31b84122517da0bc95209c5e0c04355bffbdadca5072f6cb72",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "archive_cache_before_sha256": "295c8912feca146aa69e03605e1f290aa6e7919335852553f6a63c9adbb77b46",
+      "case": "source-change-invalidates-approval",
+      "exit_code": 1,
+      "input_repo_after_sha256": "906b6810e06f7e4477652083428f433eaf7b74f36705f1b6d4f1149156102912",
+      "input_repo_before_sha256": "906b6810e06f7e4477652083428f433eaf7b74f36705f1b6d4f1149156102912",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "4d86a86592fbc59b5dec872b2ea0bf5320f81644916d1a135ffdff5416196018",
+      "archive_cache_before_sha256": "4d86a86592fbc59b5dec872b2ea0bf5320f81644916d1a135ffdff5416196018",
+      "case": "archive-change-invalidates-approval",
+      "exit_code": 1,
+      "input_repo_after_sha256": "333b9aaa009e6bcce5ea4df751ac6cce15a25e6c0207358565e9e4726596d130",
+      "input_repo_before_sha256": "333b9aaa009e6bcce5ea4df751ac6cce15a25e6c0207358565e9e4726596d130",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "41ef86629cf69f576993a6fadd251085ae27cfa03b6411edae85047bb7b64ae5",
+      "archive_cache_before_sha256": "41ef86629cf69f576993a6fadd251085ae27cfa03b6411edae85047bb7b64ae5",
+      "case": "recompression-invalidates-approval",
+      "exit_code": 1,
+      "input_repo_after_sha256": "e8efbf3a6b1b76afab09646b7243ac919d9c2883e86c4eec5a146ee118a272c1",
+      "input_repo_before_sha256": "e8efbf3a6b1b76afab09646b7243ac919d9c2883e86c4eec5a146ee118a272c1",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "41ef86629cf69f576993a6fadd251085ae27cfa03b6411edae85047bb7b64ae5",
+      "archive_cache_before_sha256": "41ef86629cf69f576993a6fadd251085ae27cfa03b6411edae85047bb7b64ae5",
+      "case": "native-source-invalidates-approval",
+      "exit_code": 1,
+      "input_repo_after_sha256": "bbaedb75a518da80599e9c65d7200bdb64a9d8ab5748057e494de717963d91c0",
+      "input_repo_before_sha256": "bbaedb75a518da80599e9c65d7200bdb64a9d8ab5748057e494de717963d91c0",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "introduced-candidate-path",
+      "exit_code": 1,
+      "input_repo_after_sha256": "cf7a7b46c0c46e33086485097559982857386a6c9aa22994a42ddcf4d5b7fdf0",
+      "input_repo_before_sha256": "cf7a7b46c0c46e33086485097559982857386a6c9aa22994a42ddcf4d5b7fdf0",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "unsupported-lock-version-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "b4606442f064dd5a6cf1798674a83965faacf203bb95311f0a7744f1a7d57491",
+      "input_repo_before_sha256": "b4606442f064dd5a6cf1798674a83965faacf203bb95311f0a7744f1a7d57491",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "removed-head-lock-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "5251f67e341d863c1403582e9d79dc3bf41121f6fbdb4469991f8d09cf66355e",
+      "input_repo_before_sha256": "5251f67e341d863c1403582e9d79dc3bf41121f6fbdb4469991f8d09cf66355e",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "removed-head-manifest-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "4c3f951f18c5896832c8a242620e195d592476564494d38fcfed574d8dbf9932",
+      "input_repo_before_sha256": "4c3f951f18c5896832c8a242620e195d592476564494d38fcfed574d8dbf9932",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "head-manifest-symlink-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "db6bc0eeb635a52de98ee2d7e2c2feef096e86ce5f5c378495dabe149bc46902",
+      "input_repo_before_sha256": "db6bc0eeb635a52de98ee2d7e2c2feef096e86ce5f5c378495dabe149bc46902",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "missing-base-policy-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "01a0ffa13503886a0ead95dec3f4cd7c42dfea0097a7de3bab5b311ddca6406e",
+      "input_repo_before_sha256": "01a0ffa13503886a0ead95dec3f4cd7c42dfea0097a7de3bab5b311ddca6406e",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "invalid-revision-operator-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "01a0ffa13503886a0ead95dec3f4cd7c42dfea0097a7de3bab5b311ddca6406e",
+      "input_repo_before_sha256": "01a0ffa13503886a0ead95dec3f4cd7c42dfea0097a7de3bab5b311ddca6406e",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "blob-ref-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "01a0ffa13503886a0ead95dec3f4cd7c42dfea0097a7de3bab5b311ddca6406e",
+      "input_repo_before_sha256": "01a0ffa13503886a0ead95dec3f4cd7c42dfea0097a7de3bab5b311ddca6406e",
+      "passed": true
+    },
+    {
+      "archive_cache_after_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "archive_cache_before_sha256": "242e3f1253050abba2bf3668019ae1cfcc9ade813d23973521f4b54c75187d78",
+      "case": "head-case-alias-incomplete",
+      "exit_code": 2,
+      "input_repo_after_sha256": "a4070b8fcd41386ff5ee4be6d2181ea94cfb3af9eca1d1a001b71761a11ed209",
+      "input_repo_before_sha256": "a4070b8fcd41386ff5ee4be6d2181ea94cfb3af9eca1d1a001b71761a11ed209",
+      "passed": true
+    }
+  ],
+  "python_wrapper_tests": 13,
+  "receipts": {
+    "core": {
+      "sha256": "3bd5896d8f313961768c77ee554e7c6ba4ebad7d03fd09e9270b29c7ee5aa65c"
+    },
+    "pr": {
+      "sha256": "ac888cc643be2d2916e949c35d0f97c6b928ec27d145256dfee871a17089da86"
+    },
+    "reference": {
+      "sha256": "225dfda3c83aca3e517829cd2a38d38af7bcc25d95ebcf6d89db9e6762727ced"
+    }
+  },
+  "rust_tests": 68,
+  "schema_version": 1,
+  "source_hashes": {
+    ".github/workflows/ci.yml": "f73729ebaf796e18eb10c6a3051c03c512bc922499cec139c0117df87c662b1e",
+    "CHANGELOG.md": "0722d4bc29069c9cbdd0293af80773c548acbdffd7d613517a337e3b4b48fac2",
+    "Cargo.lock": "e09f7c31bb2a09e3fc57966f1998633794af85016aaeb1812ce714b4905305f2",
+    "Cargo.toml": "ad8b1bd09b92daa89afa3e020c1c0f9eb2aa7e784bb5821350f922f6939cacf6",
+    "README.md": "39f6365fae983c0194ee5f1fccb5906f96e82cef440fd4a6dc3055f96c1f0135",
+    "docs/examples/npm-pr-review.yml": "a7876228e21fc866d8d08bc7fcb1aade0cf1c7c0aaba1a8e24cbf0c14e89d139",
+    "docs/pr-review.md": "7f4d43a2685a8eebaaccc8d1f8b0cd2ca82fc2648318a10d49d9608ec403f0f3",
+    "src/artifact.rs": "49d7d279991f728fb3a289bab70fe31fc6dd448e7f56085d5779406ec5f02f6b",
+    "src/config.rs": "53f969888c0257609fe66a1f1229f35d718f9eadcaabfb6bd7ed84c8b0c04597",
+    "src/digest.rs": "36312267475e4614eff64cb0d20265c32e02f00934450ee75ee3149882c2698d",
+    "src/error.rs": "207dfcf750c802629159c1f42c6ddee459fc4bf62bd071cca4cad14228dd3051",
+    "src/evidence.rs": "aeb367d0a3f7b41359a11e898a136a34cde616e417e9eef943f9a49e229e964a",
+    "src/graph.rs": "d5a316f7bff3648bb0cfe20175f6bd5bbf49afffa773dba275b8ab4a1dc36b6f",
+    "src/graph_impl.rs": "008639c876bff08b7bec6f3124ecf819448730c62d5b14588bf50030d726fd99",
+    "src/lib.rs": "ea847b8f25238a62bfba1b2fbb91743a32a5d21e7d00b6c7b2df03a38ea460da",
+    "src/main.rs": "4c01c4888388da3e4de24c66d7f1a4da3254de55162ba71170046195314d73cc",
+    "src/math.rs": "9cbc4555351f149f3ecfc0981e585624192501f7d0355fd392cffba60627e725",
+    "src/parser.rs": "62ea65dc7bc39dae8b9efeed66564fd5258d957695b226a59a06f6313e6b682d",
+    "src/pnpm.rs": "6898492605dbe53cde28effb3c2e8dd2cb092214e79c018be2553cb479c5a14b",
+    "src/policy.rs": "ca020ae726ea6a66c00463c7b04852b445e2b738375f68632b52351e07d90755",
+    "src/review.rs": "eca9c8c896dd59e86aefa777e2c396e89402eb9d7cd20b23f31b73215539233a",
+    "src/semver.rs": "c0017950e396142f67a968053a1956cb609b4a2290d04cd41ce7030132b616b1",
+    "src/telemetry.rs": "75f6c9b049312a33db1dbbdfd6d6463b7cbcc5e205b39621fb4c53ec4e1bb279",
+    "src/yarn.rs": "51681b1242fb5d4a20f7a7a945baf6885c39628cbac42890c7378000b60ac147",
+    "tests/execution_evidence.rs": "7be52da2dbb974d24b3adfa2e7c2e5dfb0d0eaa1db92e5149c8de89a13d2fcea",
+    "tests/ffi_smoke.c": "412891dfc89a4142e1b0c196f130c119960a8bcb0e5d00bf8b67ff654c1b99c0",
+    "tests/fixtures/npm-reference/matrix.json": "c05f9b041bae5918b33b5bac2c261b74d1b152afadcc714efed27467408a6c7e",
+    "tests/fixtures/real/LICENSE.hono": "a6ab98e5c77b9070c443eaff2ff81034a6f8cc05a7524d5098eb0f24defa0115",
+    "tests/fixtures/real/LICENSE.yarn": "ae09761b5d27e237571245437653b483bbb85de3cc64b802e8ef47d03aabec1e",
+    "tests/fixtures/real/README.md": "4f03bbbc811b86f70a4323f5dc33ed5bda7873d6da372f39bb80f69cd6def940",
+    "tests/fixtures/real/pnpm-hono-v9.yaml": "3bbe772c131585b3e138d0a48b7f229069c1533dc63225629beb3039a5fcac86",
+    "tests/fixtures/real/pnpm-hono.package.json": "169a02072e32d85aacb089ad14b62b027d975479d811f741771fbd0f559fb5c9",
+    "tests/fixtures/real/provenance.json": "1ff6c277a794a9a208edbff8435aa2d2be5616c992f15aa68cd7a9c94b1b1beb",
+    "tests/fixtures/real/yarn-classic-v1.lock": "80653a1a393d3747fc6aefe19d3feafc2a9f8249ba843d25c26273020b721cd9",
+    "tests/fixtures/real/yarn-classic.package.json": "549eae42b2e80f56784b7fb5ea1ec991ee1a91680845557e2e337e52a192a544",
+    "tests/integration_test.rs": "56e2dd899d1f1cb0c799d133748e02d9fccf912091ad5a7f1e5499921a9fe716",
+    "tests/package_manager_cli.rs": "4a24da17cab8a9e6ce26072d7057c9cf49648ddefd3068d2f06185841d697e1d",
+    "tests/real_lockfiles.rs": "adb26a8d92b470ae41ecbddc435e039addc23ff50cdc2185b534cc3aa769f7aa",
+    "tests/test_pr_review.py": "4faaadf3218def5b8b1e937bc17d06136a654dcad63daaa4ca699d5af3c4bf71",
+    "tools/npm_evidence.py": "893879e13ddfe02879144c3d148863ac82aa5344e34a892086b2274ae5c7a271",
+    "tools/npm_reference.py": "d61debcd4360289d40d2b57b1773fbaa2732e542b95b58278541d48d14aafd14",
+    "tools/pr_review.py": "6eeff95714fac18ed2b0fb55550de0d6ad69f2a1aa10db206234710a30164b64",
+    "tools/verify_npm_evidence.py": "998eee0e674d085dc68eaa51f0e9266e2e9919007e2f7484dcb1d1643b9ca6d1",
+    "tools/verify_pr_review.py": "f7326e56d5bd7d1e2fbbf0d132f43b727f330ffcd1fde66d88e06775edb99e8b"
+  },
+  "status": "VERIFIED",
+  "upstream_main": "e052ac03517286f2f56dfac46aa19770358ccbe8"
+}

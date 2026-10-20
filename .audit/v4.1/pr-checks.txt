@@ -1,0 +1,19 @@
+Local path prefixes normalized to <checkout> and <scratch>.
+test_case_aliases_and_nonportable_directory_entries_are_incomplete (test_pr_review.PullRequestReview.test_case_aliases_and_nonportable_directory_entries_are_incomplete) ... ok
+test_changed_lifecycle_and_forged_head_approval_remain_blocked (test_pr_review.PullRequestReview.test_changed_lifecycle_and_forged_head_approval_remain_blocked) ... ok
+test_exact_git_bytes_ignore_dirty_worktree_and_repeat_deterministically (test_pr_review.PullRequestReview.test_exact_git_bytes_ignore_dirty_worktree_and_repeat_deterministically) ... ok
+test_gitlink_mode_rejected_and_regular_executable_mode_preserved (test_pr_review.PullRequestReview.test_gitlink_mode_rejected_and_regular_executable_mode_preserved) ... ok
+test_manifest_and_binding_symlinks_are_incomplete (test_pr_review.PullRequestReview.test_manifest_and_binding_symlinks_are_incomplete) ... ok
+test_missing_and_noncommit_revisions_are_incomplete (test_pr_review.PullRequestReview.test_missing_and_noncommit_revisions_are_incomplete) ... ok
+test_missing_base_policy_is_incomplete_even_if_head_contains_policy (test_pr_review.PullRequestReview.test_missing_base_policy_is_incomplete_even_if_head_contains_policy) ... ok
+test_missing_workspace_manifest_is_incomplete_with_stable_error (test_pr_review.PullRequestReview.test_missing_workspace_manifest_is_incomplete_with_stable_error) ... ok
+test_native_input_and_same_version_source_change_invalidate_approval (test_pr_review.PullRequestReview.test_native_input_and_same_version_source_change_invalidate_approval) ... ok
+test_output_cannot_overwrite_repository_or_cache (test_pr_review.PullRequestReview.test_output_cannot_overwrite_repository_or_cache) ... ok
+test_removed_npm_lock_and_cross_format_are_incomplete (test_pr_review.PullRequestReview.test_removed_npm_lock_and_cross_format_are_incomplete) ... ok
+test_revision_option_and_project_traversal_rejected (test_pr_review.PullRequestReview.test_revision_option_and_project_traversal_rejected) ... ok
+test_source_url_preserved_across_checkout_locations (test_pr_review.PullRequestReview.test_source_url_preserved_across_checkout_locations) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 8.521s
+
+OK

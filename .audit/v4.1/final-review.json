@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reviewer_configuration": "inherit-parent",
+  "comments": "no findings",
+  "reviewer_a": "no findings",
+  "reviewer_b": [
+    {
+      "severity": "warning",
+      "finding": "Recursive path normalization rewrites locked source URL data",
+      "decision": "accepted",
+      "scope": "report correctness; enforcement fingerprint retained original data",
+      "repair": "verified",
+      "regression": "Exact source URL retained in JSON and Markdown across relocated checkouts; identical core reports and fingerprints",
+      "root_replay": "Original saved fixture returns allowed with the original source URL preserved"
+    }
+  ]
+}

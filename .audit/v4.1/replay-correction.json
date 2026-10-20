@@ -1,0 +1,52 @@
+{
+  "classification": "Expected CLI rejection and input preservation passed. The verifier working directory changed. Origin of the metadata file was not established.",
+  "failed_assertion": "no_new_working_directory_files",
+  "failed_case": {
+    "case": "m1_negative_wrong_version",
+    "command": [
+      "<checkout>/target/release/tau-gate",
+      "audit",
+      "--lock",
+      "<scratch>/v41-final-reference/negative-controls/wrong_version/package-lock.json",
+      "--manifest",
+      "<scratch>/v41-final-reference/project/package.json",
+      "--evidence",
+      "<scratch>/v41-final-reference/negative-controls/wrong_version/index.json",
+      "--json"
+    ],
+    "diagnostics": [
+      "manifest version does not match lock instance \"node_modules/tau-ref-leaf\""
+    ],
+    "exit": 2,
+    "expected": "incomplete",
+    "expected_reason": "manifest version does not match lock instance",
+    "input_tree_sha256": "4bbd1bc78eff14e074c7affa5007f8f6f9aa1fb7cf0ccd9127819a2b20514099",
+    "inputs_unchanged": true,
+    "intended_reason_proven": true,
+    "method": "Direct CLI comparison with sealed M1 npm installation oracle and original negative locator bundles.",
+    "no_new_working_directory_files": false,
+    "pass": false,
+    "status": "incomplete",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "9e328a9e90b701c791688194243bf0d2b0b871b0fbe3a8d0ef45907608f2662f"
+  },
+  "failed_counts": {
+    "complete": 113,
+    "fail": 1,
+    "incomplete": 182,
+    "pass": 305,
+    "total": 306
+  },
+  "failed_receipt_sha256": "4f6478368432413ec4e2f4752fe30b7118db0cdb0588de0025855a3cfdb87d56",
+  "observed_unexpected_file": ".DS_Store",
+  "passing_counts": {
+    "complete": 113,
+    "fail": 0,
+    "incomplete": 182,
+    "pass": 306,
+    "total": 306
+  },
+  "passing_receipt_sha256": "3bd5896d8f313961768c77ee554e7c6ba4ebad7d03fd09e9270b29c7ee5aa65c",
+  "repair": "Separate auditor working directory from report collection; report new and removed paths explicitly.",
+  "schema_version": 1
+}
