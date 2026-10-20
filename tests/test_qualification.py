@@ -122,6 +122,74 @@ class QualificationTests(unittest.TestCase):
         report["execution_evidence_changes"][0]["after"]["facts"]["lifecycle"]["install"] = q.script_hash("after")
         self.assertEqual(q.compare_events([event], report, "complete")["misses"], 0)
 
+    def test_complete_or_qualified_report_cannot_omit_known_facts(self):
+        facts = {"head": {"packages": {"node_modules/example": {"status": "known", "scope": "archive", "scripts": {"install": "echo ready"}}}}}
+        for report in ({"status": "complete"}, {"status": "incomplete", "head": {"status": "complete"}}, {"status": "incomplete", "head": {"execution_evidence": [{"path": "node_modules/example", "state": "qualified", "facts": None}]}}):
+            with self.subTest(report=report):
+                mismatch = q.compare_facts(facts, report)
+                self.assertEqual(len(mismatch), 1)
+                self.assertEqual(mismatch[0]["field"], "facts")
+                self.assertIsNone(mismatch[0]["actual"])
+
+    def test_unsupported_or_unknown_facts_remain_unassessed(self):
+        facts = {"head": {"packages": {"node_modules/example": {"status": "known", "scope": "archive", "scripts": {"install": "echo ready"}}}}}
+        report = {"status": "incomplete", "head": {"execution_evidence": [{"path": "node_modules/example", "state": "unsupported", "facts": None}]}}
+        self.assertEqual(q.compare_facts(facts, report), [])
+        facts["head"]["packages"]["node_modules/example"]["status"] = "unknown"
+        self.assertEqual(q.compare_facts(facts, {"status": "complete"}), [])
+
+    def test_added_and_removed_events_require_available_package_identity(self):
+        identity = {"name": "example", "version": "1.0.0", "source": "https://registry.npmjs.org/example.tgz", "integrity": "sha512-reviewed"}
+        for kind, side in (("added", "after"), ("removed", "before")):
+            event = {"path": "node_modules/example", "kind": kind, "before": None, "after": None, "obligation": "package_change", "approval_relevant": True}
+            event[side] = {"status": "known", "scope": "archive", **identity}
+            for field in identity:
+                with self.subTest(kind=kind, field=field):
+                    wrong = {**identity, field: "wrong"}
+                    report = {"status": "complete", "package_changes": [{"path": event["path"], "change": kind, side: wrong}]}
+                    self.assertEqual(q.compare_events([event], report, "complete")["misses"], 1)
+            report = {"status": "complete", "package_changes": [{"path": event["path"], "change": kind, side: identity}]}
+            self.assertEqual(q.compare_events([event], report, "complete")["misses"], 0)
+
+    def test_unknown_identity_fields_are_not_empty_string_requirements(self):
+        event = {"path": "node_modules/example", "kind": "added", "before": None, "after": {"status": "unknown", "name": None, "version": "1.0.0", "source": None, "integrity": None}, "obligation": "package_change", "approval_relevant": False}
+        report = {"status": "incomplete", "package_changes": [{"path": event["path"], "change": "added", "after": {"name": "example", "version": "1.0.0", "source": "", "integrity": ""}}]}
+        result = q.compare_events([event], report, "partial")
+        self.assertEqual(result["misses"], 0)
+        self.assertEqual(result["status"], "partial")
+
+    def test_subprocess_deadline_covers_descendant_streams_after_parent_exit(self):
+        marker = self.root / "orphan-finished"
+        child = f"import pathlib,time; time.sleep(2); pathlib.Path({str(marker)!r}).write_text('orphan')"
+        parent = f"import subprocess,sys; subprocess.Popen([sys.executable, '-c', {child!r}])"
+        started = time.monotonic()
+        result = q.run_bounded([sys.executable, "-c", parent], self.root / "descendant", 0.05)
+        self.assertEqual(result["termination"], "timeout")
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertFalse(marker.exists())
+        self.assertEqual(set(result["output_sha256"]), {"stdout", "stderr"})
+        time.sleep(2.1)
+        self.assertFalse(marker.exists())
+
+    def test_subprocess_deadline_covers_descendants_without_inherited_streams(self):
+        child = "import time; time.sleep(2)"
+        parent = f"import subprocess,sys; subprocess.Popen([sys.executable, '-c', {child!r}], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)"
+        result = q.run_bounded([sys.executable, "-c", parent], self.root / "closed-streams", 0.05)
+        self.assertEqual(result["termination"], "timeout")
+        self.assertLess(result["elapsed_seconds"], 1.0)
+
+    def test_output_limit_kills_descendants_and_preserves_bounded_bytes(self):
+        marker = self.root / "output-orphan-finished"
+        child = f"import pathlib,time; time.sleep(0.5); pathlib.Path({str(marker)!r}).write_text('orphan')"
+        parent = f"import subprocess,sys; subprocess.Popen([sys.executable, '-c', {child!r}]); sys.stdout.write('x' * 131072); sys.stdout.flush()"
+        with patch.object(q, "MAX_OUTPUT", 1024):
+            result = q.run_bounded([sys.executable, "-c", parent], self.root / "excess", 2)
+        self.assertEqual(result["termination"], "output_limit")
+        self.assertEqual(result["output_bytes"]["stdout"], 1024)
+        self.assertEqual((self.root / "excess/stdout.bin").read_bytes(), b"x" * 1024)
+        time.sleep(0.6)
+        self.assertFalse(marker.exists())
+
     def test_subprocess_memory_metric_is_separate_from_raw_output(self):
         result = q.run_bounded([sys.executable, "-c", "print('complete')"], self.root / "memory", 2)
         self.assertEqual(result["termination"], "exited")

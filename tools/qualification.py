@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import selectors
 import shutil
 import signal
 import subprocess
@@ -317,9 +318,6 @@ def run_bounded(argv, output, timeout):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
-    exceeded = threading.Event()
-    hashes = {}
-    counts = {}
     program_argv = [str(arg) for arg in argv]
     metric_path = output / "process-metrics.txt"
     execution_argv = program_argv
@@ -340,42 +338,61 @@ def run_bounded(argv, output, timeout):
         except ProcessLookupError:
             pass
 
-    def drain(name, stream):
-        size = 0
-        hasher = hashlib.sha256()
-        with (output / (name + ".bin")).open("wb") as destination:
-            while True:
-                chunk = stream.read(65536)
-                if not chunk:
-                    break
-                remaining = MAX_OUTPUT - size
-                kept = chunk[:max(remaining, 0)]
-                destination.write(kept)
-                hasher.update(kept)
-                size += len(kept)
-                if len(kept) != len(chunk):
-                    exceeded.set()
-                    terminate()
-                    break
-        stream.close()
-        hashes[name] = hasher.hexdigest()
-        counts[name] = size
+    def group_alive():
+        try:
+            os.killpg(process.pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
 
-    threads = [threading.Thread(target=drain, args=(name, stream))
-               for name, stream in (("stdout", process.stdout), ("stderr", process.stderr))]
-    for thread in threads:
-        thread.start()
+    deadline = started + timeout
     termination = "exited"
+    streams = {"stdout": process.stdout, "stderr": process.stderr}
+    destinations = {name: (output / (name + ".bin")).open("wb") for name in streams}
+    hashers = {name: hashlib.sha256() for name in streams}
+    counts = {name: 0 for name in streams}
+    with selectors.DefaultSelector() as selector:
+        for name, stream in streams.items():
+            os.set_blocking(stream.fileno(), False)
+            selector.register(stream, selectors.EVENT_READ, name)
+        try:
+            while True:
+                leader_running = process.poll() is None
+                if not leader_running and not selector.get_map() and not group_alive():
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    if termination != "exited":
+                        break
+                    termination = "timeout"
+                    terminate()
+                    deadline = time.monotonic() + 0.2
+                    continue
+                for key, _ in selector.select(min(remaining, 0.02)):
+                    chunk = os.read(key.fd, 65536)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        continue
+                    name = key.data
+                    kept = chunk[:max(MAX_OUTPUT - counts[name], 0)]
+                    destinations[name].write(kept)
+                    hashers[name].update(kept)
+                    counts[name] += len(kept)
+                    if len(kept) != len(chunk) and termination != "output_limit":
+                        termination = "output_limit"
+                        terminate()
+                        deadline = time.monotonic() + 0.2
+        finally:
+            for stream in streams.values():
+                stream.close()
+            for destination in destinations.values():
+                destination.close()
     try:
-        process.wait(timeout=timeout)
+        process.wait(timeout=0.2)
     except subprocess.TimeoutExpired:
-        termination = "timeout"
         terminate()
-        process.wait()
-    for thread in threads:
-        thread.join()
-    if exceeded.is_set():
-        termination = "output_limit"
+        process.wait(timeout=0.2)
+    hashes = {name: hasher.hexdigest() for name, hasher in hashers.items()}
     peak_rss = None
     metric_hash = None
     if metric_path.exists():
@@ -479,7 +496,12 @@ def compare_events(expected, report, oracle_status):
         if event["obligation"] == "package_change" and kind not in execution_fields:
             change = package_changes.get(path)
             if kind in ("added", "removed"):
-                observed = bool(change and change.get("change") == kind )
+                side = "after" if kind == "added" else "before"
+                identity = event[side]
+                actual = (change or {}).get(side) or {}
+                observed = bool(change and change.get("change") == kind and isinstance(change.get(side), dict) and
+                                all(actual.get(field) == value for field, value in identity.items()
+                                    if field in ("name", "version", "source", "integrity") and value is not None))
             elif kind in package_fields:
                 field = package_fields[kind]
                 observed = bool(change and field in change.get("changed_fields", []) and
@@ -523,7 +545,12 @@ def compare_facts(facts, report):
         for path, expected in independent["packages"].items():
             item = observed.get(path, {})
             actual = item.get("facts")
-            if expected.get("scope") == "link" or expected.get("status") != "known" or not actual:
+            if expected.get("scope") == "link" or expected.get("status") != "known":
+                continue
+            if not actual:
+                if report.get("status") == "complete" or report.get(side, {}).get("status") == "complete" or item.get("state") == "qualified":
+                    mismatches.append({"side": side, "path": path, "field": "facts",
+                                       "expected": "known package facts", "actual": actual})
                 continue
             for source, target in fields.items():
                 value = {event: script_hash(body) for event, body in expected[source].items()} if source == "scripts" else expected.get(source)
