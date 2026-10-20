@@ -30,7 +30,7 @@ A milestone closes only with inspectable artifacts. An incomplete or unavailable
 
 - [x] M1 measurement. All 90 unchanged baseline reviews are accounted for, with independently checked input/output hashes and corrected event scoring. The product baseline is unqualified. See [the baseline](baseline.md).
 - [x] M2 repairs, differential controls, fuzzing, and resource qualification. The [frozen candidate and holdout](m2.md) preserve 11 known reporting misses and limited comparison coverage; mandatory controls found no false allowed outcome.
-- [ ] M3 trusted approvals and consumer CI lifecycle.
+- [ ] M3 trusted approvals and consumer CI lifecycle. Schema 2, the trusted-base workflow, and local stage/update/cleanup controls pass; the two live consumer installs and required checks remain for M5 after the qualified release exists.
 - [ ] M4 final Linux release payload and verification.
 - [ ] M5 two owned-repository self-pilots and a sustained-use record.
 
