@@ -1,6 +1,13 @@
 # Changelog
 
-## 4.1.0 (unreleased)
+## 4.2.0
+
+- Published a frozen 30-project, 90-update npm v3 corpus with independent event labels, baseline replay, and measured limitations. The candidate completes 29 of 90 core reviews and 12 of 90 independent comparisons. Eleven known reporting misses remain in incomplete reviews. No assessed approval-relevant miss or fact mismatch was observed. These results do not establish general malware detection.
+- Expanded measured archive compatibility, bounded cumulative input work, and added differential, fuzz, resource, and real-Git controls. The offline, read-only Rust core still has no third-party runtime dependencies.
+- Added staged exact-path approval sets and a base-trusted npm pull-request workflow. Missing or untrusted evidence remains incomplete. Adopting repositories must require the live check for it to block merges.
+- Added a reproducible Debian 12 x86_64 release recipe with two clean builds, a CycloneDX SBOM, signed provenance and SBOM attestations, an independent rebuild procedure, and a separate publication step.
+
+## 4.1.0 (not released separately)
 
 - Added an independent npm reference check using original archives and scripts-disabled installs. It covers aliases, nested versions, workspaces, optional omissions, native defaults, and substituted evidence.
 - Added offline, bounded SHA512, gzip/DEFLATE, and strict ustar verification to the standard-library-only Rust core. The core derives lifecycle and native-build facts from original archives and explicitly trusted source snapshots.
