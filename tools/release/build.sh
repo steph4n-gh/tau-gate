@@ -4,6 +4,7 @@ set -eu
 export LC_ALL=C
 export TZ=UTC
 export CARGO_INCREMENTAL=0
+export RUSTUP_TOOLCHAIN=1.85.0-x86_64-unknown-linux-gnu
 
 : "${TAU_GATE_SOURCE_COMMIT:?set the exact source commit}"
 : "${CARGO_TARGET_DIR:?set an output directory outside the source tree}"

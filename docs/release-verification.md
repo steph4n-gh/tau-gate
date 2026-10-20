@@ -46,12 +46,27 @@ docker run --rm --platform linux/amd64 --network none \
   sh tools/release/build.sh
 ```
 
-The build script rejects a dirty checkout, a wrong explicit commit, a missing
-Cargo lockfile, and output inside the source. It tests and builds with Cargo's
-frozen offline mode. Compare every file in `$work/output/release/dist` to the
+The build script selects the installed Rust 1.85.0 toolchain explicitly, so
+the repository's `rustfmt` component request cannot trigger a network lookup.
+It rejects a dirty checkout, a wrong explicit commit, a missing Cargo lockfile,
+and output inside the source. It tests and builds with Cargo's frozen offline
+mode. Compare every file in `$work/output/release/dist` to the
 published candidate or release asset with `cmp` or SHA256; matching JSON
 reports or a successful compilation alone are insufficient. The downloaded
 archive can be checked with `sha256sum --check SHA256SUMS`.
+
+Install the archive in a clean Debian 12 x86_64 runtime to check the declared
+platform without relying on the Rust build image:
+
+```sh
+archive="$work/output/release/dist/tau-gate-v4.2.0-linux-x86_64.tar.gz"
+docker run --rm --platform linux/amd64 --network none --read-only \
+  --tmpfs /tmp:rw,exec,nosuid,size=64m --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --mount "type=bind,src=$archive,dst=/input/release.tar.gz,readonly" \
+  debian@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 \
+  sh -ceu 'mkdir /tmp/tau-gate; tar -xzf /input/release.tar.gz -C /tmp/tau-gate; /tmp/tau-gate/tau-gate --verify'
+```
 
 For published assets, verify both the Sigstore signature and the expected
 GitHub workflow identity before use:
