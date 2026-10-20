@@ -48,7 +48,7 @@ Lifecycle body hashes follow the qualified npm 11.19.1 `ci` rules.
 
 Empty bodies retain their hashes but do not create execution candidates. A regular `binding.gyp` supplies implicit `node-gyp rebuild` when `gypfile` is not false and both `preinstall` and `install` are absent or empty. Binary entrypoints remain separate from automatic installation execution.
 
-An absent `hasInstallScript` makes no assertion. An explicit marker that contradicts the inspected install events or implicit native build produces a conflict. Unknown and conflicting evidence cannot authorize execution. Workspace scripts require approval once at the source target, not again at each structural link. Link evidence and provenance remain visible.
+An absent `hasInstallScript` makes no assertion. A true marker is a hint that npm uses to inspect the unpacked package manifest; a fully verified artifact with no install script or implicit native build resolves that hint without an execution candidate. The marker remains visible in the report. An explicit false marker with observed install execution is a conflict. Missing, unsupported, and conflicting evidence cannot authorize execution. Workspace scripts require approval once at the source target, not again at each structural link. Link evidence and provenance remain visible.
 
 Every locked record remains in scope, including disconnected and platform-omitted optional packages. This inventory does not predict host installation selection or observe script execution. The independent scripts-disabled reference check proves artifact and installed-manifest correspondence within its fixture scope.
 

@@ -21,7 +21,7 @@ Scripts-disabled installation proves manifest correspondence for this controlled
 
 Negative controls must reject corrupted archives, same-name/version substitutions, wrong-version archives even with matching SRI, duplicate instances, wrong lock hashes, missing evidence, registry manifests supplied without artifacts, wrong workspace identity, unsafe locators, and invented verification flags. A lifecycle body paired with an explicit false install marker must produce a conflict. These are independent Python outcomes. Rust enforcement requires its separate milestone gate.
 
-An absent install marker makes no assertion about execution. The controlled native package's lock has no install marker, although its archive contains `binding.gyp` and qualifies for npm's implicit build rule. Archive facts refine missing marker metadata. An explicit false marker contradicts positive install evidence. An explicit true marker contradicts the absence of both install scripts and an implicit build.
+An absent install marker makes no assertion about execution. The controlled native package's lock has no install marker, although its archive contains `binding.gyp` and qualifies for npm's implicit build rule. Archive facts refine missing marker metadata. An explicit false marker contradicts positive install evidence. A true marker only prompts npm to inspect the unpacked manifest. If the integrity-verified archive has no install script or implicit native build, its inspected facts resolve the hint without an execution candidate; the raw marker remains in the report.
 
 ## Collect a locator bundle without installing
 

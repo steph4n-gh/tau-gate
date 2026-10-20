@@ -1,0 +1,578 @@
+{
+  "cases": [
+    {
+      "case_id": "npm__cli-ae98c62586b6",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "npm__cli-7b0c2e8f7fe6",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "npm__cli-e9e99b41b6bc",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "nodejs__undici-9f06d6bc6473",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "nodejs__undici-c653639034fa",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "nodejs__undici-e8f34234d10f",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "nodejs__node-core-utils-4b5695c1a14c",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "nodejs__node-core-utils-11533f231e9a",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "nodejs__node-core-utils-5613e89d2871",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "npm__node-tar-52632cf38fdb",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "npm__node-tar-700734f9aeb1",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "npm__node-tar-dd1c36ab7acf",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__node-lru-cache-425dd43e921d",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__node-lru-cache-183afe4788fb",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__node-lru-cache-b2ad0ca46e71",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__node-glob-7df583d631ff",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__node-glob-aee5a632c5c2",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__node-glob-5ce582a3365e",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__minimatch-0215dfef073c",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__minimatch-6d9b356cd593",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "isaacs__minimatch-0873fbabc00a",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "nestjs__nest-4f5d894b4783",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "nestjs__nest-bca3f7b2e29e",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "nestjs__nest-0ed128dcc0db",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "nestjs__typescript-starter-a122dea65cd0",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "nestjs__typescript-starter-63eb592ceb70",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "nestjs__typescript-starter-c8fb6bc4b017",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "koajs__koa-4a191b1fb7bc",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "koajs__koa-4b12945e2e5d",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "koajs__koa-2047f59823b8",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "electron__electron-quick-start-841329e9c54a",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "electron__electron-quick-start-29a1043c7e8d",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "electron__electron-quick-start-1e3a9803707b",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "socketio__socket.io-e387ab116f69",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "socketio__socket.io-aaf2af36ec8a",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 2
+    },
+    {
+      "case_id": "socketio__socket.io-6bb2e7f5fb7c",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__TypeScript-dca8e236a227",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__TypeScript-b6eaace9d7cf",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__TypeScript-716fee863d36",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__vscode-1155fd012168",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 1
+    },
+    {
+      "case_id": "microsoft__vscode-e630a740c191",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 4
+    },
+    {
+      "case_id": "microsoft__vscode-c35fcfc17e8f",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "mochajs__mocha-38681ba53032",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "mochajs__mocha-53f09cf73e5e",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "mochajs__mocha-308f7e2553cd",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "axios__axios-e58cf0e91f7f",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "axios__axios-37041f51f5a4",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "axios__axios-1a94bdbdf051",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "cheeriojs__cheerio-651a867af976",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "cheeriojs__cheerio-9b619da69f11",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "cheeriojs__cheerio-0ca8c58dd664",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "swagger-api__swagger-ui-2f91b75bafee",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "swagger-api__swagger-ui-f170383d461e",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "swagger-api__swagger-ui-cfd955eb5473",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "tj__commander.js-d785d8b3b944",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "tj__commander.js-9098b4863ef7",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "tj__commander.js-0ea3bb3e883e",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__rest.js-351ee1dc7d6f",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__rest.js-cd6ace029871",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__rest.js-fefa2ba23656",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__octokit.js-bc34deaf3574",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__octokit.js-f2d3153de93a",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__octokit.js-cb4defeb802c",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__core.js-6432a6fa68e8",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__core.js-5f9452a556fd",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "octokit__core.js-f619c29aa2dd",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "probot__probot-4ea8ea48f11a",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "probot__probot-825da55138bd",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "probot__probot-665c5fddb30f",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "semantic-release__semantic-release-04c1923646eb",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "semantic-release__semantic-release-e8c2436e5704",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "semantic-release__semantic-release-a1def89ffdaa",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__playwright-e6f60ac6fc92",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__playwright-1f8549d1534a",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "microsoft__playwright-1c83ceda6d06",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "puppeteer__puppeteer-d1b9a2162a01",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "puppeteer__puppeteer-9478d6036761",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "puppeteer__puppeteer-4aa33a7de7c3",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "realm__realm-js-99ab0aea00c0",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "realm__realm-js-ffd1be345aa8",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 4
+    },
+    {
+      "case_id": "realm__realm-js-74289cb3de4e",
+      "comparison_status": "partial",
+      "core_status": "incomplete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-cli-55dcdd61c0aa",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-cli-dfeda926fe99",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-cli-ba1f7160dfc2",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-lib-9aa0df0c4954",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-lib-791441572f07",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-lib-873673455732",
+      "comparison_status": "partial",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-android-2b1248f80a2c",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-android-a637442f84a5",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    },
+    {
+      "case_id": "apache__cordova-android-c64f303e3a36",
+      "comparison_status": "complete",
+      "core_status": "complete",
+      "misses": 0
+    }
+  ],
+  "claims": {
+    "independent_npm_install_observation": false,
+    "maintainer_time_measured": false,
+    "malware_detection": false,
+    "real_world_coverage": "historical cohort only"
+  },
+  "counts": {
+    "approval_relevant_misses": 0,
+    "comparison_complete_pairs": 17,
+    "complete_pairs": 17,
+    "core_complete_pairs": 38,
+    "core_max_peak_rss_bytes": 890634240,
+    "core_package_states": {
+      "missing": 15828,
+      "qualified": 110121,
+      "unsupported": 14187
+    },
+    "core_peak_rss_measured_cases": 90,
+    "core_statuses": {
+      "complete": 38,
+      "incomplete": 52
+    },
+    "fact_mismatches": 0,
+    "frozen_pairs": 90,
+    "human_review_minutes": null,
+    "known_misses": 11,
+    "oracle_package_snapshot_records": 140136,
+    "oracle_packages_known": 109972,
+    "package_denominator_complete": true,
+    "receipts": 90,
+    "unknown_comparison_pairs": 73
+  },
+  "denominator_note": "Every frozen pair remains counted. Package counts are pair-side records, including reused snapshots.",
+  "schema_version": 1
+}

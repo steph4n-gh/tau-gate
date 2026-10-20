@@ -70,6 +70,8 @@ Review the candidate fingerprints before recording approvals in the [explicit ap
 
 Approvals bind the exact instance, source, integrity, original archive, manifest bytes, lifecycle bodies, and native metadata. Changed evidence needs approval again. Workspace targets require one approval, while their structural links remain visible. Missing, conflicting, or unsupported evidence takes precedence over approvals. Legacy coordinate whitelists cannot authorize v4.1 enforcement. Existing configuration values are still validated for compatibility.
 
+For pull requests containing root or workspace install scripts, use the [trusted Git PR helper](docs/pr-review.md). It additionally binds the entire tracked source tree because an unchanged lifecycle command can run changed local script files.
+
 The qualified archive profile is deliberately narrow. It requires SHA512 SRI, direct HTTP(S) archive sources, a single gzip member, and portable ASCII ustar paths. Unsupported source kinds, archive extensions, or ambiguous paths remain incomplete. Source manifests retain caller trust. Integrity does not authenticate a publisher or establish artifact safety. See the [execution contract](docs/execution-evidence.md) and [collection and independent checks](docs/npm-reference.md).
 
 | Exit | Meaning |

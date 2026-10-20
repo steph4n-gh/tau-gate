@@ -132,7 +132,9 @@ impl ExecutionEvidence {
         {
             return false;
         }
-        self.marker == Some(true) || self.facts.as_ref().is_some_and(Facts::candidate)
+        self.facts
+            .as_ref()
+            .map_or(self.marker == Some(true), Facts::candidate)
     }
     pub(crate) fn capabilities(&self) -> Vec<String> {
         let Some(f) = &self.facts else {
@@ -418,7 +420,7 @@ pub(crate) fn load(
     Ok((result, index_hash))
 }
 fn qualify(path: &str, record: &J, marker: Option<bool>, facts: Facts) -> ExecutionEvidence {
-    let conflict = marker.is_some_and(|m| m != facts.install_candidate);
+    let conflict = marker == Some(false) && facts.install_candidate;
     let fingerprint = if conflict {
         None
     } else {
@@ -642,7 +644,10 @@ pub(crate) fn apply(evidence: &Evidence, graph: &mut DepGraph) {
         }
         if let Some(p) = graph.packages.get_mut(label) {
             if e.facts.is_some() {
-                p.capabilities.retain(|c| !c.starts_with("root-lifecycle:"));
+                p.capabilities.retain(|c| {
+                    !c.starts_with("root-lifecycle:")
+                        && c != "install-lifecycle-script (body not inspected)"
+                });
             }
             p.capabilities.extend(e.capabilities());
             p.capabilities.sort();

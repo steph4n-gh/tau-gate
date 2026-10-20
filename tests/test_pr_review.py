@@ -17,6 +17,7 @@ BINARY = Path(os.environ.get("TAU_GATE", ROOT / "target/release/tau-gate")).reso
 WRAPPER = ROOT / "tools/pr_review.py"
 sys.path.insert(0, str(ROOT / "tools"))
 from npm_evidence import collect_evidence
+from pr_review import GitObjects
 
 
 def json_data(value):
@@ -41,7 +42,7 @@ class PullRequestReview(unittest.TestCase):
         self.git("config", "core.filemode", "true")
         self.manifest = {"name": "fixture", "version": "1.0.0", "workspaces": ["packages/local"],
                          "dependencies": {"pkg": "1.0.0", "local": "file:packages/local"},
-                         "scripts": {"prepare": "echo root-canary > CANARY_EXECUTED"}}
+                         "scripts": {"prepare": "node scripts/prepare.mjs"}}
         self.workspace = {"name": "local", "version": "1.0.0", "scripts": {"prepare": "echo workspace-canary > CANARY_EXECUTED"}}
         package = {"name": "pkg", "version": "1.0.0", "scripts": {"install": "echo dependency-canary > CANARY_EXECUTED"}}
         archive = self.archive(package)
@@ -57,13 +58,17 @@ class PullRequestReview(unittest.TestCase):
         self.write("package-lock.json", json_data(self.lock))
         self.write("packages/local/package.json", json_data(self.workspace))
         self.write("packages/local/binding.gyp", b"native-source-v1\n")
+        self.write("scripts/prepare.mjs", b"import { writeFileSync } from 'node:fs'; writeFileSync('CANARY_EXECUTED', 'executed');\n")
         self.policy_path = self.project / ".tau-gate-approvals.json"
+        self.source_policy_path = self.project / ".tau-gate-source-approvals.json"
         self.policy_path.write_bytes(json_data({"schema_version": 1, "approvals": []}))
         self.commit("initial fixture")
         self.policy = self.approvals()
         self.policy_bytes = json_data(self.policy)
         self.policy_path.write_bytes(self.policy_bytes)
-        self.base = self.commit("trusted approvals")
+        trusted = self.commit("trusted approvals")
+        self.source_policy_path.write_bytes(json_data({"schema_version": 1, "digests": [self.source_digest(trusted)]}))
+        self.base = self.commit("trusted source approval")
 
     def git(self, *args):
         return subprocess.check_output(["git", "-C", str(self.repo), *args], stderr=subprocess.PIPE).decode().strip()
@@ -77,6 +82,24 @@ class PullRequestReview(unittest.TestCase):
         self.git("add", "-A")
         self.git("commit", "-q", "-m", message)
         return self.git("rev-parse", "HEAD")
+
+    def source_digest(self, commit):
+        excluded = {b"apps/example/.tau-gate-approvals.json", b"apps/example/.tau-gate-source-approvals.json"}
+        return GitObjects(self.repo).source_tree(commit, excluded)["sha256"]
+
+    def script_free_base(self):
+        self.manifest.pop("scripts")
+        self.workspace.pop("scripts")
+        self.write("package.json", json_data(self.manifest))
+        self.write("packages/local/package.json", json_data(self.workspace))
+        (self.project / "packages/local/binding.gyp").unlink()
+        archive = self.archive({"name": "pkg", "version": "1.0.0"})
+        digest = hashlib.sha512(archive).digest()
+        (self.cache / (digest.hex() + ".tgz")).write_bytes(archive)
+        self.lock["packages"]["node_modules/pkg"]["integrity"] = "sha512-" + base64.b64encode(digest).decode()
+        self.lock["packages"]["node_modules/pkg"].pop("hasInstallScript")
+        self.write("package-lock.json", json_data(self.lock))
+        return self.commit("script-free base")
 
     def archive(self, manifest):
         stream = io.BytesIO()
@@ -105,6 +128,7 @@ class PullRequestReview(unittest.TestCase):
         output = self.root / f"review-{self.sequence}"
         command = [sys.executable, str(WRAPPER), "--repo", str(self.repo), "--base", base or self.base,
                    "--head", head or self.base, "--project", "apps/example", "--approvals", "apps/example/.tau-gate-approvals.json",
+                   "--source-approvals", "apps/example/.tau-gate-source-approvals.json",
                    "--tau-gate", str(BINARY), "--archive-cache", str(self.cache), "--output", str(output), *extra]
         result = subprocess.run(command, capture_output=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
         report = json.loads(result.stdout)
@@ -132,6 +156,7 @@ class PullRequestReview(unittest.TestCase):
         self.assertEqual(first["core"]["head"]["manifest_sha256"], entry["sha256"])
         self.assertEqual(first["policy"]["sha256"], hashlib.sha256(self.policy_bytes).hexdigest())
         self.assertEqual(first["policy"]["origin"], "base")
+        self.assertEqual(first["source_approval"]["status"], "allowed")
         self.assertEqual(self.git("status", "--porcelain"), before)
 
     def test_changed_lifecycle_and_forged_head_approval_remain_blocked(self):
@@ -163,6 +188,8 @@ class PullRequestReview(unittest.TestCase):
         new_manifest = json_data(self.manifest)
         self.write("package.json", new_manifest)
         candidate_policy = self.approvals()
+        candidate_preview = self.commit("candidate digest preview")
+        candidate_digest = self.source_digest(candidate_preview)
         self.write("package.json", old_manifest)
         old_by_path = {item["path"]: item["fingerprint"] for item in self.policy["approvals"]}
         new_by_path = {item["path"]: item["fingerprint"] for item in candidate_policy["approvals"]}
@@ -172,8 +199,11 @@ class PullRequestReview(unittest.TestCase):
             {"path": path, "fingerprints": sorted({old_by_path[path], new_by_path[path]})}
             for path in sorted(old_by_path)]}
         self.policy_path.write_bytes(json_data(staged))
+        self.source_policy_path.write_bytes(json_data({"schema_version": 1, "digests": sorted({self.source_digest(self.base), candidate_digest})}))
         staged_commit = self.commit("stage old and new fingerprints")
-        self.run_review(base=self.base, head=staged_commit)
+        blocked, _ = self.run_review(base=self.base, head=staged_commit, expected=1)
+        self.assertEqual(blocked["source_approval"]["changed_trusted_paths"], [
+            "apps/example/.tau-gate-approvals.json", "apps/example/.tau-gate-source-approvals.json"])
         self.run_review(base=staged_commit, head=staged_commit)
 
         self.write("package.json", new_manifest)
@@ -184,8 +214,10 @@ class PullRequestReview(unittest.TestCase):
             {"path": path, "fingerprints": [new_by_path[path]]}
             for path in sorted(new_by_path)]}
         self.policy_path.write_bytes(json_data(cleaned))
+        self.source_policy_path.write_bytes(json_data({"schema_version": 1, "digests": [candidate_digest]}))
         cleaned_commit = self.commit("remove old fingerprints")
-        self.run_review(base=candidate_commit, head=cleaned_commit)
+        self.run_review(base=candidate_commit, head=cleaned_commit, expected=1)
+        self.run_review(base=cleaned_commit, head=cleaned_commit)
         self.write("package.json", old_manifest)
         rollback_commit = self.commit("attempt rollback to removed evidence")
         blocked, _ = self.run_review(base=cleaned_commit, head=rollback_commit, expected=1)
@@ -289,8 +321,83 @@ class PullRequestReview(unittest.TestCase):
         self.git("reset", "--hard", self.base)
         self.git("update-index", "--chmod=+x", "apps/example/package.json")
         self.git("commit", "-q", "-m", "regular executable source")
-        report, _ = self.run_review(head=self.git("rev-parse", "HEAD"))
+        report, _ = self.run_review(head=self.git("rev-parse", "HEAD"), expected=1)
         self.assertEqual(report["head"]["files"]["apps/example/package.json"]["mode"], "100755")
+
+    def test_local_script_and_imported_file_changes_require_new_tree_digest(self):
+        self.write("scripts/prepare.mjs", b"import './helper.mjs';\n")
+        self.write("scripts/helper.mjs", b"process.stdout.write('changed');\n")
+        head = self.commit("change local script and imported helper")
+        report, output = self.run_review(head=head, expected=1)
+        self.assertEqual(report["core"]["policy"]["outcome"], "allowed")
+        self.assertEqual(report["source_approval"]["status"], "blocked")
+        self.assertEqual(report["source_approval"]["unapproved_head_digest"], self.source_digest(head))
+        self.assertIn("Unapproved source tree digest", (output / "summary.md").read_text())
+
+    def test_untrusted_source_policy_edit_cannot_approve_script_change(self):
+        self.write("scripts/prepare.mjs", b"process.stdout.write('changed');\n")
+        changed = self.commit("change local script")
+        self.source_policy_path.write_bytes(json_data({"schema_version": 1, "digests": [self.source_digest(changed)]}))
+        report, _ = self.run_review(head=self.commit("forge source approval"), expected=1)
+        self.assertEqual(report["source_approval"]["changed_trusted_paths"], ["apps/example/.tau-gate-source-approvals.json"])
+        self.assertFalse(report["source_approval"]["matched"])
+
+    def test_missing_and_malformed_trusted_source_policy_are_incomplete(self):
+        for data in (None, b'{"schema_version":1,"digests":["BAD"]}', b'{"schema_version":1,"digests":[],"extra":1}'):
+            with self.subTest(data=data):
+                self.git("reset", "--hard", self.base)
+                if data is None:
+                    self.source_policy_path.unlink()
+                else:
+                    self.source_policy_path.write_bytes(data)
+                base = self.commit("invalid trusted source policy")
+                report, _ = self.run_review(base=base, head=base, expected=2)
+                self.assertEqual(report["errors"][0]["stage"], "source_policy")
+
+    def test_outside_project_change_and_symlink_fail_closed(self):
+        outside = self.repo / "docs" / "note.md"
+        outside.parent.mkdir()
+        outside.write_text("new tracked file\n")
+        report, _ = self.run_review(head=self.commit("outside project change"), expected=1)
+        self.assertEqual(report["core"]["policy"]["outcome"], "allowed")
+        self.assertEqual(report["source_approval"]["status"], "blocked")
+        self.git("reset", "--hard", self.base)
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.unlink(missing_ok=True)
+        outside.symlink_to("/tmp/outside-tree")
+        report, _ = self.run_review(head=self.commit("symlink source"), expected=2)
+        self.assertIn("symlink", report["errors"][0]["message"])
+
+    def test_gitlink_oid_is_bound_without_reading_submodule_contents(self):
+        self.git("update-index", "--add", "--cacheinfo", "160000," + self.base + ",third_party/example")
+        self.git("commit", "-q", "-m", "add pinned submodule")
+        head = self.git("rev-parse", "HEAD")
+        report, _ = self.run_review(head=head, expected=1)
+        self.assertEqual(report["core"]["policy"]["outcome"], "allowed")
+        self.assertEqual(report["source_approval"]["base"]["gitlinks"], 0)
+        self.assertEqual(report["source_approval"]["head"]["gitlinks"], 1)
+        self.assertNotEqual(report["source_approval"]["base"]["sha256"], report["source_approval"]["head"]["sha256"])
+
+    def test_policy_change_blocks_even_without_source_candidates(self):
+        candidate_free = self.script_free_base()
+        self.source_policy_path.write_bytes(json_data({"schema_version": 1, "digests": ["0" * 64]}))
+        head = self.commit("head changes future source policy")
+        report, _ = self.run_review(base=candidate_free, head=head, expected=1)
+        self.assertEqual(report["core"]["policy"]["outcome"], "allowed")
+        self.assertFalse(report["source_approval"]["required"])
+        self.assertEqual(report["source_approval"]["changed_trusted_paths"], ["apps/example/.tau-gate-source-approvals.json"])
+
+    def test_trusted_helper_and_workflow_edits_block_without_source_candidates(self):
+        candidate_free = self.script_free_base()
+        for path in ("tools/pr_review.py", "tools/npm_evidence.py", "tools/hashlib.py", ".github/workflows/other.yml"):
+            with self.subTest(path=path):
+                self.git("reset", "--hard", candidate_free)
+                target = self.repo / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"changed trusted gate input\n")
+                report, _ = self.run_review(base=candidate_free, head=self.commit("edit trusted gate input"), expected=1)
+                self.assertEqual(report["core"]["policy"]["outcome"], "allowed")
+                self.assertEqual(report["source_approval"]["changed_trusted_paths"], [path])
 
     def test_output_cannot_overwrite_repository_or_cache(self):
         before = self.git("status", "--porcelain")
