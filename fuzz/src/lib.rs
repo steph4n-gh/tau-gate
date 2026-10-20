@@ -121,11 +121,12 @@ fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
     for entry in reader.entries().ok()? {
         let mut entry = entry.ok()?;
         let path = entry.path().ok()?.to_string_lossy().to_string();
-        if path == "package/package.json" {
+        let relative = path.split_once('/').map(|(_, relative)| relative);
+        if relative == Some("package.json") {
             let mut bytes = Vec::new();
             entry.read_to_end(&mut bytes).ok()?;
             manifest = Some(bytes);
-        } else if path == "package/binding.gyp" {
+        } else if relative == Some("binding.gyp") {
             let mut bytes = Vec::new();
             entry.read_to_end(&mut bytes).ok()?;
             binding = Some(format!("{:x}", Sha256::digest(&bytes)));
@@ -320,6 +321,9 @@ mod seed_checks {
         let tar_facts = archive::tar(&raw).unwrap();
         assert!(tar_facts.0.starts_with(b"{\"name\":\"seed\""));
         assert!(tar_facts.1.is_some());
+        let named = std::fs::read("corpus/tar/named-root").unwrap();
+        assert_eq!(archive::tar(&named).unwrap(), tar_facts);
+        assert_eq!(external_tar(&named), Some(tar_facts.clone()));
         let gz = std::fs::read("corpus/artifact/ordinary").unwrap();
         let sri = format!(
             "sha512-{}",

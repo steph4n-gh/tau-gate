@@ -47,21 +47,23 @@ for name, value in {
     compressor = zlib.compressobj(wbits=-15)
     put("deflate", name, compressor.compress(value) + compressor.flush())
 
-with io.BytesIO() as stream:
-    with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-        for name, body in [
-            ("package/package.json", manifest),
-            ("package/binding.gyp", b"{\n  'targets': []\n}\n"),
-        ]:
-            info = tarfile.TarInfo(name)
-            info.size = len(body)
-            info.mode = 0o644
-            archive.addfile(info, io.BytesIO(body))
-    tar_bytes = stream.getvalue()
-put("tar", "ordinary", tar_bytes)
-put("tar", "repair-checksum", b"\x01" + tar_bytes)
-put("artifact", "ordinary", gzip.compress(tar_bytes, mtime=0))
-put("artifact", "repair-tar-and-repack", b"\x01" + tar_bytes)
+for root, label in (("package", "ordinary"), ("json5", "named-root")):
+    with io.BytesIO() as stream:
+        with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+            for name, body in [
+                (f"{root}/package.json", manifest),
+                (f"{root}/binding.gyp", b"{\n  'targets': []\n}\n"),
+            ]:
+                info = tarfile.TarInfo(name)
+                info.size = len(body)
+                info.mode = 0o644
+                archive.addfile(info, io.BytesIO(body))
+        tar_bytes = stream.getvalue()
+    put("tar", label, tar_bytes)
+    put("artifact", label, gzip.compress(tar_bytes, mtime=0))
+    if root == "package":
+        put("tar", "repair-checksum", b"\x01" + tar_bytes)
+        put("artifact", "repair-tar-and-repack", b"\x01" + tar_bytes)
 
 put("lockfiles", "npm-v3", json.dumps(lock, separators=(",", ":")).encode())
 put("lockfiles", "pnpm-v9", b"lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies: {}\nsnapshots: {}\n")
