@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-20T20:17:52Z	frame	Start from merged v4.1 with five evidence gates	Capture real coverage before changing parser or approval semantics	4fcf535fd1b52922fd4b0d2584bc0d2fb8bbbbe0; docs/qualification/PROGRAM.md	open
+2026-10-20T20:20:48Z	design	Select immutable case receipts and advisory baseline	Public projects lack trusted approvals; separate event truth and policy controls	/tmp/taugate-qualification-design-b/README.md; /tmp/taugate-qualification-design-a/DESIGN.md	design judge selected B 23/25 with stage-status and acquisition grafts
+2026-10-20T20:20:48Z	corpus	Freeze first 30 eligible projects and 90 pairs before replay	Preserve selection exclusions and prevent tuning on checker outcomes	docs/qualification/selection-contract.json; docs/qualification/corpus.json	76 screened; 33 eligible; 30 selected; six project holdouts

@@ -1,0 +1,379 @@
+{
+  "projects": [
+    {
+      "repository": "npm/cli",
+      "maxLockedPackages": 1201,
+      "distinctHTTPResolvedURLs": 344,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents",
+        "node_modules/node-gyp",
+        "node_modules/tap/node_modules/electron-to-chromium"
+      ]
+    },
+    {
+      "repository": "nodejs/undici",
+      "maxLockedPackages": 665,
+      "distinctHTTPResolvedURLs": 612,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/node-addon-api"
+      ]
+    },
+    {
+      "repository": "nodejs/node-core-utils",
+      "maxLockedPackages": 658,
+      "distinctHTTPResolvedURLs": 637,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": false,
+      "nativeRelatedNameExamples": []
+    },
+    {
+      "repository": "npm/node-tar",
+      "maxLockedPackages": 391,
+      "distinctHTTPResolvedURLs": 552,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/node-gyp"
+      ]
+    },
+    {
+      "repository": "isaacs/node-lru-cache",
+      "maxLockedPackages": 380,
+      "distinctHTTPResolvedURLs": 687,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/fsevents",
+        "node_modules/node-gyp",
+        "node_modules/node-gyp/node_modules/glob",
+        "node_modules/node-gyp/node_modules/jackspeak"
+      ]
+    },
+    {
+      "repository": "isaacs/node-glob",
+      "maxLockedPackages": 410,
+      "distinctHTTPResolvedURLs": 572,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/node-gyp"
+      ]
+    },
+    {
+      "repository": "isaacs/minimatch",
+      "maxLockedPackages": 348,
+      "distinctHTTPResolvedURLs": 491,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/node-gyp"
+      ]
+    },
+    {
+      "repository": "nestjs/nest",
+      "maxLockedPackages": 1655,
+      "distinctHTTPResolvedURLs": 1464,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents",
+        "node_modules/gulp-watch/node_modules/fsevents",
+        "node_modules/node-gyp"
+      ]
+    },
+    {
+      "repository": "nestjs/typescript-starter",
+      "maxLockedPackages": 818,
+      "distinctHTTPResolvedURLs": 987,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents",
+        "node_modules/node-addon-api",
+        "node_modules/node-gyp-build"
+      ]
+    },
+    {
+      "repository": "koajs/koa",
+      "maxLockedPackages": 374,
+      "distinctHTTPResolvedURLs": 379,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": false,
+      "nativeRelatedNameExamples": []
+    },
+    {
+      "repository": "electron/electron-quick-start",
+      "maxLockedPackages": 13,
+      "distinctHTTPResolvedURLs": 16,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron"
+      ]
+    },
+    {
+      "repository": "socketio/socket.io",
+      "maxLockedPackages": 1512,
+      "distinctHTTPResolvedURLs": 1302,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents",
+        "node_modules/node-addon-api",
+        "node_modules/prebuild-install"
+      ]
+    },
+    {
+      "repository": "microsoft/TypeScript",
+      "maxLockedPackages": 248,
+      "distinctHTTPResolvedURLs": 240,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": []
+    },
+    {
+      "repository": "microsoft/vscode",
+      "maxLockedPackages": 1669,
+      "distinctHTTPResolvedURLs": 1437,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@parcel/watcher/node_modules/node-addon-api",
+        "node_modules/@vscode/fs-copyfile/node_modules/node-addon-api",
+        "node_modules/@vscode/policy-watcher/node_modules/node-addon-api",
+        "node_modules/@vscode/spdlog/node_modules/node-addon-api",
+        "node_modules/@vscode/sqlite3/node_modules/node-addon-api"
+      ]
+    },
+    {
+      "repository": "mochajs/mocha",
+      "maxLockedPackages": 744,
+      "distinctHTTPResolvedURLs": 740,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "axios/axios",
+      "maxLockedPackages": 687,
+      "distinctHTTPResolvedURLs": 701,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "cheeriojs/cheerio",
+      "maxLockedPackages": 386,
+      "distinctHTTPResolvedURLs": 378,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "swagger-api/swagger-ui",
+      "maxLockedPackages": 2230,
+      "distinctHTTPResolvedURLs": 1089,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron-to-chromium",
+        "node_modules/fsevents",
+        "node_modules/node-addon-api",
+        "node_modules/node-gyp-build"
+      ]
+    },
+    {
+      "repository": "tj/commander.js",
+      "maxLockedPackages": 215,
+      "distinctHTTPResolvedURLs": 304,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": false,
+      "nativeRelatedNameExamples": []
+    },
+    {
+      "repository": "octokit/rest.js",
+      "maxLockedPackages": 311,
+      "distinctHTTPResolvedURLs": 330,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "octokit/octokit.js",
+      "maxLockedPackages": 180,
+      "distinctHTTPResolvedURLs": 270,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "octokit/core.js",
+      "maxLockedPackages": 240,
+      "distinctHTTPResolvedURLs": 246,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "probot/probot",
+      "maxLockedPackages": 503,
+      "distinctHTTPResolvedURLs": 609,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "semantic-release/semantic-release",
+      "maxLockedPackages": 1131,
+      "distinctHTTPResolvedURLs": 885,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/node-gyp",
+        "node_modules/node-gyp-build",
+        "node_modules/node-gyp/node_modules/abbrev",
+        "node_modules/node-gyp/node_modules/isexe"
+      ]
+    },
+    {
+      "repository": "microsoft/playwright",
+      "maxLockedPackages": 705,
+      "distinctHTTPResolvedURLs": 647,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/electron",
+        "node_modules/electron-to-chromium",
+        "node_modules/electron/node_modules/@types/node",
+        "node_modules/electron/node_modules/undici-types",
+        "node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "puppeteer/puppeteer",
+      "maxLockedPackages": 2717,
+      "distinctHTTPResolvedURLs": 65,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@babel/core/node_modules/@babel/helper-compilation-targets/node_modules/browserslist/node_modules/electron-to-chromium",
+        "node_modules/rollup/node_modules/fsevents",
+        "node_modules/wireit/node_modules/chokidar/node_modules/fsevents"
+      ]
+    },
+    {
+      "repository": "realm/realm-js",
+      "maxLockedPackages": 2257,
+      "distinctHTTPResolvedURLs": 2435,
+      "rootWorkspacesDeclared": true,
+      "linksPresent": true,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "integration-tests/environments/electron",
+        "integration-tests/environments/electron/node_modules/fs-extra",
+        "node_modules/@realm/electron-tests",
+        "node_modules/electron",
+        "node_modules/electron-builder"
+      ]
+    },
+    {
+      "repository": "apache/cordova-cli",
+      "maxLockedPackages": 459,
+      "distinctHTTPResolvedURLs": 439,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/node-gyp",
+        "node_modules/node-gyp/node_modules/isexe",
+        "node_modules/node-gyp/node_modules/which"
+      ]
+    },
+    {
+      "repository": "apache/cordova-lib",
+      "maxLockedPackages": 464,
+      "distinctHTTPResolvedURLs": 446,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": [
+        "node_modules/@npmcli/node-gyp",
+        "node_modules/node-gyp",
+        "node_modules/node-gyp/node_modules/abbrev",
+        "node_modules/node-gyp/node_modules/isexe",
+        "node_modules/node-gyp/node_modules/nopt"
+      ]
+    },
+    {
+      "repository": "apache/cordova-android",
+      "maxLockedPackages": 358,
+      "distinctHTTPResolvedURLs": 375,
+      "rootWorkspacesDeclared": false,
+      "linksPresent": false,
+      "optionalPresent": true,
+      "nativeRelatedNameExamples": []
+    }
+  ],
+  "distinctHTTPResolvedURLs": 8749,
+  "distinctSnapshots": 152
+}
