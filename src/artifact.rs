@@ -13,7 +13,12 @@ pub(crate) struct Artifact {
     pub sha512: String,
 }
 
-pub(crate) fn inspect(bytes: &[u8], integrity: &str) -> Result<Artifact, String> {
+pub(crate) fn inspect(
+    bytes: &[u8],
+    integrity: &str,
+    expanded: &mut Vec<u8>,
+) -> Result<Artifact, String> {
+    expanded.clear();
     if bytes.len() > MAX_COMPRESSED {
         return Err("compressed artifact exceeds 64 MiB".into());
     }
@@ -21,8 +26,8 @@ pub(crate) fn inspect(bytes: &[u8], integrity: &str) -> Result<Artifact, String>
     if integrity != format!("sha512-{}", base64_digest(&digest)) {
         return Err("artifact requires one matching canonical SHA512 integrity".into());
     }
-    let tar = gunzip(bytes)?;
-    let (manifest, binding_gyp_sha256) = inspect_tar(&tar)?;
+    gunzip(bytes, expanded)?;
+    let (manifest, binding_gyp_sha256) = inspect_tar(expanded)?;
     Ok(Artifact {
         manifest,
         binding_gyp_sha256,
@@ -81,7 +86,8 @@ fn crc32(bytes: &[u8]) -> u32 {
     !crc
 }
 
-fn gunzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
+fn gunzip(bytes: &[u8], output: &mut Vec<u8>) -> Result<(), String> {
+    output.clear();
     if bytes.len() < 18 || bytes[..3] != [0x1f, 0x8b, 8] || bytes[3] & 0xe0 != 0 {
         return Err("invalid gzip header".into());
     }
@@ -114,14 +120,14 @@ fn gunzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
         start += 2;
     }
     let payload = bytes.get(start..end).ok_or("truncated gzip header")?;
-    let output = inflate(payload)?;
-    if crc32(&output) != u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) {
+    inflate(payload, output)?;
+    if crc32(output) != u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) {
         return Err("gzip checksum mismatch".into());
     }
     if output.len() as u32 != u32::from_le_bytes(bytes[end + 4..].try_into().unwrap()) {
         return Err("gzip expanded size mismatch".into());
     }
-    Ok(output)
+    Ok(())
 }
 
 struct Bits<'a> {
@@ -248,12 +254,12 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman), String> {
     ))
 }
 
-fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
+fn inflate(payload: &[u8], output: &mut Vec<u8>) -> Result<(), String> {
+    output.clear();
     let mut bits = Bits {
         bytes: payload,
         position: 0,
     };
-    let mut output = Vec::new();
     loop {
         let final_block = bits.read(1)? != 0;
         match bits.read(2)? {
@@ -285,7 +291,7 @@ fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
                 } else {
                     dynamic_trees(&mut bits)?
                 };
-                compressed_block(&mut bits, &literal_tree, &distance_tree, &mut output)?;
+                compressed_block(&mut bits, &literal_tree, &distance_tree, output)?;
             }
             _ => return Err("reserved DEFLATE block type".into()),
         }
@@ -294,7 +300,7 @@ fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
             if bits.position / 8 != payload.len() {
                 return Err("gzip contains trailing data or multiple members".into());
             }
-            return Ok(output);
+            return Ok(());
         }
     }
 }
@@ -581,44 +587,84 @@ mod tests {
 
     #[test]
     fn artifact_content_is_bound_to_original_gzip_bytes() {
+        let mut expanded = Vec::new();
         let manifest = br#"{"name":"sample","version":"1.0.0"}"#;
         let bytes = gzip(&tar(&[
             ("package/", b'5', b""),
             ("package/package.json", b'0', manifest),
             ("package/binding.gyp", b'0', b"native"),
         ]));
-        let value = inspect(&bytes, &integrity(&bytes)).unwrap();
+        let value = inspect(&bytes, &integrity(&bytes), &mut expanded).unwrap();
         assert_eq!(value.manifest, manifest);
         assert_eq!(value.binding_gyp_sha256, Some(sha256(b"native")));
         assert_eq!(value.sha512, sha512(&bytes));
         let mut other_header = bytes.clone();
         other_header[4] = 1;
-        assert!(inspect(&other_header, &integrity(&bytes)).is_err());
-        assert!(inspect(&other_header, &integrity(&other_header)).is_ok());
+        assert!(inspect(&other_header, &integrity(&bytes), &mut expanded).is_err());
+        assert!(inspect(&other_header, &integrity(&other_header), &mut expanded).is_ok());
         for invalid in [
             format!(" {}", integrity(&bytes)),
             format!("{} {}", integrity(&bytes), integrity(&bytes)),
             integrity(&bytes).trim_end_matches('=').to_owned(),
             integrity(&bytes).replace("sha512-", "sha256-"),
         ] {
-            assert!(inspect(&bytes, &invalid).is_err());
+            assert!(inspect(&bytes, &invalid, &mut expanded).is_err());
+        }
+    }
+
+    #[test]
+    fn repeated_artifact_inspection_recovers_after_failed_integrity_crc_and_truncation() {
+        let large_manifest = br#"{"name":"large","version":"1.0.0"}"#;
+        let large = gzip(&tar(&[
+            ("package/package.json", b'0', large_manifest),
+            ("package/binding.gyp", b'0', b"native"),
+            ("package/data.bin", b'0', &vec![42; 4 * 1024 * 1024]),
+        ]));
+        let small_manifest = br#"{"name":"small","version":"2.0.0"}"#;
+        let small = gzip(&tar(&[("package/package.json", b'0', small_manifest)]));
+        let large_integrity = integrity(&large);
+        let small_integrity = integrity(&small);
+        let mut bad_crc = large.clone();
+        let crc_position = bad_crc.len() - 8;
+        bad_crc[crc_position] ^= 1;
+        let truncated = large[..large.len() - 10].to_vec();
+        let mut expanded = Vec::new();
+        for (invalid, invalid_integrity) in [
+            (large.as_slice(), small_integrity.clone()),
+            (bad_crc.as_slice(), integrity(&bad_crc)),
+            (truncated.as_slice(), integrity(&truncated)),
+        ] {
+            let first = inspect(&large, &large_integrity, &mut expanded).unwrap();
+            assert_eq!(first.manifest, large_manifest);
+            assert_eq!(first.binding_gyp_sha256, Some(sha256(b"native")));
+            assert_eq!(first.sha512, sha512(&large));
+            assert!(inspect(invalid, &invalid_integrity, &mut expanded).is_err());
+            let next = inspect(&small, &small_integrity, &mut expanded).unwrap();
+            assert_eq!(next.manifest, small_manifest);
+            assert_eq!(next.binding_gyp_sha256, None);
+            assert_eq!(next.sha512, sha512(&small));
+            assert_eq!(first.manifest, large_manifest);
         }
     }
 
     #[test]
     fn stored_fixed_and_dynamic_deflate_match_external_zlib_vectors() {
+        let mut output = Vec::new();
         assert_eq!(crc32(b"123456789"), 0xcbf43926);
-        assert_eq!(gunzip(&gzip(b"stored")).unwrap(), b"stored");
-        assert_eq!(inflate(b"KLJNDB\0").unwrap(), b"abcabcabcabcabc");
+        gunzip(&gzip(b"stored"), &mut output).unwrap();
+        assert_eq!(output, b"stored");
+        inflate(b"KLJNDB\0", &mut output).unwrap();
+        assert_eq!(output, b"abcabcabcabcabc");
         let dynamic = b"\xed\xcaG\x01\x800\x10EA+_\x01jb\x80\x92\xd0\xd9\x10\x08M=\x88\xe0\xf8\xce3\xae\xf3Zs_\x8f\xaa\x92\x9d\x8b\x82]\x1a\xf2\x1c7\xd9\xe1\x93\xf6\x8f\xa7\xf2\xb9\xd5X[\xc8\x91\xc9d2\x99L&\x93\xc9d2\x99L&\x93\xff\xc8/";
+        inflate(dynamic, &mut output).unwrap();
         assert_eq!(
-            inflate(dynamic).unwrap(),
+            output,
             b"The quick brown fox jumps over the lazy dog. ".repeat(100)
         );
-        assert!(inflate(&dynamic[..dynamic.len() - 1]).is_err());
-        assert!(inflate(&[7]).is_err());
-        assert!(inflate(&[1, 1, 0, 0, 0, 1]).is_err());
-        assert!(inflate(&[3, 2, 0]).is_err());
+        assert!(inflate(&dynamic[..dynamic.len() - 1], &mut output).is_err());
+        assert!(inflate(&[7], &mut output).is_err());
+        assert!(inflate(&[1, 1, 0, 0, 0, 1], &mut output).is_err());
+        assert!(inflate(&[3, 2, 0], &mut output).is_err());
     }
 
     #[test]
@@ -654,26 +700,28 @@ mod tests {
 
     #[test]
     fn gzip_rejects_crc_size_reserved_flags_junk_and_multiple_members() {
+        let mut output = Vec::new();
         let bytes = gzip(b"payload");
         for position in [0, 2, bytes.len() - 8, bytes.len() - 4] {
             let mut changed = bytes.clone();
             changed[position] ^= 1;
-            assert!(gunzip(&changed).is_err());
+            assert!(gunzip(&changed, &mut output).is_err());
         }
         let mut reserved = bytes.clone();
         reserved[3] = 0x20;
-        assert!(gunzip(&reserved).is_err());
-        assert!(gunzip(&bytes[..bytes.len() - 1]).is_err());
+        assert!(gunzip(&reserved, &mut output).is_err());
+        assert!(gunzip(&bytes[..bytes.len() - 1], &mut output).is_err());
         let mut junk = bytes.clone();
         junk.push(0);
-        assert!(gunzip(&junk).is_err());
+        assert!(gunzip(&junk, &mut output).is_err());
         let mut concatenated = bytes.clone();
         concatenated.extend_from_slice(&bytes);
-        assert!(gunzip(&concatenated).is_err());
+        assert!(gunzip(&concatenated, &mut output).is_err());
     }
 
     #[test]
     fn gzip_optional_fields_require_valid_bounds_and_header_checksum() {
+        let mut output = Vec::new();
         let base = gzip(b"payload");
         let mut bytes = base[..10].to_vec();
         bytes[3] = 4 | 8 | 16 | 2;
@@ -681,17 +729,18 @@ mod tests {
         bytes.extend_from_slice(b"name\0comment\0");
         bytes.extend_from_slice(&(crc32(&bytes) as u16).to_le_bytes());
         bytes.extend_from_slice(&base[10..]);
-        assert_eq!(gunzip(&bytes).unwrap(), b"payload");
+        gunzip(&bytes, &mut output).unwrap();
+        assert_eq!(output, b"payload");
         bytes[14] ^= 1;
-        assert!(gunzip(&bytes).is_err());
+        assert!(gunzip(&bytes, &mut output).is_err());
         let mut truncated = base.clone();
         truncated[3] = 4;
         truncated[10..12].fill(255);
-        assert!(gunzip(&truncated).is_err());
+        assert!(gunzip(&truncated, &mut output).is_err());
         let mut unterminated = base;
         unterminated[3] = 8;
         unterminated[10..].fill(255);
-        assert!(gunzip(&unterminated).is_err());
+        assert!(gunzip(&unterminated, &mut output).is_err());
     }
 
     #[test]

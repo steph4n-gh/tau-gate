@@ -186,6 +186,12 @@ fn parse(bytes: &[u8]) -> Result<J, String> {
     MiniParser::parse_json(text).map_err(|e| e.to_string())
 }
 pub(crate) fn read_regular(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    read_regular_into(path, limit, &mut bytes)?;
+    Ok(bytes)
+}
+fn read_regular_into(path: &Path, limit: u64, bytes: &mut Vec<u8>) -> Result<(), String> {
+    bytes.clear();
     let meta =
         fs::symlink_metadata(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     if !meta.file_type().is_file() {
@@ -195,15 +201,14 @@ pub(crate) fn read_regular(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("input is not a regular file".into());
     }
-    let mut bytes = Vec::new();
     (&mut file)
         .take(limit + 1)
-        .read_to_end(&mut bytes)
+        .read_to_end(bytes)
         .map_err(|e| e.to_string())?;
     if bytes.len() as u64 > limit {
         return Err(format!("input exceeds {limit} bytes"));
     }
-    Ok(bytes)
+    Ok(())
 }
 fn safe_relative(value: &str, empty: bool) -> Result<(), String> {
     if value.is_empty() && empty {
@@ -347,13 +352,23 @@ pub(crate) fn load(
     }
     let mut result = BTreeMap::new();
     let root = index_path.parent().unwrap_or(Path::new("."));
+    let mut compressed = Vec::new();
+    let mut expanded = Vec::new();
     for (path, record) in records {
         let marker = record.get("hasInstallScript").and_then(J::as_bool);
         if record.get("link").and_then(J::as_bool) == Some(true) {
             continue;
         }
         let evidence = if let Some(entry) = locators.get(path.as_str()) {
-            match read_facts(root, path, record, entry, root_hash) {
+            match read_facts(
+                root,
+                path,
+                record,
+                entry,
+                root_hash,
+                &mut compressed,
+                &mut expanded,
+            ) {
                 Ok(facts) => qualify(path, record, marker, facts),
                 Err(reason) => ExecutionEvidence::unknown(State::Unsupported, marker, reason),
             }
@@ -429,6 +444,8 @@ fn read_facts(
     record: &J,
     entry: &J,
     root_hash: Option<&str>,
+    compressed: &mut Vec<u8>,
+    expanded: &mut Vec<u8>,
 ) -> Result<Facts, String> {
     let (bytes, binding, kind, artifact_sha512) = if let Some(value) = entry.get("artifact") {
         if !registry(path) {
@@ -445,9 +462,11 @@ fn read_facts(
             root,
             value.as_str().ok_or("artifact locator must be a string")?,
         )?;
+        read_regular_into(&file, MAX_FILE, compressed)?;
         let archive = artifact::inspect(
-            &read_regular(&file, MAX_FILE)?,
+            compressed,
             record.get("integrity").and_then(J::as_str).unwrap_or(""),
+            expanded,
         )?;
         (
             archive.manifest,
@@ -595,5 +614,36 @@ pub(crate) fn apply(evidence: &Evidence, graph: &mut DepGraph) {
             p.capabilities.sort();
             p.capabilities.dedup();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_regular_reads_recover_after_size_and_file_errors() {
+        let root = std::env::temp_dir().join(format!(
+            "tau-gate-regular-read-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&root).unwrap();
+        let large = root.join("large");
+        let small = root.join("small");
+        fs::write(&large, vec![42; 8192]).unwrap();
+        fs::write(&small, b"small").unwrap();
+        let mut bytes = Vec::new();
+        for (invalid, limit) in [(&large, 8191), (&root, 8192), (&root.join("missing"), 8192)] {
+            read_regular_into(&large, 8192, &mut bytes).unwrap();
+            assert_eq!(bytes, vec![42; 8192]);
+            assert!(read_regular_into(invalid, limit, &mut bytes).is_err());
+            read_regular_into(&small, 8192, &mut bytes).unwrap();
+            assert_eq!(bytes, b"small");
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 }
