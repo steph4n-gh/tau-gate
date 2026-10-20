@@ -23,6 +23,7 @@ A known record additionally has these fields.
 | `manifest_sha256` | SHA256 of original manifest bytes. Links omit this field. |
 | `binding_sha256` | SHA256 of original `binding.gyp` bytes, or null when absent. Links omit this field. |
 | `artifact_sha256`, `artifact_sha512` | Original compressed artifact digests when bytes are available. |
+| `archive_root` | Actual single top-level archive component. Archive records expose it after successful archive inspection. |
 | `binary_entrypoints` | The manifest's `bin` value. It does not imply automatic lifecycle execution. |
 | `profile_conditions` | Observed metadata differences from the core's strict profile. This list is diagnostic, not an exhaustive core-compatibility verdict. |
 
@@ -44,7 +45,11 @@ Git sources and local file sources remain unknown. A caller-supplied matching ar
 
 Files and compressed archives have a 64 MiB limit. Expanded gzip data has a separate 64 MiB limit. Archives have at most 10,000 yielded members. Manifests have a 1 MiB limit. JSON has at most 128 nested containers and rejects duplicate keys and nonfinite constants. Large hidden tar extension data still counts against the expanded limit.
 
-The oracle accepts valid PAX and GNU metadata and ordinary names with spaces or Unicode. It reads only exact regular `package/package.json` and `package/binding.gyp` members. Duplicate paths, case-fold collisions, lifecycle case aliases, and file-ancestor conflicts make the artifact's execution facts unknown. It never chooses the last duplicate manifest as truth.
+The oracle accepts valid PAX and GNU metadata and ordinary names with spaces or Unicode. It follows npm's first-component stripping for archives with one consistent top-level component. The component may be `package`, a legacy package name such as `json5`, or another safe relative name. A non-`package` component receives `legacy_archive_root` in `profile_conditions`. The actual component remains visible as `archive_root`. This is an oracle compatibility rule, not a change to the core's supported archive profile.
+
+Only exact regular root-relative `package.json` and `binding.gyp` members supply lifecycle facts. A top-level entry without a second component must be a directory. Multiple roots, roots that differ only in case, duplicate paths, case-fold collisions, lifecycle case aliases, and file-ancestor conflicts make the artifact's execution facts unknown. The oracle never chooses the last duplicate manifest as truth. Manifest name and version still must match the lock identity. A root named `json5` does not establish the package identity.
+
+Python's mature tar parser interprets legacy ustar fields, including nonzero padding after an early NUL in the prefix field. Such padding does not change the root-relative manifest lookup. SRI still binds all original compressed bytes. The oracle does not relabel a valid legacy archive as an integrity failure merely because the core rejects its narrower archive profile.
 
 The oracle verifies SRI against original compressed bytes. It accepts SHA1, SHA256, SHA384, and SHA512 tokens and verifies the strongest algorithm present. At least one strongest digest must match. A verified form outside the core's single canonical SHA512 token receives `noncanonical_integrity`. An incorrect digest remains unknown with an integrity error.
 
@@ -75,4 +80,6 @@ Run the independent controls from the repository root.
 python3 -m unittest discover -s tests -p test_qualification_oracle.py -v
 ```
 
-The tests generate independent ustar, PAX, and GNU inputs. They cover hook changes, source changes, native defaults, workspace scope, binary separation, duplicate and ambiguous inputs, missing evidence, integrity failures, recompression, resource bounds, and root byte binding.
+The tests generate independent ustar, PAX, and GNU inputs. They cover legacy roots and ustar padding, hook changes, source changes, native defaults, workspace scope, binary separation, duplicate and ambiguous inputs, missing evidence, integrity failures, recompression, resource bounds, and root byte binding.
+
+The legacy-root correction was also checked with npm 11.19.1 and Node v26.9.0. Offline installs of an independently generated `legacy-root` archive and the development corpus's original `@types/json5` 0.0.29 archive produced byte-identical installed manifests. The controlled archive's native-build input also matched, and its lifecycle canary remained absent under `--ignore-scripts`. The original `@types/cacheable-request` 6.0.3 archive was inspected independently without installing its external dependencies. These checks establish byte correspondence for those examples. They do not observe lifecycle execution or establish universal npm archive support.

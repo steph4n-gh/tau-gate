@@ -18,10 +18,10 @@ def encoded(value):
     return json.dumps(value, sort_keys=True).encode()
 
 
-def archive(manifest, extra=(), format=tarfile.USTAR_FORMAT, mtime=0):
+def archive(manifest, extra=(), format=tarfile.USTAR_FORMAT, mtime=0, root="package"):
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=format) as stream:
-        for name, data in [("package/package.json", encoded(manifest)), *extra]:
+        for name, data in [(root + "/package.json", encoded(manifest)), *extra]:
             member = tarfile.TarInfo(name)
             member.size = len(data)
             stream.addfile(member, io.BytesIO(data))
@@ -129,6 +129,55 @@ class OracleTests(unittest.TestCase):
             package = facts["packages"]["node_modules/pkg"]
             self.assertEqual(package["status"], "unknown")
             self.assertNotIn("scripts", package)
+
+    def test_legacy_archive_roots_preserve_lifecycle_facts_and_actual_root(self):
+        manifest = {"name": "pkg", "version": "1.0.0", "scripts": {"postinstall": "visible"}}
+        for root in ("json5", "cacheable-request"):
+            data = archive(manifest, [(root + "/binding.gyp", b"{}")], root=root)
+            facts, _ = self.snapshot(manifest, archive_bytes=data)
+            package = facts["packages"]["node_modules/pkg"]
+            self.assertEqual(package["status"], "known")
+            self.assertEqual(package["archive_root"], root)
+            self.assertEqual(package["scripts"], {"postinstall": "visible"})
+            self.assertTrue(package["implicit_native"])
+            self.assertIn("legacy_archive_root", package["profile_conditions"])
+
+    def test_legacy_ustar_padding_after_prefix_nul_is_not_integrity_failure(self):
+        manifest = {"name": "pkg", "version": "1.0.0"}
+        raw = bytearray(gzip.decompress(archive(manifest, root="cacheable-request")))
+        raw[345:360] = b"\0" + b"1460914891531" + b"\0"
+        raw[148:156] = b"        "
+        raw[148:156] = (f"{sum(raw[:512]):06o}\0 ").encode()
+        facts, _ = self.snapshot(manifest, archive_bytes=gzip.compress(bytes(raw), mtime=0))
+        package = facts["packages"]["node_modules/pkg"]
+        self.assertEqual(package["status"], "known")
+        self.assertEqual(package["archive_root"], "cacheable-request")
+
+    def test_legacy_root_ambiguities_and_lifecycle_special_entries_are_unknown(self):
+        manifest = {"name": "pkg", "version": "1.0.0"}
+        extras = [
+            [("legacy/Package.json", b"{}")],
+            [("Legacy/binding.gyp", b"{}")],
+            [("other/package.json", encoded(manifest))],
+            [("legacy/path", b"file"), ("legacy/path/child", b"child")],
+            [("legacy/binding.gyp", b"one"), ("legacy/binding.gyp", b"two")],
+        ]
+        for extra in extras:
+            facts, _ = self.snapshot(archive_bytes=archive(manifest, extra, root="legacy"))
+            self.assertEqual(facts["packages"]["node_modules/pkg"]["status"], "unknown")
+        raw = io.BytesIO()
+        with tarfile.open(fileobj=raw, mode="w", format=tarfile.USTAR_FORMAT) as stream:
+            member = tarfile.TarInfo("legacy/package.json")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "elsewhere"
+            stream.addfile(member)
+        facts, _ = self.snapshot(archive_bytes=gzip.compress(raw.getvalue(), mtime=0))
+        self.assertEqual(facts["packages"]["node_modules/pkg"]["status"], "unknown")
+
+    def test_legacy_archive_identity_still_matches_lock(self):
+        data = archive({"name": "different", "version": "1.0.0"}, root="legacy")
+        facts, _ = self.snapshot(archive_bytes=data)
+        self.assertIn("manifest name differs", facts["packages"]["node_modules/pkg"]["reason"])
 
     def test_missing_evidence_keeps_identity_without_claiming_script_removal(self):
         before, _ = self.snapshot({"name": "pkg", "version": "1.0.0", "scripts": {"install": "run"}})

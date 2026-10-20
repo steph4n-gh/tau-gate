@@ -142,6 +142,7 @@ def _archive(data, integrity):
     found = {}
     seen = {}
     ambiguous = []
+    root = None
     try:
         with gzip.GzipFile(fileobj=io.BytesIO(data)) as compressed:
             stream = _ExpandedStream(compressed)
@@ -151,6 +152,13 @@ def _archive(data, integrity):
                         raise OracleError("archive exceeds member count")
                     name = member.name.rstrip("/") if member.isdir() else member.name
                     _relative(name)
+                    member_root, separator, relative = name.partition("/")
+                    if root is None:
+                        root = member_root
+                    elif member_root != root:
+                        ambiguous.append("archive has multiple or case-aliased roots")
+                    if not separator and not member.isdir():
+                        ambiguous.append("archive root is not a directory")
                     canonical = name.casefold()
                     if canonical in seen:
                         ambiguous.append("duplicate or case-folded archive path")
@@ -166,18 +174,19 @@ def _archive(data, integrity):
                         conditions.append("nonportable_tar_path")
                     if not member.isfile() and not member.isdir():
                         conditions.append("special_tar_entry")
-                    if canonical in ("package/package.json", "package/binding.gyp"):
-                        if name != canonical or not member.isfile():
+                    lifecycle = relative.casefold()
+                    if lifecycle in ("package.json", "binding.gyp"):
+                        if relative != lifecycle or not member.isfile():
                             ambiguous.append("ambiguous lifecycle input path")
                             continue
-                        limit = MAX_MANIFEST if canonical.endswith("package.json") else MAX_FILE
+                        limit = MAX_MANIFEST if lifecycle == "package.json" else MAX_FILE
                         if member.size < 0 or member.size > limit:
                             raise OracleError("lifecycle input exceeds size limit")
                         member_stream = archive.extractfile(member)
                         value = member_stream.read(limit + 1)
                         if len(value) != member.size:
                             raise OracleError("truncated lifecycle input")
-                        found[name] = value
+                        found[relative] = value
             while remainder := stream.read(65536):
                 if any(remainder):
                     raise OracleError("nonzero data after tar terminator")
@@ -185,9 +194,11 @@ def _archive(data, integrity):
         raise OracleError(f"invalid archive: {exc}") from exc
     if ambiguous:
         raise OracleError("; ".join(sorted(set(ambiguous))))
-    if "package/package.json" not in found:
-        raise OracleError("archive has no package/package.json")
-    return found["package/package.json"], found.get("package/binding.gyp"), sorted(set(conditions))
+    if "package.json" not in found:
+        raise OracleError("archive has no root-relative package.json")
+    if root != "package":
+        conditions.append("legacy_archive_root")
+    return found["package.json"], found.get("binding.gyp"), sorted(set(conditions)), root
 
 
 def _manifest(data, binding, scope, record, path):
@@ -300,7 +311,8 @@ def snapshot_facts(lock_path: Path, index_path: Path, manifest: Path | None = No
                     raise OracleError("non-archive source execution semantics are unknown")
                 archive = _read(source_path)
                 facts.update({"artifact_sha256": _sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest()})
-                data, binding, conditions = _archive(archive, record.get("integrity"))
+                data, binding, conditions, archive_root = _archive(archive, record.get("integrity"))
+                facts["archive_root"] = archive_root
             else:
                 if kind != "project_manifest":
                     raise OracleError("source project requires a project manifest")
