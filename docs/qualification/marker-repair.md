@@ -37,7 +37,8 @@ the repaired REA report SHA256 is
 The frozen public corpus, its original v4.1 baseline, and the v4.2.0 M2
 candidate remain unchanged. A fresh 90-pair replay of the pinned repaired
 binary SHA256 `07f00d8cb141eccb8d4a9a21e809dc971adb702831c5b1e22dd738074b8ac3a0`
-is in `replay-v4.2.1/`. Core-complete pairs rose from 29 to 38;
+is in `replay-v4.2.1/`; its [90-case summary](evidence/marker-repair-replay.json)
+is committed here. Core-complete pairs rose from 29 to 38;
 comparison-complete pairs rose from 12 to 17. Nine pairs gained core
 completion and five gained comparison completion, with no regression in either
 status and no change to any case's known-miss count. The eleven known misses
