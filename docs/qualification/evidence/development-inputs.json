@@ -1,0 +1,132 @@
+{
+  "archive_classes": {
+    "expanded_limit": 24,
+    "extension_or_special_record": 18,
+    "legacy_numeric_time_tail": 205,
+    "mixed_archive_roots": 18,
+    "non_posix_ustar_magic": 15,
+    "nonportable_path": 90,
+    "single_legacy_root": 234,
+    "single_portable_legacy_root": 205
+  },
+  "corpus_sha256": "3b9ad0dda0bb8d5de9ccc3c47d9984457244808ad6e2832aa28c3b31797d48f3",
+  "json_maxima": {
+    "package-lock.json": {
+      "array_nodes": 243,
+      "max_array_elements": 68,
+      "max_depth": 6,
+      "max_key_bytes": 289,
+      "max_object_members": 2718,
+      "max_string_value_bytes": 386,
+      "object_key_bytes": 550327,
+      "object_nodes": 7799,
+      "source_bytes": 1379833,
+      "string_value_bytes": 442868,
+      "total_decoded_string_and_key_bytes": 934277,
+      "value_nodes": 27547
+    },
+    "package.json": {
+      "array_nodes": 12,
+      "max_array_elements": 68,
+      "max_depth": 7,
+      "max_key_bytes": 52,
+      "max_object_members": 111,
+      "max_string_value_bytes": 486,
+      "object_key_bytes": 4953,
+      "object_nodes": 72,
+      "source_bytes": 15673,
+      "string_value_bytes": 6843,
+      "total_decoded_string_and_key_bytes": 11796,
+      "value_nodes": 319
+    }
+  },
+  "original_json_census_sha256": "452edd8557b64503c4f398ce46b5f255750d95c67ba7e2cd0e57d07b16fd729b",
+  "original_pair_census_sha256": "1ed4a42204b78f78c8ae634d8ef282dfc815dccc86dc8c49e16f13a376208bee",
+  "original_profile_summary_sha256": "d96046ca9a25970e26ccf0861aefa89d5ee99cfa981b1932915ded80c9acb4a5",
+  "resource_summary_sha256": "f0e445f987adc1c23c9ba269340548cc0a3e05ef4fbce87f67ab7a49841ab590",
+  "schema_version": 1,
+  "scope": "Diagnostic counts only. Classes overlap. Expanded-limit failures retain lower bounds. No holdout failure detail was inspected.",
+  "split": "development",
+  "whole_review_maxima": {
+    "archive_attempts": {
+      "pairs": [
+        {
+          "id": "puppeteer__puppeteer-d1b9a2162a01",
+          "repository": "puppeteer/puppeteer"
+        }
+      ],
+      "value": 4688
+    },
+    "compressed_bytes": {
+      "pairs": [
+        {
+          "id": "microsoft__vscode-1155fd012168",
+          "repository": "microsoft/vscode"
+        }
+      ],
+      "value": 1291810107
+    },
+    "declared_edge_count": {
+      "pairs": [
+        {
+          "id": "swagger-api__swagger-ui-2f91b75bafee",
+          "repository": "swagger-api/swagger-ui"
+        }
+      ],
+      "value": 9726
+    },
+    "lock_bytes": {
+      "pairs": [
+        {
+          "id": "puppeteer__puppeteer-d1b9a2162a01",
+          "repository": "puppeteer/puppeteer"
+        }
+      ],
+      "value": 2759665
+    },
+    "logical_tar_members": {
+      "pairs": [
+        {
+          "id": "realm__realm-js-99ab0aea00c0",
+          "repository": "realm/realm-js"
+        }
+      ],
+      "value": 119102
+    },
+    "produced_bytes": {
+      "pairs": [
+        {
+          "id": "microsoft__TypeScript-dca8e236a227",
+          "repository": "microsoft/TypeScript"
+        }
+      ],
+      "value": 3408805376
+    },
+    "raw_tar_headers": {
+      "pairs": [
+        {
+          "id": "realm__realm-js-99ab0aea00c0",
+          "repository": "realm/realm-js"
+        }
+      ],
+      "value": 119278
+    },
+    "record_count": {
+      "pairs": [
+        {
+          "id": "puppeteer__puppeteer-d1b9a2162a01",
+          "repository": "puppeteer/puppeteer"
+        },
+        {
+          "id": "puppeteer__puppeteer-9478d6036761",
+          "repository": "puppeteer/puppeteer"
+        },
+        {
+          "id": "puppeteer__puppeteer-4aa33a7de7c3",
+          "repository": "puppeteer/puppeteer"
+        }
+      ],
+      "value": 5436
+    }
+  }
+}
