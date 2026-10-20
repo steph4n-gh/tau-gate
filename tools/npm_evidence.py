@@ -3,9 +3,7 @@
 
 import argparse
 import base64
-import gzip
 import hashlib
-import io
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -20,12 +18,31 @@ import zlib
 
 MAX_FILE = 64 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
+MAX_NPM_RECORDS = 10_000
+MAX_NPM_REFERENCES = 50_000
 ROOT_EVENTS = ("preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare")
 DEPENDENCY_EVENTS = ("preinstall", "install", "postinstall")
 
 
 class EvidenceError(ValueError):
     pass
+
+
+class WorkBudget:
+    def __init__(self, read=2 * 1024 ** 3, expanded=4 * 1024 ** 3, headers=250_000):
+        self.read_remaining = read
+        self.expanded_remaining = expanded
+        self.headers_remaining = headers
+        self.exhausted = None
+
+    def charge(self, field, count, reason):
+        if self.exhausted is not None:
+            raise EvidenceError(self.exhausted)
+        if count > getattr(self, field):
+            self.exhausted = reason
+            setattr(self, field, 0)
+            raise EvidenceError(reason)
+        setattr(self, field, getattr(self, field) - count)
 
 
 def sha256(data):
@@ -51,15 +68,20 @@ def strict_json(data):
         raise EvidenceError(f"invalid JSON: {exc}") from exc
 
 
-def read_limited(path, limit=MAX_FILE):
+def read_limited(path, limit=MAX_FILE, *, budget=None):
     path = Path(path)
+    if budget is not None and budget.exhausted is not None:
+        raise EvidenceError(budget.exhausted)
+    bound = min(limit, budget.read_remaining) if budget is not None else limit
     try:
         with path.open("rb") as stream:
             if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
                 raise EvidenceError(f"not a regular file: {path}")
-            data = stream.read(limit + 1)
+            data = stream.read(bound + 1)
     except OSError as exc:
         raise EvidenceError(f"cannot read {path}: {exc}") from exc
+    if budget is not None:
+        budget.charge("read_remaining", len(data), "snapshot evidence reads exceed 2 GiB")
     if len(data) > limit:
         raise EvidenceError(f"file exceeds {limit} bytes: {path}")
     return data
@@ -135,7 +157,9 @@ def tar_text(field):
         raise EvidenceError("non-UTF8 tar path") from exc
 
 
-def archive_facts(archive, integrity):
+def archive_facts(archive, integrity, *, budget=None):
+    if budget is not None and budget.exhausted is not None:
+        raise EvidenceError(budget.exhausted)
     if len(archive) > MAX_FILE:
         raise EvidenceError("archive exceeds compressed limit")
     if hashlib.sha512(archive).digest() != sri_digest(integrity):
@@ -143,14 +167,17 @@ def archive_facts(archive, integrity):
     try:
         decoder = zlib.decompressobj(31)
         tar_data = decoder.decompress(archive, MAX_FILE + 1)
+        if budget is not None:
+            budget.charge("expanded_remaining", len(tar_data), "snapshot expanded evidence exceeds 4 GiB")
         if len(tar_data) > MAX_FILE or decoder.unconsumed_tail:
             raise EvidenceError("archive exceeds decompressed limit")
         if not decoder.eof or decoder.unused_data:
             raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
-        with gzip.GzipFile(fileobj=io.BytesIO(archive)) as stream:
-            if stream.read(MAX_FILE + 1) != tar_data:
-                raise EvidenceError("gzip readers disagree")
-    except (OSError, EOFError, zlib.error) as exc:
+    except zlib.error as exc:
+        if budget is not None:
+            budget.charge("expanded_remaining", MAX_FILE + 1, "snapshot expanded evidence exceeds 4 GiB")
+        raise EvidenceError(f"invalid gzip: {exc}") from exc
+    except (OSError, EOFError) as exc:
         raise EvidenceError(f"invalid gzip: {exc}") from exc
     offset = 0
     seen = {}
@@ -163,6 +190,8 @@ def archive_facts(archive, integrity):
             if len(tar_data) - offset < 1024 or any(tar_data[offset:]):
                 raise EvidenceError("invalid tar terminator")
             break
+        if budget is not None:
+            budget.charge("headers_remaining", 1, "snapshot tar processing exceeds 250000 headers")
         if header[257:265] != b"ustar\0" + b"00":
             raise EvidenceError("unsupported tar format; requires ustar")
         if any(header[157:257]) or any(header[500:]):
@@ -255,6 +284,9 @@ def load_lock(lock_path):
     lock = strict_json(data)
     if not isinstance(lock, dict) or lock.get("lockfileVersion") != 3 or not isinstance(lock.get("packages"), dict):
         raise EvidenceError("requires an npm v3 packages lockfile")
+    if len(lock["packages"]) > MAX_NPM_RECORDS:
+        raise EvidenceError("npm snapshot exceeds 10000 package records")
+    references = 0
     for path, record in lock["packages"].items():
         safe_relative(path, allow_empty=True)
         if not isinstance(record, dict):
@@ -262,6 +294,13 @@ def load_lock(lock_path):
         for flag in ("link", "hasInstallScript"):
             if flag in record and type(record[flag]) is not bool:
                 raise EvidenceError(f"lock {flag} must be a boolean")
+        for kind in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
+            if kind in record:
+                if not isinstance(record[kind], dict):
+                    raise EvidenceError("invalid dependency map")
+                references += len(record[kind])
+                if references > MAX_NPM_REFERENCES:
+                    raise EvidenceError("npm snapshot exceeds 50000 dependency references")
     if "" not in lock["packages"]:
         raise EvidenceError("missing root lock record")
     return data, lock
@@ -300,9 +339,12 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
         raise EvidenceError("index lock hash mismatch")
     if not isinstance(index["packages"], list):
         raise EvidenceError("packages index must be an array")
+    if len(index["packages"]) > MAX_NPM_RECORDS:
+        raise EvidenceError("locator index exceeds 10000 package records")
     expected = {path: record for path, record in lock["packages"].items() if not record.get("link", False)}
     seen = set()
     results = []
+    budget = WorkBudget()
     for item in index["packages"]:
         if not isinstance(item, dict) or set(item) not in ({"path", "artifact"}, {"path", "project_manifest"}):
             raise EvidenceError("locator entry requires path and one supported evidence source")
@@ -315,8 +357,8 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
             if not is_registry_path(path):
                 raise EvidenceError("project instance cannot use registry artifact evidence")
             archive_source(record.get("resolved"))
-            archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]))
-            data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"))
+            archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]), budget=budget)
+            data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"), budget=budget)
             facts = manifest_facts(data, binding_gyp, binding_hash=binding_hash)
             facts.update({"kind": "artifact", "artifact_sha256": sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest(), "source": record.get("resolved"), "integrity": record.get("integrity")})
             expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
@@ -326,14 +368,14 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
             if is_registry_path(path):
                 raise EvidenceError("supplied manifest cannot establish registry artifact binding")
             source_path = confined_file(Path(index_path).parent, item["project_manifest"])
-            data = read_limited(source_path, MAX_MANIFEST)
-            if path == "" and root_manifest is not None and data != read_limited(root_manifest, MAX_MANIFEST):
+            data = read_limited(source_path, MAX_MANIFEST, budget=budget)
+            if path == "" and root_manifest is not None and data != read_limited(root_manifest, MAX_MANIFEST, budget=budget):
                 raise EvidenceError("index root manifest differs from supplied root input")
             binding_path = source_path.parent / "binding.gyp"
             if binding_path.is_symlink():
                 raise EvidenceError("symlink binding.gyp source")
             binding_gyp = binding_path.exists()
-            binding_hash = sha256(read_limited(binding_path)) if binding_gyp else None
+            binding_hash = sha256(read_limited(binding_path, budget=budget)) if binding_gyp else None
             manifest = strict_json(data)
             facts = manifest_facts(data, binding_gyp, "root" if path == "" else "workspace", binding_hash)
             facts["kind"] = "source_project"
@@ -350,7 +392,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise EvidenceError("artifact redirects are unsupported; use an offline cache")
 
 
-def fetch_archive(url, allow_loopback=False):
+def fetch_archive(url, allow_loopback=False, *, budget=None):
+    if budget is not None and budget.exhausted is not None:
+        raise EvidenceError(budget.exhausted)
     parsed = archive_source(url)
     if parsed.username is not None or parsed.password is not None or parsed.fragment or not parsed.hostname:
         raise EvidenceError("credentials, fragments, or missing host in artifact URL")
@@ -366,9 +410,12 @@ def fetch_archive(url, allow_loopback=False):
         with opener.open(urllib.request.Request(url, headers={"User-Agent": "tau-gate-evidence/1", "Accept-Encoding": "identity"}), timeout=30) as response:
             if response.status != 200:
                 raise EvidenceError("artifact response must have status 200")
-            data = response.read(MAX_FILE + 1)
+            bound = min(MAX_FILE, budget.read_remaining) if budget is not None else MAX_FILE
+            data = response.read(bound + 1)
     except (OSError, ValueError) as exc:
         raise EvidenceError(f"artifact acquisition failed: {exc}") from exc
+    if budget is not None:
+        budget.charge("read_remaining", len(data), "snapshot evidence reads exceed 2 GiB")
     if len(data) > MAX_FILE:
         raise EvidenceError("artifact response exceeds compressed limit")
     return data
@@ -382,7 +429,8 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
         raise EvidenceError("evidence output directory must be empty")
     output.mkdir(parents=True, exist_ok=True)
     entries = []
-    archives = {}
+    archives = set()
+    budget = WorkBudget()
     for path, record in sorted(lock["packages"].items()):
         if record.get("link", False):
             continue
@@ -391,18 +439,22 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
             digest = sri_digest(record.get("integrity"))
             cache_name = digest.hex() + ".tgz"
             if archive_cache is not None:
-                archive = read_limited(confined_file(archive_cache, cache_name))
+                archive = read_limited(confined_file(archive_cache, cache_name), budget=budget)
             else:
-                archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback)
-            data, manifest, _, _ = archive_facts(archive, record.get("integrity"))
+                archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback, budget=budget)
+            data, manifest, _, _ = archive_facts(archive, record.get("integrity"), budget=budget)
             check_identity(path, record, manifest)
             relative = "artifacts/" + sha256(archive) + ".tgz"
-            archives[relative] = archive
+            if relative not in archives:
+                destination = output / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(archive)
+                archives.add(relative)
             entries.append({"path": path, "artifact": relative})
         else:
             relative_source = (path + "/" if path else "") + "package.json"
             source = confined_file(project_dir, relative_source)
-            data = read_limited(source, MAX_MANIFEST)
+            data = read_limited(source, MAX_MANIFEST, budget=budget)
             check_identity(path, record, strict_json(data))
             relative = "projects/" + (path + "/" if path else "") + "package.json"
             destination = output / relative
@@ -412,12 +464,8 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
             if binding.is_symlink():
                 raise EvidenceError("symlink binding.gyp source")
             if binding.exists():
-                (destination.parent / "binding.gyp").write_bytes(read_limited(binding))
+                (destination.parent / "binding.gyp").write_bytes(read_limited(binding, budget=budget))
             entries.append({"path": path, "project_manifest": relative})
-    for relative, archive in sorted(archives.items()):
-        destination = output / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(archive)
     index_path = output / "index.json"
     index_path.write_bytes(json_bytes({"schema_version": 1, "lock_sha256": sha256(lock_bytes), "packages": entries}))
     validate_bundle(lock_path, index_path, confined_file(project_dir, "package.json"))

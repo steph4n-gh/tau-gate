@@ -59,3 +59,15 @@ budgets exercise cumulative repeated archives, CRC and truncation failures,
 failed file-size checks, header failures, exhaustion, and recovery after errors.
 The CLI checks assert exit 2, deterministic incomplete JSON, and unchanged input
 files for oversized npm records, declared references, and JSON values.
+
+The Python evidence collector applies the same fixed record, reference, read,
+expanded-byte, and tar-header ceilings before it accepts a bundle. Collection
+and subsequent validation each have their own per-snapshot budget; the two
+passes are separately bounded. Failed and repeated local reads retain returned
+byte charges. A zlib error whose partial output is unavailable to Python is
+charged as a full capped 64 MiB attempt. The collector writes distinct archive
+bytes directly to its isolated output directory instead of retaining all
+archives in memory. A failed collection may leave partial files there, but it
+never returns a validated index. Python's JSON decoder and network acquisition
+still rely on the existing per-file limit and request timeout; a whole-review
+deadline is part of the consumer workflow qualification.
