@@ -35,5 +35,26 @@ earthquake report SHA256 is
 the repaired REA report SHA256 is
 `79ef1a03cc836d09349097367a9381b8eb84b6b49e4013c7065c5ac3c325328b`.
 The frozen public corpus, its original v4.1 baseline, and the v4.2.0 M2
-candidate remain unchanged. A separate post-pilot replay receipt is required
-before claiming any corpus change.
+candidate remain unchanged. A fresh 90-pair replay of the pinned repaired
+binary SHA256 `07f00d8cb141eccb8d4a9a21e809dc971adb702831c5b1e22dd738074b8ac3a0`
+is in `replay-v4.2.1/`. Core-complete pairs rose from 29 to 38;
+comparison-complete pairs rose from 12 to 17. Nine pairs gained core
+completion and five gained comparison completion, with no regression in either
+status and no change to any case's known-miss count. The eleven known misses
+remain; no assessed approval-relevant miss was observed. This is an historical
+corpus, not a sustained-use or malware-detection claim.
+
+The REA pilot also exposed a separate source-project approval gap: the root
+`prepare` command kept the same manifest bytes while a referenced local script
+changed. An approval still returned allowed. The PR helper now requires a
+trusted-base digest of the entire tracked Git tree for source-project lifecycle
+candidates and blocks head-side changes to trusted gate files, including policy-only PRs. An
+independent 20-case Git qualification and 21 focused real-Git tests cover local
+script and imported-file edits, policy forgery, candidate-free policy changes,
+administrative stage/update/cleanup, symlinks, Gitlink identity, dirty-tree exclusion, and
+deterministic reports. The initial false-allow report is preserved at
+`rea-entrypoint-probe-report/report.json` (SHA256
+`68f85050b9f619ce85874e3244a6ca21db173b280d3393c31a6fc56a5effd7dd`).
+The tracked-tree policy is deliberately conservative and will increase review
+work for repositories with source-project scripts; untracked or runtime-fetched
+inputs remain outside its binding.

@@ -3,6 +3,7 @@
 
 import argparse
 from dataclasses import dataclass, field
+import hashlib
 import html
 import json
 import os
@@ -38,6 +39,8 @@ class GitObjects:
         self.repository = Path(self.run("rev-parse", "--show-toplevel").decode().strip())
         self.trees = {}
         self.commit_trees = {}
+        self.source_content = {}
+        self.source_trees = {}
 
     def run(self, *args):
         result = subprocess.run(["git", "--no-lazy-fetch", "--no-replace-objects", "--literal-pathspecs", "-C", str(self.repository), *args],
@@ -131,6 +134,62 @@ class GitObjects:
             raise EvidenceError("Git blob size changed during capture")
         return data, {"git_oid": oid, "mode": mode, "size": size, "sha256": sha256(data)}
 
+    def source_tree(self, commit, excluded):
+        """Bind every tracked regular file, including paths and executable modes."""
+        key = (commit, tuple(sorted(excluded)))
+        if key in self.source_trees:
+            return self.source_trees[key]
+        digest = hashlib.sha256(b"tau-gate-source-tree-v1\0")
+        total = 0
+        count = 0
+        gitlinks = 0
+        for record in self.run("ls-tree", "-r", "-l", "-z", commit).split(b"\0"):
+            if not record:
+                continue
+            metadata, path = record.split(b"\t", 1)
+            mode, kind, oid, declared_size = metadata.split()
+            if path in excluded:
+                continue
+            if kind == b"commit" and mode == b"160000":
+                size, content = len(oid), hashlib.sha256(oid).digest()
+                gitlinks += 1
+            elif kind == b"blob" and mode in (b"100644", b"100755"):
+                if oid not in self.source_content:
+                    object_id = oid.decode("ascii")
+                    size = int(declared_size)
+                    if size > MAX_FILE:
+                        raise EvidenceError("source tree exceeds 64 MiB per file")
+                    data = self.run("cat-file", "blob", object_id)
+                    if len(data) != size:
+                        raise EvidenceError("Git blob size changed during source-tree capture")
+                    self.source_content[oid] = (size, hashlib.sha256(data).digest())
+                size, content = self.source_content[oid]
+                if total + size > 512 * 1024 * 1024:
+                    raise EvidenceError("source tree exceeds 512 MiB total")
+                total += size
+                count += 1
+            else:
+                raise EvidenceError(f"source tree contains an unsupported symlink or Git mode: {path!r}")
+            digest.update(len(path).to_bytes(8, "big"))
+            digest.update(path)
+            digest.update(mode)
+            digest.update(size.to_bytes(8, "big"))
+            digest.update(content)
+        self.source_trees[key] = {"sha256": digest.hexdigest(), "files": count, "bytes": total,
+                                  "gitlinks": gitlinks}
+        return self.source_trees[key]
+
+    def tracked_entries(self, commit, paths, prefixes):
+        found = {}
+        for record in self.run("ls-tree", "-r", "-z", commit).split(b"\0"):
+            if not record:
+                continue
+            metadata, path = record.split(b"\t", 1)
+            if path in paths or any(path.startswith(prefix) for prefix in prefixes):
+                mode, kind, oid = metadata.split()
+                found[path] = (mode, kind, oid)
+        return found
+
 
 def portable_path(value):
     safe_relative(value)
@@ -193,6 +252,16 @@ def summary(report):
     if report["policy"] is not None:
         policy = report["policy"]
         lines.extend(["", f"Approvals come from base `{policy['commit']}` at `{markdown_text(policy['path'])}`."])
+    source = report.get("source_approval")
+    if source is not None:
+        lines.extend(["", f"Trusted gate and source-tree approval: {source['status']}."])
+        for label in ("base", "head"):
+            if label in source:
+                lines.append(f"{label.capitalize()} tracked-tree SHA-256 `{source[label]['sha256']}` ({source[label]['files']} files, {source[label]['bytes']} bytes, {source[label]['gitlinks']} gitlinks).")
+        if source.get("changed_trusted_paths"):
+            lines.append("Head changes trusted gate files: " + ", ".join(f"`{markdown_text(path)}`" for path in source["changed_trusted_paths"]) + ". Use a trusted administrative update.")
+        if source.get("unapproved_head_digest"):
+            lines.append(f"Unapproved source tree digest `{source['unapproved_head_digest']}`.")
     core = report.get("core") or {}
     changes = core.get("execution_evidence_changes", [])
     packages = core.get("package_changes", [])
@@ -261,7 +330,7 @@ def prepare_output(path, repository, cache):
 
 def review(args):
     report = {"schema_version": 1, "outcome": "incomplete", "exit_code": 2,
-              "base": None, "head": None, "policy": None, "core": None, "errors": []}
+              "base": None, "head": None, "policy": None, "source_approval": None, "core": None, "errors": []}
     output = None
     replacements = []
     stage = "inputs"
@@ -274,6 +343,9 @@ def review(args):
             replacements.append((str(args.archive_cache.resolve()), "<archive-cache>"))
         project = "" if args.project == "." else portable_path(args.project)
         approval_path = portable_path(args.approvals)
+        source_approval_path = portable_path(args.source_approvals)
+        if approval_path == source_approval_path:
+            raise EvidenceError("approval paths must be distinct")
         binary = args.tau_gate.resolve(strict=True)
         report["trusted_tools"] = {
             "tau_gate_sha256": sha256(read_limited(binary)),
@@ -309,7 +381,52 @@ def review(args):
         outcome = core.get("policy", {}).get("outcome", "incomplete")
         if outcome not in ("allowed", "blocked", "incomplete") or result.returncode != {"allowed": 0, "blocked": 1, "incomplete": 2}[outcome]:
             raise EvidenceError(f"core outcome or exit code is inconsistent: {result.returncode}")
-        report.update(outcome=outcome, exit_code=result.returncode)
+        source_required = any(
+            item.get("candidate") and (item.get("facts") or {}).get("kind") == "source_project"
+            for label in ("base", "head")
+            for item in core.get(label, {}).get("execution_evidence", []))
+        excluded = {path.encode("utf-8") for path in (approval_path, source_approval_path)}
+        protected_prefixes = (b"tools/", b".github/workflows/")
+        stage = "policy_changes"
+        base_entries = git.tracked_entries(snapshots["base"].commit, excluded, protected_prefixes)
+        head_entries = git.tracked_entries(snapshots["head"].commit, excluded, protected_prefixes)
+        changed_paths = sorted(path.decode("utf-8") for path in base_entries.keys() | head_entries.keys()
+                               if base_entries.get(path) != head_entries.get(path))
+        if source_required or changed_paths:
+            source = {"status": "incomplete", "required": source_required,
+                      "origin": "base", "commit": snapshots["base"].commit,
+                      "path": source_approval_path, "excluded_paths": sorted((approval_path, source_approval_path)),
+                      "changed_trusted_paths": changed_paths}
+            report["source_approval"] = source
+        if source_required:
+            for label in ("base", "head"):
+                stage = label + "_source_tree"
+                source[label] = git.source_tree(snapshots[label].commit, excluded)
+            stage = "source_policy"
+            data, metadata = git.blob(snapshots["base"].commit, source_approval_path, MAX_MANIFEST)
+            source["policy_sha256"] = metadata["sha256"]
+            policy = strict_json(data)
+            if (not isinstance(policy, dict) or set(policy) != {"schema_version", "digests"}
+                    or type(policy["schema_version"]) is not int or policy["schema_version"] != 1
+                    or not isinstance(policy["digests"], list)
+                    or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                           for value in policy["digests"])
+                    or len(set(policy["digests"])) != len(policy["digests"])):
+                raise EvidenceError("source approval file must contain schema_version 1 and unique lowercase SHA-256 digests")
+            source["matched"] = source["head"]["sha256"] in policy["digests"]
+            if changed_paths or not source["matched"]:
+                source["status"] = "blocked"
+                if not source["matched"]:
+                    source["unapproved_head_digest"] = source["head"]["sha256"]
+                if outcome == "allowed":
+                    outcome = "blocked"
+            else:
+                source["status"] = "allowed"
+        elif changed_paths:
+            source["status"] = "blocked"
+            if outcome == "allowed":
+                outcome = "blocked"
+        report.update(outcome=outcome, exit_code={"allowed": 0, "blocked": 1, "incomplete": 2}[outcome])
     except (EvidenceError, OSError, ValueError) as exc:
         message = str(exc)
         for original, replacement in replacements:
@@ -330,6 +447,7 @@ def main(argv=None):
     parser.add_argument("--head", required=True)
     parser.add_argument("--project", default=".", help="portable repository-relative npm project directory")
     parser.add_argument("--approvals", default="tau-gate.approvals.json", help="repository-relative approval file read from base only")
+    parser.add_argument("--source-approvals", default="tau-gate.source-approvals.json", help="repository-relative source-tree approval file read from base only")
     parser.add_argument("--tau-gate", type=Path, required=True, help="caller-trusted executable")
     parser.add_argument("--archive-cache", type=Path, help="offline SHA512-hex.tgz cache; omission permits constrained downloads")
     parser.add_argument("--output", type=Path, required=True, help="new or empty directory outside repository and cache")

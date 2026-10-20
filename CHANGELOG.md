@@ -4,6 +4,7 @@
 
 - Resolve a stale positive npm `hasInstallScript` hint against the complete, integrity-verified archive. A verified package without an install hook or implicit native build is no longer an execution candidate. A false marker with observed execution, missing evidence, and unsupported archives still return incomplete. The marker remains visible in reports.
 - Correct the independent npm evidence check to use the same asymmetric rule. Preserve qualified approval fingerprints and the offline, read-only, dependency-free core.
+- Bind source-project lifecycle approvals to the exact tracked Git tree in the PR helper. Base-only source digests detect edits to referenced scripts and imports; head changes to approval files, vendored helpers, or workflows block even when no source candidate is present. Policy updates require a reviewed administrative merge.
 - Exercise the repair against both owned pilot lockfiles and the frozen public corpus. See [the repair record](docs/qualification/marker-repair.md) for measured scope and limitations.
 
 ## 4.2.0

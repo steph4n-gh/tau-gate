@@ -94,7 +94,9 @@ class Qualification:
         self.write("packages/local/binding.gyp", b"{ 'targets': [] }\n")
         self.write("tools/pr_review.py", b"from pathlib import Path\nPath('HEAD_HELPER_EXECUTED').write_text('bad')\nraise RuntimeError('HEAD CODE EXECUTED')\n")
         self.write(".tau-gate-approvals.json", encoded({"schema_version": 1, "approvals": []}))
-        self.initial = self.commit("Initial fixture")
+        initial_without_source_policy = self.commit("Initial fixture")
+        self.write(".tau-gate-source-approvals.json", encoded({"schema_version": 1, "digests": [self.source_digest(initial_without_source_policy)]}))
+        self.initial = self.commit("Initial source policy")
         self.approvals = self.discover_approvals()
         self.write(".tau-gate-approvals.json", encoded(self.approvals))
         self.base = self.commit("Trusted baseline approvals")
@@ -157,6 +159,26 @@ class Qualification:
     def blob(self, ref, relative):
         return run(["git", "show", f"{ref}:{self.prefix}/{relative}"], cwd=self.repo).stdout
 
+    def source_digest(self, ref):
+        excluded = {self.prefix.encode() + b"/.tau-gate-approvals.json",
+                    self.prefix.encode() + b"/.tau-gate-source-approvals.json"}
+        digest = hashlib.sha256(b"tau-gate-source-tree-v1\0")
+        for record in run(["git", "ls-tree", "-r", "-z", ref], cwd=self.repo).stdout.split(b"\0"):
+            if not record:
+                continue
+            metadata, path = record.split(b"\t", 1)
+            if path in excluded:
+                continue
+            mode, kind, oid = metadata.split()
+            assert kind == b"blob" and mode in (b"100644", b"100755")
+            body = run(["git", "cat-file", "blob", oid.decode()], cwd=self.repo).stdout
+            digest.update(len(path).to_bytes(8, "big"))
+            digest.update(path)
+            digest.update(mode)
+            digest.update(len(body).to_bytes(8, "big"))
+            digest.update(hashlib.sha256(body).digest())
+        return digest.hexdigest()
+
     def execute(self, label, base, head, expected, reason=(), **options):
         destination = self.output / "runs" / label
         before_repo = tree_hashes(self.repo, include_git=True)
@@ -164,6 +186,7 @@ class Qualification:
         command = [sys.executable, self.wrapper, "--repo", self.repo, "--base", base,
                    "--head", head, "--tau-gate", self.binary, "--output", destination,
                    "--project", self.prefix, "--approvals", self.prefix + "/.tau-gate-approvals.json",
+                   "--source-approvals", self.prefix + "/.tau-gate-source-approvals.json",
                    "--archive-cache", self.cache]
         result = run(command, check=False)
         assert result.returncode == expected, (label, result.returncode, expected,
@@ -188,6 +211,10 @@ class Qualification:
             policy = report["policy"]
             assert policy["origin"] == "base" and policy["commit"] == base, policy
             assert policy["sha256"] == sha(self.blob(base, ".tau-gate-approvals.json")), policy
+            source = report["source_approval"]
+            assert source["base"]["sha256"] == self.source_digest(base), source
+            assert source["head"]["sha256"] == self.source_digest(head), source
+            assert source["policy_sha256"] == sha(self.blob(base, ".tau-gate-source-approvals.json")), source
             self.exact_capture(report, base, head)
         self.cases.append({"case": label, "passed": True, "exit_code": result.returncode,
                            "report_sha256": sha(report_bytes), "command": [str(arg) for arg in command],
@@ -262,7 +289,15 @@ class Qualification:
         assert sha(self.blob(changed, ".tau-gate-approvals.json")) != report["policy"]["sha256"]
         assert report["core"]["execution_evidence_changes"], report["core"]
         head_deleted_policy = self.variant("head-policy-deleted", lambda: (self.project / ".tau-gate-approvals.json").unlink())
-        self.execute("head-policy-deletion-ignored", self.base, head_deleted_policy, 0)
+        self.execute("head-policy-deletion-blocked", self.base, head_deleted_policy, 1)
+
+        def forge_source_policy():
+            self.write("tools/pr_review.py", b"print('changed tracked source')\n")
+            self.write(".tau-gate-source-approvals.json", encoded({"schema_version": 1, "digests": ["0" * 64]}))
+        forged = self.variant("head-source-policy-forgery", forge_source_policy)
+        report = self.execute("head-source-policy-cannot-self-authorize", self.base, forged, 1)
+        assert report["core"]["policy"]["outcome"] == "allowed", report["core"]["policy"]
+        assert report["source_approval"]["unapproved_head_digest"] == self.source_digest(forged)
 
         def change_lock(transform):
             lock = copy.deepcopy(self.lock)
