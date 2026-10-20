@@ -21,6 +21,8 @@ Generate seeds with `python3 fuzz/seeds.py`. The script uses Python's json,
 gzip, zlib, and tarfile, not Tau-Gate's implementation. Run
 `cargo test --manifest-path fuzz/Cargo.toml --lib --locked` to verify that the
 valid tar, artifact, and enforcement seeds reach successful inspection paths.
+The generated tar seeds include an ordinary root, a named root, and an
+identical non-lifecycle dot-alias pair observed in registry archives.
 The generated corpus and crash artifacts are deliberately outside Git; the
 seed recipe and dependency lockfile are versioned.
 

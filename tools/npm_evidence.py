@@ -181,6 +181,7 @@ def archive_facts(archive, integrity, *, budget=None):
         raise EvidenceError(f"invalid gzip: {exc}") from exc
     offset = 0
     seen = {}
+    entry_count = 0
     root_name = None
     manifest_bytes = None
     binding_hash = None
@@ -190,6 +191,9 @@ def archive_facts(archive, integrity, *, budget=None):
             if len(tar_data) - offset < 1024 or any(tar_data[offset:]):
                 raise EvidenceError("invalid tar terminator")
             break
+        if entry_count == 10_000:
+            raise EvidenceError("tar exceeds 10000 entries")
+        entry_count += 1
         if budget is not None:
             budget.charge("headers_remaining", 1, "snapshot tar processing exceeds 250000 headers")
         if header[257:265] != b"ustar\0" + b"00":
@@ -220,6 +224,12 @@ def archive_facts(archive, integrity, *, budget=None):
         raw_name = tar_text(header[:100])
         joined = f"{prefix}/{raw_name}" if prefix else raw_name
         name = joined.removesuffix("/") if info.isdir() else joined
+        raw_parts = name.split("/")
+        dot_alias = len(raw_parts) >= 3 and raw_parts[1] == "."
+        if dot_alias:
+            if raw_parts.count(".") != 1:
+                raise EvidenceError("unsupported dot tar path")
+            name = "/".join((raw_parts[0], *raw_parts[2:]))
         safe_relative(name)
         parts = name.split("/")
         if any(part.endswith((".", " ")) or any(not (32 <= ord(char) <= 126) or char in '\\:*?"<>|' for char in part)
@@ -238,11 +248,10 @@ def archive_facts(archive, integrity, *, budget=None):
             raise EvidenceError("noncanonical lifecycle input path")
         if info.isdir() and relative in ("package.json", "binding.gyp"):
             raise EvidenceError("evidence path is not a regular tar file")
-        if canonical in seen or len(seen) >= 10000:
-            raise EvidenceError("duplicate tar path or excessive entry count")
-        if any(seen.get("/".join(parts[:n]).lower()) == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
+        if dot_alias and (info.isdir() or relative in ("package.json", "binding.gyp")):
+            raise EvidenceError("dot aliases of directories or lifecycle evidence are unsupported")
+        if any(seen.get("/".join(parts[:n]).lower(), {}).get("kind") == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
             raise EvidenceError("tar file and parent path conflict")
-        seen[canonical] = "directory" if info.isdir() else "file"
         if info.size < 0 or info.size > MAX_FILE or (info.isdir() and info.size) or offset + 512 + info.size > len(tar_data):
             raise EvidenceError("invalid tar size")
         start = offset + 512
@@ -250,6 +259,19 @@ def archive_facts(archive, integrity, *, budget=None):
         padded_end = start + ((info.size + 511) // 512) * 512
         if padded_end > len(tar_data) or any(tar_data[end:padded_end]):
             raise EvidenceError("invalid tar padding")
+        previous = seen.get(canonical)
+        if previous is not None:
+            if (previous["name"] != name or previous["kind"] != "file" or info.isdir()
+                    or previous["paired"] or previous["dot_alias"] == dot_alias):
+                raise EvidenceError("duplicate tar path or excessive entry count")
+            if (previous["before"] != header[100:148] or previous["after"] != header[156:512]
+                    or tar_data[previous["start"]:previous["end"]] != tar_data[start:end]):
+                raise EvidenceError("conflicting dot-alias tar path")
+            previous["paired"] = True
+        else:
+            seen[canonical] = {"name": name, "kind": "directory" if info.isdir() else "file",
+                               "start": start, "end": end, "before": header[100:148], "after": header[156:512],
+                               "dot_alias": dot_alias, "paired": False}
         if relative == "package.json":
             if info.size > MAX_MANIFEST:
                 raise EvidenceError("invalid archived package.json")
@@ -259,6 +281,8 @@ def archive_facts(archive, integrity, *, budget=None):
         offset = padded_end
     else:
         raise EvidenceError("missing tar terminator")
+    if any(item["dot_alias"] and not item["paired"] for item in seen.values()):
+        raise EvidenceError("unpaired dot-alias tar path")
     if manifest_bytes is None:
         raise EvidenceError("tar is missing package.json")
     manifest = strict_json(manifest_bytes)

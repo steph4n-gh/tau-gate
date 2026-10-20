@@ -65,6 +65,19 @@ for root, label in (("package", "ordinary"), ("json5", "named-root")):
         put("tar", "repair-checksum", b"\x01" + tar_bytes)
         put("artifact", "repair-tar-and-repack", b"\x01" + tar_bytes)
 
+with io.BytesIO() as stream:
+    with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        for name, body in (("package/package.json", manifest),
+                           ("package/./dist/index.js", b"same bytes"),
+                           ("package/dist/index.js", b"same bytes")):
+            info = tarfile.TarInfo(name)
+            info.size = len(body)
+            info.mode = 0o644
+            archive.addfile(info, io.BytesIO(body))
+    alias_tar = stream.getvalue()
+put("tar", "identical-dot-alias", alias_tar)
+put("artifact", "identical-dot-alias", gzip.compress(alias_tar, mtime=0))
+
 put("lockfiles", "npm-v3", json.dumps(lock, separators=(",", ":")).encode())
 put("lockfiles", "pnpm-v9", b"lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies: {}\nsnapshots: {}\n")
 put("lockfiles", "yarn-v1", b"# yarn lockfile v1\n\nseed@1:\n  version \"1\"\n")

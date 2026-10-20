@@ -324,6 +324,9 @@ mod seed_checks {
         let named = std::fs::read("corpus/tar/named-root").unwrap();
         assert_eq!(archive::tar(&named).unwrap(), tar_facts);
         assert_eq!(external_tar(&named), Some(tar_facts.clone()));
+        let alias = std::fs::read("corpus/tar/identical-dot-alias").unwrap();
+        assert_eq!(archive::tar(&alias).unwrap().0, tar_facts.0);
+        assert_eq!(external_tar(&alias).unwrap().0, tar_facts.0);
         let gz = std::fs::read("corpus/artifact/ordinary").unwrap();
         let sri = format!(
             "sha512-{}",

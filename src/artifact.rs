@@ -471,11 +471,22 @@ fn tar_number(field: &[u8]) -> Result<usize, String> {
 }
 
 fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<String>), String> {
+    struct Seen<'a> {
+        path: String,
+        directory: bool,
+        data: &'a [u8],
+        metadata_before_checksum: &'a [u8],
+        metadata_after_checksum: &'a [u8],
+        dot_alias: bool,
+        paired: bool,
+    }
+
     if tar.len() % 512 != 0 {
         return Err("tar length is not block aligned".into());
     }
     let mut position = 0;
-    let mut paths = BTreeMap::new();
+    let mut paths: BTreeMap<String, Seen<'_>> = BTreeMap::new();
+    let mut entry_count = 0;
     let mut root: Option<String> = None;
     let mut manifest = None;
     let mut binding = None;
@@ -490,9 +501,10 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
             break;
         }
         budget.entry()?;
-        if paths.len() == MAX_ENTRIES {
+        if entry_count == MAX_ENTRIES {
             return Err("tar exceeds 10000 entries".into());
         }
+        entry_count += 1;
         if &header[257..265] != b"ustar\x0000" {
             return Err("artifact requires POSIX ustar headers".into());
         }
@@ -554,10 +566,19 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         } else {
             format!("{prefix}/{name}")
         };
-        let path = if directory {
+        let raw_path = if directory {
             joined.strip_suffix('/').unwrap_or(&joined)
         } else {
             &joined
+        };
+        let (path, dot_alias) = match raw_path.split_once("/./") {
+            Some((archive_root, rest))
+                if !archive_root.contains('/') && !rest.is_empty() && !rest.contains("/./") =>
+            {
+                (format!("{archive_root}/{rest}"), true)
+            }
+            Some(_) => return Err("unsupported dot tar path".into()),
+            None => (raw_path.to_owned(), false),
         };
         if path.split('/').any(|part| {
             let base = part.split('.').next().unwrap().to_ascii_uppercase();
@@ -577,7 +598,7 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         }) {
             return Err("unsupported nonportable tar path".into());
         }
-        let (member_root, relative) = path.split_once('/').unwrap_or((path, ""));
+        let (member_root, relative) = path.split_once('/').unwrap_or((&path, ""));
         if root
             .as_deref()
             .is_some_and(|expected| expected != member_root)
@@ -591,6 +612,9 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         if directory && matches!(relative, "package.json" | "binding.gyp") {
             return Err("evidence path is not a regular tar file".into());
         }
+        if dot_alias && (directory || matches!(relative, "package.json" | "binding.gyp")) {
+            return Err("dot aliases of directories or lifecycle evidence are unsupported".into());
+        }
         let folded = path.to_ascii_lowercase();
         if matches!(
             relative.to_ascii_lowercase().as_str(),
@@ -598,9 +622,6 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         ) && !matches!(relative, "package.json" | "binding.gyp")
         {
             return Err("noncanonical lifecycle evidence tar path".into());
-        }
-        if paths.insert(folded, directory).is_some() {
-            return Err("duplicate case-folded tar path".into());
         }
         let start = position + 512;
         let padded = size.div_ceil(512) * 512;
@@ -610,6 +631,36 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
             .ok_or("truncated tar padding")?;
         if padding.iter().any(|byte| *byte != 0) {
             return Err("nonzero tar entry padding".into());
+        }
+        if let Some(prior) = paths.get_mut(&folded) {
+            if prior.path != path
+                || prior.directory
+                || directory
+                || prior.paired
+                || prior.dot_alias == dot_alias
+            {
+                return Err("duplicate case-folded tar path".into());
+            }
+            if prior.data != data
+                || prior.metadata_before_checksum != &header[100..148]
+                || prior.metadata_after_checksum != &header[156..512]
+            {
+                return Err("conflicting dot-alias tar path".into());
+            }
+            prior.paired = true;
+        } else {
+            paths.insert(
+                folded,
+                Seen {
+                    path: path.clone(),
+                    directory,
+                    data,
+                    metadata_before_checksum: &header[100..148],
+                    metadata_after_checksum: &header[156..512],
+                    dot_alias,
+                    paired: false,
+                },
+            );
         }
         match relative {
             "package.json" => {
@@ -623,9 +674,15 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         }
         position = start + padded;
     }
+    if paths.values().any(|entry| entry.dot_alias && !entry.paired) {
+        return Err("unpaired dot-alias tar path".into());
+    }
     for path in paths.keys() {
         for (offset, _) in path.match_indices('/') {
-            if paths.get(&path[..offset]) == Some(&false) {
+            if paths
+                .get(&path[..offset])
+                .is_some_and(|entry| !entry.directory)
+            {
                 return Err("tar file conflicts with a parent directory".into());
             }
         }
@@ -1091,6 +1148,57 @@ mod tests {
         for entries in rejected {
             assert!(inspect_tar(&tar(&entries), &mut Budget::new()).is_err());
         }
+    }
+
+    #[test]
+    fn identical_nonlifecycle_dot_alias_requires_an_exact_canonical_partner() {
+        let manifest = br#"{"name":"sample","version":"1"}"#;
+        for (first, second) in [
+            ("package/./dist/index.js", "package/dist/index.js"),
+            ("package/dist/index.js", "package/./dist/index.js"),
+        ] {
+            let archive = tar(&[
+                ("package/package.json", b'0', manifest),
+                (first, b'0', b"same"),
+                (second, b'0', b"same"),
+            ]);
+            assert_eq!(
+                inspect_tar(&archive, &mut Budget::new()).unwrap().0,
+                manifest
+            );
+        }
+        for entries in [
+            vec![
+                ("package/package.json", b'0', manifest.as_slice()),
+                ("package/./dist/index.js", b'0', b"first".as_slice()),
+                ("package/dist/index.js", b'0', b"later".as_slice()),
+            ],
+            vec![
+                ("package/package.json", b'0', manifest.as_slice()),
+                ("package/./dist/index.js", b'0', b"same".as_slice()),
+            ],
+            vec![
+                ("package/./package.json", b'0', manifest.as_slice()),
+                ("package/package.json", b'0', manifest.as_slice()),
+            ],
+            vec![
+                ("package/package.json", b'0', manifest.as_slice()),
+                ("package/./Dist/index.js", b'0', b"same".as_slice()),
+                ("package/dist/index.js", b'0', b"same".as_slice()),
+            ],
+        ] {
+            assert!(inspect_tar(&tar(&entries), &mut Budget::new()).is_err());
+        }
+        let mut different_mode = tar(&[
+            ("package/package.json", b'0', manifest),
+            ("package/./dist/index.js", b'0', b"same"),
+            ("package/dist/index.js", b'0', b"same"),
+        ]);
+        different_mode[2048 + 100..2048 + 108].copy_from_slice(b"0000755\0");
+        checksum(&mut different_mode[2048..2560]);
+        assert!(inspect_tar(&different_mode, &mut Budget::new())
+            .unwrap_err()
+            .contains("conflicting dot-alias"));
     }
 
     #[test]

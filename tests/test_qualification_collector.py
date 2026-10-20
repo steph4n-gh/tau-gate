@@ -65,6 +65,31 @@ class CollectorCompatibility(unittest.TestCase):
             with self.assertRaises(npm_evidence.EvidenceError):
                 check(changed)
 
+    def test_identical_nonlifecycle_dot_alias_requires_exact_partner(self):
+        for first, second in (("package/./dist/index.js", "package/dist/index.js"),
+                              ("package/dist/index.js", "package/./dist/index.js")):
+            with self.subTest(first=first):
+                raw = archive([("package/package.json", MANIFEST), (first, b"same"), (second, b"same")])
+                self.assertEqual(check(raw)[0], MANIFEST)
+        for entries in (
+            [("package/package.json", MANIFEST), ("package/./dist/index.js", b"first"),
+             ("package/dist/index.js", b"later")],
+            [("package/package.json", MANIFEST), ("package/./dist/index.js", b"same")],
+            [("package/./package.json", MANIFEST), ("package/package.json", MANIFEST)],
+            [("package/package.json", MANIFEST), ("package/./Dist/index.js", b"same"),
+             ("package/dist/index.js", b"same")],
+        ):
+            with self.subTest(entries=entries):
+                with self.assertRaises(npm_evidence.EvidenceError):
+                    check(archive(entries))
+        changed = bytearray(archive([("package/package.json", MANIFEST),
+                                     ("package/./dist/index.js", b"same"),
+                                     ("package/dist/index.js", b"same")]))
+        changed[2048 + 100:2048 + 108] = b"0000755\0"
+        checksum(memoryview(changed)[2048:2560])
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "conflicting dot-alias"):
+            check(changed)
+
     def test_mixed_roots_and_lifecycle_aliases_fail(self):
         for entries in [
             [("json5/package.json", MANIFEST), ("other/readme", b"text")],

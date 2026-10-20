@@ -8,9 +8,10 @@ exact, consistent root and that measured timestamp-tail layout. It also
 accepts printable ASCII path characters such as spaces, `#`, `$`, `^`, and
 `~`, which appeared in development archives. Components still cannot be empty,
 `.` or `..`, end in a dot or space, contain Windows-forbidden characters, or
-use reserved device names. Case-folded duplicates, lifecycle path aliases,
-links, extensions, parent-file conflicts, nonzero padding, malformed end
-markers, checksum errors, and incorrect original-byte SRI still fail.
+use reserved device names, apart from the measured dot-alias exception below.
+Case-folded duplicates, lifecycle path aliases, links, extensions,
+parent-file conflicts, nonzero padding, malformed end markers, checksum
+errors, and incorrect original-byte SRI still fail.
 
 The timestamp exception requires zero bytes 345–475 and two 11-digit octal
 fields followed by NUL at bytes 476–487 and 488–499. The full tar header
@@ -27,6 +28,24 @@ install those bytes; it does not make this unsupported profile safe to infer.
 The `@types/cacheable-request` reference was inspected without an npm install
 of its external dependencies. These examples establish specific byte-level
 correspondence, not general npm archive compatibility or execution safety.
+
+## Identical dot-alias pairs
+
+The frozen development sample exposed five original registry archives with a
+regular file path of the form `root/./rest` and an exact `root/rest` partner.
+Each pair had identical file bytes and tar header fields apart from its name
+and checksum. The 27 affected development pairs were previously stopped by the
+evidence collector. A real `@rollup/plugin-commonjs` 29.0.0 archive was also
+extracted with npm's bundled tar implementation; both members resolved to the
+same file bytes. The reference receipt is at
+`/Volumes/Storage/taugate-qualification/dot-path-reference/receipt.json`.
+
+The core and collector now accept only this paired, byte-identical case for
+non-lifecycle regular files. Both physical headers count toward the 10,000-entry
+limit. An unpaired alias, changed file content or metadata, extra dot segment,
+directory alias, or alias of `package.json` or `binding.gyp` remains incomplete.
+This rule follows the measured archive behavior and does not imply that other
+path-normalization patterns are safe.
 
 The local replay script and exact result are retained at
 `/Volumes/Storage/taugate-qualification/compatibility-check/replay.py`
