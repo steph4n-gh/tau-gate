@@ -379,6 +379,9 @@ impl JsonReader<'_> {
             .bytes
             .get(self.pos..self.pos + 4)
             .ok_or_else(|| self.error())?;
+        if !raw.iter().all(u8::is_ascii_hexdigit) {
+            return Err(self.error());
+        }
         let text = std::str::from_utf8(raw).map_err(|_| self.error())?;
         let n = u32::from_str_radix(text, 16).map_err(|_| self.error())?;
         self.pos += 4;
@@ -602,6 +605,8 @@ mod strict_regressions {
     #[test]
     fn malformed_rejected() {
         for s in [
+            r#""\u+041""#,
+            r#""\u+000""#,
             "{a:1}",
             "[1 2]",
             "[1,]",
