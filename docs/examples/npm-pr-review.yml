@@ -1,14 +1,17 @@
 name: Review npm execution evidence
 
 on:
-  pull_request:
+  pull_request_target:
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   review:
+    name: tau-gate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
       HEAD_COMMIT: ${{ github.event.pull_request.head.sha }}

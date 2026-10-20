@@ -337,6 +337,77 @@ fn approvals_bind_source_bytes_lifecycle_and_identity() {
     assert_eq!(before, fs::read(f.0.join("approvals.json")).unwrap());
 }
 #[test]
+fn approval_sets_keep_old_and_new_evidence_valid_during_transition() {
+    let f = root_fixture();
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    let fingerprint = |output: &Output| {
+        json(output)
+            .get("execution_evidence")
+            .and_then(J::as_array)
+            .unwrap()[0]
+            .get("approval_fingerprint")
+            .and_then(J::as_str)
+            .unwrap()
+            .to_owned()
+    };
+    let old = fingerprint(&f.audit(false));
+    let changed = ROOT.replace("before", "after");
+    f.put("bundle/projects/package.json", &changed);
+    outcome(&f.audit(true), 1, "blocked");
+    let new = fingerprint(&f.audit(false));
+    assert_ne!(old, new);
+    f.put("bundle/projects/package.json", ROOT);
+    f.put(
+        "approvals.json",
+        format!(
+            r#"{{"schema_version":2,"approvals":[{{"path":"","fingerprints":["{old}","{new}"]}}]}}"#
+        ),
+    );
+    outcome(&f.audit(true), 0, "allowed");
+    f.put("bundle/projects/package.json", &changed);
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "approvals.json",
+        format!(r#"{{"schema_version":2,"approvals":[{{"path":"","fingerprints":["{new}"]}}]}}"#),
+    );
+    outcome(&f.audit(true), 0, "allowed");
+    f.put("bundle/projects/package.json", ROOT);
+    outcome(&f.audit(true), 1, "blocked");
+}
+
+#[test]
+fn malformed_approval_sets_cannot_authorize_execution() {
+    let f = root_fixture();
+    let report = json(&f.audit(false));
+    let fingerprint = report
+        .get("execution_evidence")
+        .and_then(J::as_array)
+        .unwrap()[0]
+        .get("approval_fingerprint")
+        .and_then(J::as_str)
+        .unwrap();
+    for input in [
+        r#"{"schema_version":2,"approvals":[{"path":"","fingerprints":[]}]}"#.to_owned(),
+        format!(
+            r#"{{"schema_version":2,"approvals":[{{"path":"","fingerprints":["{fingerprint}","{fingerprint}"]}}]}}"#
+        ),
+        format!(
+            r#"{{"schema_version":2,"approvals":[{{"path":"","fingerprints":["{fingerprint}"]}},{{"path":"","fingerprints":["{fingerprint}"]}}]}}"#
+        ),
+        format!(
+            r#"{{"schema_version":2,"approvals":[{{"path":"","fingerprint":"{fingerprint}"}}]}}"#
+        ),
+        format!(
+            r#"{{"schema_version":2,"approvals":[{{"path":"","fingerprints":["{}"]}}]}}"#,
+            fingerprint.to_ascii_uppercase()
+        ),
+    ] {
+        f.put("approvals.json", input);
+        assert_eq!(f.audit(true).status.code(), Some(2));
+    }
+}
+#[test]
 fn missing_conflicting_and_untrusted_inputs_precede_approvals() {
     let f = root_fixture();
     f.approve();

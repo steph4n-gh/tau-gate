@@ -139,7 +139,14 @@ class PullRequestReview(unittest.TestCase):
         self.write("package.json", json_data(self.manifest))
         forged = self.approvals()
         self.policy_path.write_bytes(json_data(forged))
-        head = self.commit("head attempts self approval")
+        for name, body in (("tools/pr_review.py", b"print('allowed')\n"),
+                           ("tools/npm_evidence.py", b"print('allowed')\n"),
+                           ("bin/tau-gate", b"forged binary\n"),
+                           (".github/workflows/npm-pr-review.yml", b"jobs: {}\n")):
+            destination = self.repo / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(body)
+        head = self.commit("head attempts self approval and replaces tools")
         report, output = self.run_review(head=head, expected=1)
         candidates = report["core"]["policy"]["unapproved_execution_candidates"]
         self.assertEqual([item["path"] for item in candidates], [""])
@@ -149,6 +156,40 @@ class PullRequestReview(unittest.TestCase):
         self.assertIn(candidates[0]["fingerprint"], text)
         self.assertIn("lifecycle", text)
         self.assertIn("Introducer", text)
+
+    def test_approval_transition_stays_valid_through_policy_update_and_cleanup(self):
+        old_manifest = json_data(self.manifest)
+        self.manifest["scripts"]["prepare"] = "echo approved-change > CANARY_EXECUTED"
+        new_manifest = json_data(self.manifest)
+        self.write("package.json", new_manifest)
+        candidate_policy = self.approvals()
+        self.write("package.json", old_manifest)
+        old_by_path = {item["path"]: item["fingerprint"] for item in self.policy["approvals"]}
+        new_by_path = {item["path"]: item["fingerprint"] for item in candidate_policy["approvals"]}
+        self.assertNotEqual(old_by_path[""], new_by_path[""])
+
+        staged = {"schema_version": 2, "approvals": [
+            {"path": path, "fingerprints": sorted({old_by_path[path], new_by_path[path]})}
+            for path in sorted(old_by_path)]}
+        self.policy_path.write_bytes(json_data(staged))
+        staged_commit = self.commit("stage old and new fingerprints")
+        self.run_review(base=self.base, head=staged_commit)
+        self.run_review(base=staged_commit, head=staged_commit)
+
+        self.write("package.json", new_manifest)
+        candidate_commit = self.commit("update reviewed lifecycle")
+        self.run_review(base=staged_commit, head=candidate_commit)
+
+        cleaned = {"schema_version": 2, "approvals": [
+            {"path": path, "fingerprints": [new_by_path[path]]}
+            for path in sorted(new_by_path)]}
+        self.policy_path.write_bytes(json_data(cleaned))
+        cleaned_commit = self.commit("remove old fingerprints")
+        self.run_review(base=candidate_commit, head=cleaned_commit)
+        self.write("package.json", old_manifest)
+        rollback_commit = self.commit("attempt rollback to removed evidence")
+        blocked, _ = self.run_review(base=cleaned_commit, head=rollback_commit, expected=1)
+        self.assertEqual([item["path"] for item in blocked["core"]["policy"]["unapproved_execution_candidates"]], [""])
 
     def test_native_input_and_same_version_source_change_invalidate_approval(self):
         self.write("packages/local/binding.gyp", b"native-source-v2\n")

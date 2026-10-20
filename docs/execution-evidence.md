@@ -54,7 +54,20 @@ Every locked record remains in scope, including disconnected and platform-omitte
 
 ## Approval schema and outcomes
 
-An approval file has exactly these fields.
+The current approval file has exactly these fields. Each path names one exact
+npm lock instance. Its nonempty fingerprint array can hold the current and a
+separately reviewed replacement during a policy transition.
+
+```json
+{
+	"schema_version": 2,
+	"approvals": [
+		{"path": "node_modules/example", "fingerprints": ["64 lowercase SHA256 hex characters"]}
+	]
+}
+```
+
+Version 1 remains readable for existing installations:
 
 ```json
 {
@@ -64,6 +77,13 @@ An approval file has exactly these fields.
 	]
 }
 ```
+
+Unknown fields, duplicate paths or fingerprints, empty fingerprint arrays,
+and malformed digests make the policy incomplete. Version 1 permits only one
+fingerprint per path. A version 2 file requires a checker that understands
+version 2, so upgrade the trusted checker before merging that policy format.
+Neither format lets a PR approve itself: the Git-object wrapper supplies the
+file from the trusted base commit.
 
 A fingerprint is SHA256 of canonical compact JSON. The tuple includes its domain and schema, npm format, exact raw instance key, locked name and version, source, integrity, and derived facts. Facts include the evidence kind, manifest name and version, original archive SHA512, manifest byte hash, lifecycle body hashes, native metadata, and binary metadata. JSON object keys use lexical order. Changing relevant evidence invalidates approval. A manifest formatting change also invalidates approval because manifest bytes are pinned. Lock formatting changes require a new index lock hash but preserve unchanged per-instance fingerprints.
 
