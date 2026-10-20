@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.1
+
+- Resolve a stale positive npm `hasInstallScript` hint against the complete, integrity-verified archive. A verified package without an install hook or implicit native build is no longer an execution candidate. A false marker with observed execution, missing evidence, and unsupported archives still return incomplete. The marker remains visible in reports.
+- Correct the independent npm evidence check to use the same asymmetric rule. Preserve qualified approval fingerprints and the offline, read-only, dependency-free core.
+- Exercise the repair against both owned pilot lockfiles and the frozen public corpus. See [the repair record](docs/qualification/marker-repair.md) for measured scope and limitations.
+
 ## 4.2.0
 
 - Published a frozen 30-project, 90-update npm v3 corpus with independent event labels, baseline replay, and measured limitations. The candidate completes 29 of 90 core reviews and 12 of 90 independent comparisons. Eleven known reporting misses remain in incomplete reviews. No assessed approval-relevant miss or fact mismatch was observed. These results do not establish general malware detection.

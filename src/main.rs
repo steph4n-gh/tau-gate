@@ -247,7 +247,7 @@ fn human(r: &J) {
     println!("All lockfile records; host installation selection is not evaluated. pnpm/Yarn records are not installed paths.");
     if let Some(c) = r.get("execution_candidates").and_then(J::as_array) {
         println!(
-            "{} execution candidates (markers, not malicious-code findings)",
+            "{} execution candidates (inspected facts or unresolved markers; not malware findings)",
             c.len()
         );
         for item in c {

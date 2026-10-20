@@ -365,6 +365,7 @@ def verify_positive_facts(folder, report):
     manifest = json.loads(raw_manifest)
     package = evidence['node_modules/pkg']
     facts = package.get('facts') or {}
+    graph_package = next((item for item in report.get('packages', []) if item.get('path') == 'node_modules/pkg'), {})
     root = evidence['']
     root_facts = root.get('facts') or {}
     expected_lifecycle = {key: sha256(value.encode()) for key, value in manifest.get('scripts', {}).items() if key in ('preinstall', 'install', 'postinstall')}
@@ -373,7 +374,10 @@ def verify_positive_facts(folder, report):
     root_binding = folder / 'evidence/project/binding.gyp'
     root_binding_raw = root_binding.read_bytes() if root_binding.is_file() else None
     root_lifecycle = {key: sha256(value.encode()) for key, value in root_manifest.get('scripts', {}).items() if key in ('preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare')}
+    install_candidate = bool(facts.get('implicit_node_gyp')) or any(manifest.get('scripts', {}).get(key) for key in ('preinstall', 'install', 'postinstall'))
     checks = [package.get('state') == 'qualified', facts.get('kind') == 'artifact',
+              package.get('candidate') is bool(install_candidate),
+              'install-lifecycle-script (body not inspected)' not in graph_package.get('capabilities', []),
               facts.get('artifact_sha512') == hashlib.sha512(compressed).hexdigest(),
               facts.get('manifest_sha256') == sha256(raw_manifest),
               facts.get('name') == manifest['name'], facts.get('version') == manifest['version'],
@@ -555,7 +559,8 @@ def portable_profile_cases():
     def no_marker(folder, lock, root, index):
         lock['packages']['node_modules/pkg'].pop('hasInstallScript')
     native = [regular('package/package.json', encoded(plain)), regular('package/binding.gyp', b'{}\n')]
-    result = [Case('portable_canonical_native_blocked', 'Canonical binding.gyp without a lock marker requires approval under the npm implicit build rule.', 'blocked', artifact=zipped(archive(native)), setup=no_marker, enforce_empty=True)]
+    result = [Case('stale_positive_install_marker', 'A verified script-free archive resolves a stale positive npm install hint.', 'allowed', manifest=plain, enforce_empty=True),
+              Case('portable_canonical_native_blocked', 'Canonical binding.gyp without a lock marker requires approval under the npm implicit build rule.', 'blocked', artifact=zipped(archive(native)), setup=no_marker, enforce_empty=True)]
     result.append(Case('portable_native_case_alias', 'A regular Binding.gyp aliases npm native evidence on case-insensitive filesystems. Matching SRI cannot authorize it.', 'incomplete', artifact=zipped(archive([native[0], regular('package/Binding.gyp', b'{}\n')])), setup=no_marker, expected_reason='noncanonical lifecycle evidence tar path', enforce_empty=True))
     result.append(Case('portable_manifest_case_overwrite', 'A later Package.json can overwrite the inspected script-free package.json on a case-insensitive filesystem.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(plain)), regular('package/Package.json', encoded(MANIFEST))])), setup=no_marker, expected_reason='noncanonical lifecycle evidence tar path', enforce_empty=True))
     paths = [

@@ -64,7 +64,7 @@ Install the archive in a clean Debian 12 x86_64 runtime to check the declared
 platform without relying on the Rust build image:
 
 ```sh
-archive="$work/output/release/dist/tau-gate-v4.2.0-linux-x86_64.tar.gz"
+archive="$work/output/release/dist/tau-gate-v4.2.1-linux-x86_64.tar.gz"
 docker run --rm --platform linux/amd64 --network none --read-only \
   --tmpfs /tmp:rw,exec,nosuid,size=64m --cap-drop ALL \
   --security-opt no-new-privileges \
@@ -77,12 +77,12 @@ For published assets, verify both the Sigstore signature and the expected
 GitHub workflow identity before use:
 
 ```sh
-gh attestation verify tau-gate-v4.2.0-linux-x86_64.tar.gz \
+gh attestation verify tau-gate-v4.2.1-linux-x86_64.tar.gz \
   --repo steph4n-gh/tau-gate \
   --signer-workflow steph4n-gh/tau-gate/.github/workflows/release.yml \
   --source-digest "$COMMIT" \
   --bundle provenance.sigstore.json
-gh attestation verify tau-gate-v4.2.0-linux-x86_64.tar.gz \
+gh attestation verify tau-gate-v4.2.1-linux-x86_64.tar.gz \
   --repo steph4n-gh/tau-gate \
   --signer-workflow steph4n-gh/tau-gate/.github/workflows/release.yml \
   --source-digest "$COMMIT" \

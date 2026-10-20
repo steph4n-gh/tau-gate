@@ -387,7 +387,7 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
             facts.update({"kind": "artifact", "artifact_sha256": sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest(), "source": record.get("resolved"), "integrity": record.get("integrity")})
             expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
             facts["locked_install_marker"] = record.get("hasInstallScript")
-            facts["marker_conflict"] = "hasInstallScript" in record and record["hasInstallScript"] != bool(expected_marker)
+            facts["marker_conflict"] = record.get("hasInstallScript") is False and bool(expected_marker)
         else:
             if is_registry_path(path):
                 raise EvidenceError("supplied manifest cannot establish registry artifact binding")
