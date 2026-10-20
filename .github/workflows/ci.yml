@@ -48,6 +48,14 @@ jobs:
       - name: Verify exact Git PR capture
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_pr_review.py' -v
 
+      - name: Verify qualification helpers
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_qualification*.py' -v
+
+      - name: Check differential harness seeds
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 fuzz/seeds.py
+          cargo test --manifest-path fuzz/Cargo.toml --lib --locked
+
       - name: Check formatting and read-only review
         run: |
           cargo fmt -- --check

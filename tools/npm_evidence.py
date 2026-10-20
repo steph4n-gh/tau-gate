@@ -3,9 +3,7 @@
 
 import argparse
 import base64
-import gzip
 import hashlib
-import io
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -20,12 +18,31 @@ import zlib
 
 MAX_FILE = 64 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
+MAX_NPM_RECORDS = 10_000
+MAX_NPM_REFERENCES = 50_000
 ROOT_EVENTS = ("preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare")
 DEPENDENCY_EVENTS = ("preinstall", "install", "postinstall")
 
 
 class EvidenceError(ValueError):
     pass
+
+
+class WorkBudget:
+    def __init__(self, read=2 * 1024 ** 3, expanded=4 * 1024 ** 3, headers=250_000):
+        self.read_remaining = read
+        self.expanded_remaining = expanded
+        self.headers_remaining = headers
+        self.exhausted = None
+
+    def charge(self, field, count, reason):
+        if self.exhausted is not None:
+            raise EvidenceError(self.exhausted)
+        if count > getattr(self, field):
+            self.exhausted = reason
+            setattr(self, field, 0)
+            raise EvidenceError(reason)
+        setattr(self, field, getattr(self, field) - count)
 
 
 def sha256(data):
@@ -51,15 +68,20 @@ def strict_json(data):
         raise EvidenceError(f"invalid JSON: {exc}") from exc
 
 
-def read_limited(path, limit=MAX_FILE):
+def read_limited(path, limit=MAX_FILE, *, budget=None):
     path = Path(path)
+    if budget is not None and budget.exhausted is not None:
+        raise EvidenceError(budget.exhausted)
+    bound = min(limit, budget.read_remaining) if budget is not None else limit
     try:
         with path.open("rb") as stream:
             if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
                 raise EvidenceError(f"not a regular file: {path}")
-            data = stream.read(limit + 1)
+            data = stream.read(bound + 1)
     except OSError as exc:
         raise EvidenceError(f"cannot read {path}: {exc}") from exc
+    if budget is not None:
+        budget.charge("read_remaining", len(data), "snapshot evidence reads exceed 2 GiB")
     if len(data) > limit:
         raise EvidenceError(f"file exceeds {limit} bytes: {path}")
     return data
@@ -125,7 +147,19 @@ def archive_source(url):
     return parsed
 
 
-def archive_facts(archive, integrity):
+def tar_text(field):
+    text, _, tail = field.partition(b"\0")
+    if any(tail):
+        raise EvidenceError("ambiguous tar text field")
+    try:
+        return text.decode("utf-8")
+    except UnicodeError as exc:
+        raise EvidenceError("non-UTF8 tar path") from exc
+
+
+def archive_facts(archive, integrity, *, budget=None):
+    if budget is not None and budget.exhausted is not None:
+        raise EvidenceError(budget.exhausted)
     if len(archive) > MAX_FILE:
         raise EvidenceError("archive exceeds compressed limit")
     if hashlib.sha512(archive).digest() != sri_digest(integrity):
@@ -133,25 +167,39 @@ def archive_facts(archive, integrity):
     try:
         decoder = zlib.decompressobj(31)
         tar_data = decoder.decompress(archive, MAX_FILE + 1)
+        if budget is not None:
+            budget.charge("expanded_remaining", len(tar_data), "snapshot expanded evidence exceeds 4 GiB")
         if len(tar_data) > MAX_FILE or decoder.unconsumed_tail:
             raise EvidenceError("archive exceeds decompressed limit")
         if not decoder.eof or decoder.unused_data:
             raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
-        with gzip.GzipFile(fileobj=io.BytesIO(archive)) as stream:
-            if stream.read(MAX_FILE + 1) != tar_data:
-                raise EvidenceError("gzip readers disagree")
-    except (OSError, EOFError, zlib.error) as exc:
+    except zlib.error as exc:
+        if budget is not None:
+            budget.charge("expanded_remaining", MAX_FILE + 1, "snapshot expanded evidence exceeds 4 GiB")
+        raise EvidenceError(f"invalid gzip: {exc}") from exc
+    except (OSError, EOFError) as exc:
         raise EvidenceError(f"invalid gzip: {exc}") from exc
     offset = 0
     seen = {}
+    entry_count = 0
+    root_name = None
+    manifest_bytes = None
+    binding_hash = None
     while offset + 512 <= len(tar_data):
         header = tar_data[offset:offset + 512]
         if not any(header):
             if len(tar_data) - offset < 1024 or any(tar_data[offset:]):
                 raise EvidenceError("invalid tar terminator")
             break
-        if header[257:263] != b"ustar\0":
+        if entry_count == 10_000:
+            raise EvidenceError("tar exceeds 10000 entries")
+        entry_count += 1
+        if budget is not None:
+            budget.charge("headers_remaining", 1, "snapshot tar processing exceeds 250000 headers")
+        if header[257:265] != b"ustar\0" + b"00":
             raise EvidenceError("unsupported tar format; requires ustar")
+        if any(header[157:257]) or any(header[500:]):
+            raise EvidenceError("unsupported tar link or reserved metadata")
         for start, width in ((100, 8), (108, 8), (116, 8), (124, 12), (136, 12), (148, 8), (329, 8), (337, 8)):
             numeric = header[start:start + width].strip(b" \0")
             if any(byte < ord("0") or byte > ord("7") for byte in numeric):
@@ -162,36 +210,81 @@ def archive_facts(archive, integrity):
             raise EvidenceError(f"invalid tar header: {exc}") from exc
         if info is None or info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
             raise EvidenceError("unsupported tar entry type")
-        name = info.name.rstrip("/") if info.isdir() else info.name
+        if info.devmajor or info.devminor:
+            raise EvidenceError("tar regular entry has device metadata")
+        prefix_field = header[345:500]
+        try:
+            prefix = tar_text(prefix_field)
+        except EvidenceError:
+            if (any(header[345:476])
+                    or not all(re.fullmatch(rb"[0-7]{11}\0", field)
+                               for field in (header[476:488], header[488:500]))):
+                raise
+            prefix = ""
+        raw_name = tar_text(header[:100])
+        joined = f"{prefix}/{raw_name}" if prefix else raw_name
+        name = joined.removesuffix("/") if info.isdir() else joined
+        raw_parts = name.split("/")
+        dot_alias = len(raw_parts) >= 3 and raw_parts[1] == "."
+        if dot_alias:
+            if raw_parts.count(".") != 1:
+                raise EvidenceError("unsupported dot tar path")
+            name = "/".join((raw_parts[0], *raw_parts[2:]))
         safe_relative(name)
         parts = name.split("/")
-        if any(not re.fullmatch(r"[A-Za-z0-9._@+-]+", part) or part.endswith(".") or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])", part.split(".", 1)[0], re.IGNORECASE) for part in parts):
+        if any(part.endswith((".", " ")) or any(not (32 <= ord(char) <= 126) or char in '\\:*?"<>|' for char in part)
+               or re.fullmatch(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])", part.split(".", 1)[0], re.IGNORECASE)
+               for part in parts):
             raise EvidenceError("nonportable tar path")
+        member_root = parts[0]
+        if root_name is not None and member_root != root_name:
+            raise EvidenceError("tar contains inconsistent archive roots")
+        root_name = member_root
+        relative = "/".join(parts[1:])
+        if not relative and not info.isdir():
+            raise EvidenceError("tar root is not a directory")
         canonical = name.lower()
-        if canonical in ("package/package.json", "package/binding.gyp") and name != canonical:
+        if relative.lower() in ("package.json", "binding.gyp") and relative not in ("package.json", "binding.gyp"):
             raise EvidenceError("noncanonical lifecycle input path")
-        if canonical in seen or len(seen) >= 10000:
-            raise EvidenceError("duplicate tar path or excessive entry count")
-        if any(seen.get("/".join(parts[:n]).lower()) == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
+        if info.isdir() and relative in ("package.json", "binding.gyp"):
+            raise EvidenceError("evidence path is not a regular tar file")
+        if dot_alias and (info.isdir() or relative in ("package.json", "binding.gyp")):
+            raise EvidenceError("dot aliases of directories or lifecycle evidence are unsupported")
+        if any(seen.get("/".join(parts[:n]).lower(), {}).get("kind") == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
             raise EvidenceError("tar file and parent path conflict")
-        seen[canonical] = "directory" if info.isdir() else "file"
-        if info.size < 0 or offset + 512 + info.size > len(tar_data):
+        if info.size < 0 or info.size > MAX_FILE or (info.isdir() and info.size) or offset + 512 + info.size > len(tar_data):
             raise EvidenceError("invalid tar size")
-        offset += 512 + ((info.size + 511) // 512) * 512
+        start = offset + 512
+        end = start + info.size
+        padded_end = start + ((info.size + 511) // 512) * 512
+        if padded_end > len(tar_data) or any(tar_data[end:padded_end]):
+            raise EvidenceError("invalid tar padding")
+        previous = seen.get(canonical)
+        if previous is not None:
+            if (previous["name"] != name or previous["kind"] != "file" or info.isdir()
+                    or previous["paired"] or previous["dot_alias"] == dot_alias):
+                raise EvidenceError("duplicate tar path or excessive entry count")
+            if (previous["before"] != header[100:148] or previous["after"] != header[156:512]
+                    or tar_data[previous["start"]:previous["end"]] != tar_data[start:end]):
+                raise EvidenceError("conflicting dot-alias tar path")
+            previous["paired"] = True
+        else:
+            seen[canonical] = {"name": name, "kind": "directory" if info.isdir() else "file",
+                               "start": start, "end": end, "before": header[100:148], "after": header[156:512],
+                               "dot_alias": dot_alias, "paired": False}
+        if relative == "package.json":
+            if info.size > MAX_MANIFEST:
+                raise EvidenceError("invalid archived package.json")
+            manifest_bytes = tar_data[start:end]
+        elif relative == "binding.gyp":
+            binding_hash = sha256(tar_data[start:end])
+        offset = padded_end
     else:
         raise EvidenceError("missing tar terminator")
-    try:
-        with tarfile.open(fileobj=io.BytesIO(tar_data), mode="r:") as archive_file:
-            manifest_info = archive_file.getmember("package/package.json")
-            if not manifest_info.isfile() or manifest_info.size > MAX_MANIFEST:
-                raise EvidenceError("invalid archived package.json")
-            manifest_bytes = archive_file.extractfile(manifest_info).read(MAX_MANIFEST + 1)
-            binding_info = archive_file.getmember("package/binding.gyp") if "package/binding.gyp" in seen else None
-            if binding_info is not None and not binding_info.isfile():
-                raise EvidenceError("binding.gyp must be a regular file")
-            binding_hash = sha256(archive_file.extractfile(binding_info).read(MAX_FILE + 1)) if binding_info is not None else None
-    except (KeyError, tarfile.TarError) as exc:
-        raise EvidenceError(f"missing or invalid archived package.json: {exc}") from exc
+    if any(item["dot_alias"] and not item["paired"] for item in seen.values()):
+        raise EvidenceError("unpaired dot-alias tar path")
+    if manifest_bytes is None:
+        raise EvidenceError("tar is missing package.json")
     manifest = strict_json(manifest_bytes)
     if not isinstance(manifest, dict):
         raise EvidenceError("manifest must be an object")
@@ -215,6 +308,9 @@ def load_lock(lock_path):
     lock = strict_json(data)
     if not isinstance(lock, dict) or lock.get("lockfileVersion") != 3 or not isinstance(lock.get("packages"), dict):
         raise EvidenceError("requires an npm v3 packages lockfile")
+    if len(lock["packages"]) > MAX_NPM_RECORDS:
+        raise EvidenceError("npm snapshot exceeds 10000 package records")
+    references = 0
     for path, record in lock["packages"].items():
         safe_relative(path, allow_empty=True)
         if not isinstance(record, dict):
@@ -222,6 +318,13 @@ def load_lock(lock_path):
         for flag in ("link", "hasInstallScript"):
             if flag in record and type(record[flag]) is not bool:
                 raise EvidenceError(f"lock {flag} must be a boolean")
+        for kind in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
+            if kind in record:
+                if not isinstance(record[kind], dict):
+                    raise EvidenceError("invalid dependency map")
+                references += len(record[kind])
+                if references > MAX_NPM_REFERENCES:
+                    raise EvidenceError("npm snapshot exceeds 50000 dependency references")
     if "" not in lock["packages"]:
         raise EvidenceError("missing root lock record")
     return data, lock
@@ -260,9 +363,12 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
         raise EvidenceError("index lock hash mismatch")
     if not isinstance(index["packages"], list):
         raise EvidenceError("packages index must be an array")
+    if len(index["packages"]) > MAX_NPM_RECORDS:
+        raise EvidenceError("locator index exceeds 10000 package records")
     expected = {path: record for path, record in lock["packages"].items() if not record.get("link", False)}
     seen = set()
     results = []
+    budget = WorkBudget()
     for item in index["packages"]:
         if not isinstance(item, dict) or set(item) not in ({"path", "artifact"}, {"path", "project_manifest"}):
             raise EvidenceError("locator entry requires path and one supported evidence source")
@@ -275,8 +381,8 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
             if not is_registry_path(path):
                 raise EvidenceError("project instance cannot use registry artifact evidence")
             archive_source(record.get("resolved"))
-            archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]))
-            data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"))
+            archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]), budget=budget)
+            data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"), budget=budget)
             facts = manifest_facts(data, binding_gyp, binding_hash=binding_hash)
             facts.update({"kind": "artifact", "artifact_sha256": sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest(), "source": record.get("resolved"), "integrity": record.get("integrity")})
             expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
@@ -286,14 +392,14 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
             if is_registry_path(path):
                 raise EvidenceError("supplied manifest cannot establish registry artifact binding")
             source_path = confined_file(Path(index_path).parent, item["project_manifest"])
-            data = read_limited(source_path, MAX_MANIFEST)
-            if path == "" and root_manifest is not None and data != read_limited(root_manifest, MAX_MANIFEST):
+            data = read_limited(source_path, MAX_MANIFEST, budget=budget)
+            if path == "" and root_manifest is not None and data != read_limited(root_manifest, MAX_MANIFEST, budget=budget):
                 raise EvidenceError("index root manifest differs from supplied root input")
             binding_path = source_path.parent / "binding.gyp"
             if binding_path.is_symlink():
                 raise EvidenceError("symlink binding.gyp source")
             binding_gyp = binding_path.exists()
-            binding_hash = sha256(read_limited(binding_path)) if binding_gyp else None
+            binding_hash = sha256(read_limited(binding_path, budget=budget)) if binding_gyp else None
             manifest = strict_json(data)
             facts = manifest_facts(data, binding_gyp, "root" if path == "" else "workspace", binding_hash)
             facts["kind"] = "source_project"
@@ -310,7 +416,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise EvidenceError("artifact redirects are unsupported; use an offline cache")
 
 
-def fetch_archive(url, allow_loopback=False):
+def fetch_archive(url, allow_loopback=False, *, budget=None):
+    if budget is not None and budget.exhausted is not None:
+        raise EvidenceError(budget.exhausted)
     parsed = archive_source(url)
     if parsed.username is not None or parsed.password is not None or parsed.fragment or not parsed.hostname:
         raise EvidenceError("credentials, fragments, or missing host in artifact URL")
@@ -326,9 +434,12 @@ def fetch_archive(url, allow_loopback=False):
         with opener.open(urllib.request.Request(url, headers={"User-Agent": "tau-gate-evidence/1", "Accept-Encoding": "identity"}), timeout=30) as response:
             if response.status != 200:
                 raise EvidenceError("artifact response must have status 200")
-            data = response.read(MAX_FILE + 1)
+            bound = min(MAX_FILE, budget.read_remaining) if budget is not None else MAX_FILE
+            data = response.read(bound + 1)
     except (OSError, ValueError) as exc:
         raise EvidenceError(f"artifact acquisition failed: {exc}") from exc
+    if budget is not None:
+        budget.charge("read_remaining", len(data), "snapshot evidence reads exceed 2 GiB")
     if len(data) > MAX_FILE:
         raise EvidenceError("artifact response exceeds compressed limit")
     return data
@@ -342,7 +453,8 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
         raise EvidenceError("evidence output directory must be empty")
     output.mkdir(parents=True, exist_ok=True)
     entries = []
-    archives = {}
+    archives = set()
+    budget = WorkBudget()
     for path, record in sorted(lock["packages"].items()):
         if record.get("link", False):
             continue
@@ -351,18 +463,22 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
             digest = sri_digest(record.get("integrity"))
             cache_name = digest.hex() + ".tgz"
             if archive_cache is not None:
-                archive = read_limited(confined_file(archive_cache, cache_name))
+                archive = read_limited(confined_file(archive_cache, cache_name), budget=budget)
             else:
-                archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback)
-            data, manifest, _, _ = archive_facts(archive, record.get("integrity"))
+                archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback, budget=budget)
+            data, manifest, _, _ = archive_facts(archive, record.get("integrity"), budget=budget)
             check_identity(path, record, manifest)
             relative = "artifacts/" + sha256(archive) + ".tgz"
-            archives[relative] = archive
+            if relative not in archives:
+                destination = output / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(archive)
+                archives.add(relative)
             entries.append({"path": path, "artifact": relative})
         else:
             relative_source = (path + "/" if path else "") + "package.json"
             source = confined_file(project_dir, relative_source)
-            data = read_limited(source, MAX_MANIFEST)
+            data = read_limited(source, MAX_MANIFEST, budget=budget)
             check_identity(path, record, strict_json(data))
             relative = "projects/" + (path + "/" if path else "") + "package.json"
             destination = output / relative
@@ -372,12 +488,8 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
             if binding.is_symlink():
                 raise EvidenceError("symlink binding.gyp source")
             if binding.exists():
-                (destination.parent / "binding.gyp").write_bytes(read_limited(binding))
+                (destination.parent / "binding.gyp").write_bytes(read_limited(binding, budget=budget))
             entries.append({"path": path, "project_manifest": relative})
-    for relative, archive in sorted(archives.items()):
-        destination = output / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(archive)
     index_path = output / "index.json"
     index_path.write_bytes(json_bytes({"schema_version": 1, "lock_sha256": sha256(lock_bytes), "packages": entries}))
     validate_bundle(lock_path, index_path, confined_file(project_dir, "package.json"))

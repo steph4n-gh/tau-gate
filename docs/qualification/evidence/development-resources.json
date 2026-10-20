@@ -1,0 +1,199 @@
+{
+  "all_snapshot_logical_tar_member_totals_exact": false,
+  "all_snapshot_produced_byte_totals_exact": false,
+  "all_snapshot_raw_tar_header_totals_exact": false,
+  "archive_failure_attempts": 98,
+  "archive_failures_unique": 24,
+  "corpus_sha256": "3b9ad0dda0bb8d5de9ccc3c47d9984457244808ad6e2832aa28c3b31797d48f3",
+  "counting": "Each snapshot charges each artifact locator, including repeated content. Unique content is decompressed once. Actual returned raw-DEFLATE bytes are counted before independent gzip CRC/ISIZE checks. No ISIZE estimates.",
+  "distributions": {
+    "archive_attempts": {
+      "max": 2344,
+      "maximum_snapshots": [
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "414231a716973ff99daa82eed0998dc4f263df4a"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "9478d60367615583b7d42f790501e0cb86bb4878"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "d1b9a2162a0113356db5093f055b4a2e1979c6a8"
+        }
+      ],
+      "median": 393,
+      "min": 13,
+      "p90": 1637,
+      "p95": 2217
+    },
+    "compressed_bytes": {
+      "max": 647354823,
+      "maximum_snapshots": [
+        {
+          "repository": "microsoft/vscode",
+          "revision": "ac31b437fc6d931ae558ca1a908aa1c911c0f41d"
+        },
+        {
+          "repository": "microsoft/vscode",
+          "revision": "e630a740c1910c24a3621b0aae0ac64a13e960bc"
+        }
+      ],
+      "median": 217453694,
+      "min": 4995784,
+      "p90": 553328079,
+      "p95": 560685742
+    },
+    "declared_edge_count": {
+      "max": 4863,
+      "maximum_snapshots": [
+        {
+          "repository": "swagger-api/swagger-ui",
+          "revision": "2f91b75bafee147b08c4b0d4b158dfb0da154ef9"
+        },
+        {
+          "repository": "swagger-api/swagger-ui",
+          "revision": "38ca10e1867a66525751590d8d51011973107ad1"
+        },
+        {
+          "repository": "swagger-api/swagger-ui",
+          "revision": "f170383d461e326875970bcde54687bee9fff0bf"
+        }
+      ],
+      "median": 748,
+      "min": 14,
+      "p90": 4749,
+      "p95": 4752
+    },
+    "lock_bytes": {
+      "max": 1379833,
+      "maximum_snapshots": [
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "414231a716973ff99daa82eed0998dc4f263df4a"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "9478d60367615583b7d42f790501e0cb86bb4878"
+        }
+      ],
+      "median": 204135,
+      "min": 5734,
+      "p90": 952323,
+      "p95": 1063541
+    },
+    "logical_tar_members": {
+      "max": 59551,
+      "maximum_snapshots": [
+        {
+          "repository": "realm/realm-js",
+          "revision": "99ab0aea00c0dc25073364df24d6b041f200f3d4"
+        },
+        {
+          "repository": "realm/realm-js",
+          "revision": "c4f068c9a25e7588df1cfa2e70c198f82f23c887"
+        },
+        {
+          "repository": "realm/realm-js",
+          "revision": "ffd1be345aa835930662bb384d973f30dd42b328"
+        }
+      ],
+      "median": 14717,
+      "min": 491,
+      "p90": 51775,
+      "p95": 53718
+    },
+    "produced_bytes": {
+      "max": 1704409600,
+      "maximum_snapshots": [
+        {
+          "repository": "microsoft/TypeScript",
+          "revision": "dca8e236a227e37183dcf1dd4e51b22571f5b558"
+        }
+      ],
+      "median": 734823936,
+      "min": 13761536,
+      "p90": 1559142400,
+      "p95": 1604653573
+    },
+    "raw_tar_headers": {
+      "max": 59639,
+      "maximum_snapshots": [
+        {
+          "repository": "realm/realm-js",
+          "revision": "99ab0aea00c0dc25073364df24d6b041f200f3d4"
+        },
+        {
+          "repository": "realm/realm-js",
+          "revision": "c4f068c9a25e7588df1cfa2e70c198f82f23c887"
+        },
+        {
+          "repository": "realm/realm-js",
+          "revision": "ffd1be345aa835930662bb384d973f30dd42b328"
+        }
+      ],
+      "median": 14717,
+      "min": 491,
+      "p90": 51778,
+      "p95": 53718
+    },
+    "record_count": {
+      "max": 2718,
+      "maximum_snapshots": [
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "414231a716973ff99daa82eed0998dc4f263df4a"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "4aa33a7de7c32bf16907e5d6341f9f31b183c65c"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "7005ffa3f185c0cfc2dce9b96852f45a03ed4cf1"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "9478d60367615583b7d42f790501e0cb86bb4878"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "b20d03b4d5df7f08c2b3be3a754578534039ba1d"
+        },
+        {
+          "repository": "puppeteer/puppeteer",
+          "revision": "d1b9a2162a0113356db5093f055b4a2e1979c6a8"
+        }
+      ],
+      "median": 404,
+      "min": 14,
+      "p90": 2228,
+      "p95": 2258
+    }
+  },
+  "input_files_changed_during_run": [],
+  "pair_count": 72,
+  "per_archive_produced_limit": 67108864,
+  "per_archive_tar_header_limit": 10000,
+  "python": "3.14.4 (main, Apr  7 2026, 13:13:20) [Clang 21.0.0 (clang-2100.0.123.102)]",
+  "schema_version": 1,
+  "scope": "Diagnostic input accounting. No speed benchmark, policy coverage, parser qualification, or holdout evaluation.",
+  "script_sha256": "9214bb72e3d699a617864a7fe2a5ab66be4fae4f50d3686259ab2424574a98e7",
+  "snapshot_count": 121,
+  "snapshot_totals": {
+    "archive_attempts": 85268,
+    "compressed_bytes": 33682025702,
+    "declared_edge_count": 190336,
+    "lock_bytes": 47351851,
+    "logical_tar_members": 2458675,
+    "produced_bytes": 95696421986,
+    "raw_tar_headers": 2464791,
+    "record_count": 99453
+  },
+  "split": "development",
+  "unique_archive_count": 7354,
+  "unique_archive_inodes_read": 7354,
+  "zlib_compile_version": "1.2.12",
+  "zlib_runtime_version": "1.2.12"
+}

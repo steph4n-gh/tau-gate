@@ -30,7 +30,7 @@ Artifact verification checks one canonical SHA512 SRI token against the original
 
 The locked `resolved` source must use lowercase `http://` or `https://` and end in `.tgz` or `.tar.gz`. Its authority must be an ASCII DNS or IPv4 host with an optional decimal port from 1 through 65535. Credentials, queries, fragments, escapes, IPv6 literals, and ambiguous path components are unsupported. URL path components contain only ASCII letters, digits, `.`, `_`, `-`, `@`, and `+`. Git, directory, and other source kinds remain incomplete even if a supplied archive matches a caller-added integrity token. The hosted Git domains `github.com`, `gist.github.com`, `gitlab.com`, `bitbucket.org`, and `git.sr.ht`, including their subdomains, remain unsupported. This conservative profile avoids applying registry archive lifecycle rules to npm Git preparation.
 
-The complete tar must use POSIX ustar headers with octal numeric fields and regular files or directories under `package/`. Exactly one regular `package/package.json` is required. A regular `package/binding.gyp` contributes its content hash. Path components contain only ASCII letters, digits, `.`, `_`, `-`, `@`, and `+`. Trailing dots, dot components, and Windows device names are unsupported. Non-ASCII archive names remain incomplete because the core does not normalize filesystem Unicode names. Manifest content remains UTF-8. Case aliases of `package/package.json` or `package/binding.gyp`, case-folded duplicate paths, and case-folded file and parent directory conflicts fail. These restrictions prevent evidence from changing when npm extracts to a case-insensitive filesystem. Links, special records, PAX or GNU extensions, malformed checksums, nonzero file padding, missing end markers, and truncation fail. Unsupported data remains incomplete.
+The complete tar must use POSIX ustar headers with octal numeric fields and regular files or directories under one exact top-level directory. That directory may have an ordinary npm package name instead of `package`. Exactly one regular root-relative `package.json` is required. A regular root-relative `binding.gyp` contributes its content hash. Path components use printable ASCII except Windows-invalid punctuation; empty and dot components, trailing dots or spaces, and Windows device names are unsupported. One measured exception accepts `root/./rest` for a non-lifecycle regular file only when the same archive also contains `root/rest` with identical file bytes and header fields apart from name and checksum. Both physical entries count toward the tar limit. Non-ASCII archive names remain incomplete because the core does not normalize filesystem Unicode names. Manifest content remains UTF-8. Case aliases of the root-relative lifecycle files, other case-folded duplicate paths, mixed top-level directories, and case-folded file and parent directory conflicts fail. A measured legacy header layout is accepted only when its otherwise empty prefix contains exactly two octal timestamp fields with null terminators and the full header checksum is valid. These restrictions prevent evidence from changing when npm extracts to a case-insensitive filesystem. Links, special records, PAX or GNU extensions, malformed checksums, nonzero file padding, missing end markers, and truncation fail. Unsupported data remains incomplete.
 
 Files, compressed archives, and expanded tar each have a 64 MiB limit. A manifest has a 1 MiB limit. Tar archives have at most 10,000 entries. JSON nesting is limited to 128. Artifact integrity binds bytes to the supplied lock. It does not authenticate a publisher or prove code safe.
 
@@ -54,7 +54,20 @@ Every locked record remains in scope, including disconnected and platform-omitte
 
 ## Approval schema and outcomes
 
-An approval file has exactly these fields.
+The current approval file has exactly these fields. Each path names one exact
+npm lock instance. Its nonempty fingerprint array can hold the current and a
+separately reviewed replacement during a policy transition.
+
+```json
+{
+	"schema_version": 2,
+	"approvals": [
+		{"path": "node_modules/example", "fingerprints": ["64 lowercase SHA256 hex characters"]}
+	]
+}
+```
+
+Version 1 remains readable for existing installations:
 
 ```json
 {
@@ -64,6 +77,13 @@ An approval file has exactly these fields.
 	]
 }
 ```
+
+Unknown fields, duplicate paths or fingerprints, empty fingerprint arrays,
+and malformed digests make the policy incomplete. Version 1 permits only one
+fingerprint per path. A version 2 file requires a checker that understands
+version 2, so upgrade the trusted checker before merging that policy format.
+Neither format lets a PR approve itself: the Git-object wrapper supplies the
+file from the trusted base commit.
 
 A fingerprint is SHA256 of canonical compact JSON. The tuple includes its domain and schema, npm format, exact raw instance key, locked name and version, source, integrity, and derived facts. Facts include the evidence kind, manifest name and version, original archive SHA512, manifest byte hash, lifecycle body hashes, native metadata, and binary metadata. JSON object keys use lexical order. Changing relevant evidence invalidates approval. A manifest formatting change also invalidates approval because manifest bytes are pinned. Lock formatting changes require a new index lock hash but preserve unchanged per-instance fingerprints.
 

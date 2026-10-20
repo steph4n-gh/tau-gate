@@ -186,6 +186,23 @@ fn parse(bytes: &[u8]) -> Result<J, String> {
     MiniParser::parse_json(text).map_err(|e| e.to_string())
 }
 pub(crate) fn read_regular(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    read_regular_into(path, limit, &mut bytes, None)?;
+    Ok(bytes)
+}
+fn read_regular_into(
+    path: &Path,
+    limit: u64,
+    bytes: &mut Vec<u8>,
+    mut budget: Option<&mut artifact::Budget>,
+) -> Result<(), String> {
+    bytes.clear();
+    if let Some(budget) = &budget {
+        budget.check()?;
+    }
+    let limit = budget
+        .as_ref()
+        .map_or(limit, |budget| limit.min(budget.read_remaining));
     let meta =
         fs::symlink_metadata(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     if !meta.file_type().is_file() {
@@ -195,15 +212,15 @@ pub(crate) fn read_regular(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("input is not a regular file".into());
     }
-    let mut bytes = Vec::new();
-    (&mut file)
-        .take(limit + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
+    let read = (&mut file).take(limit + 1).read_to_end(bytes);
+    if let Some(budget) = &mut budget {
+        budget.read(bytes.len())?;
+    }
+    read.map_err(|e| e.to_string())?;
     if bytes.len() as u64 > limit {
         return Err(format!("input exceeds {limit} bytes"));
     }
-    Ok(bytes)
+    Ok(())
 }
 fn safe_relative(value: &str, empty: bool) -> Result<(), String> {
     if value.is_empty() && empty {
@@ -301,6 +318,12 @@ fn direct_archive_source(source: &str) -> bool {
             .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
+struct Work {
+    compressed: Vec<u8>,
+    expanded: Vec<u8>,
+    budget: artifact::Budget,
+}
+
 pub(crate) fn load(
     lock: &J,
     lock_hash: &str,
@@ -322,6 +345,7 @@ pub(crate) fn load(
         .get("packages")
         .and_then(J::as_object)
         .ok_or("missing lock packages")?;
+    crate::graph::npm_limits(records).map_err(|e| e.to_string())?;
     for path in records.keys() {
         safe_relative(path, true)?;
     }
@@ -347,13 +371,18 @@ pub(crate) fn load(
     }
     let mut result = BTreeMap::new();
     let root = index_path.parent().unwrap_or(Path::new("."));
+    let mut work = Work {
+        compressed: Vec::new(),
+        expanded: Vec::new(),
+        budget: artifact::Budget::new(),
+    };
     for (path, record) in records {
         let marker = record.get("hasInstallScript").and_then(J::as_bool);
         if record.get("link").and_then(J::as_bool) == Some(true) {
             continue;
         }
         let evidence = if let Some(entry) = locators.get(path.as_str()) {
-            match read_facts(root, path, record, entry, root_hash) {
+            match read_facts(root, path, record, entry, root_hash, &mut work) {
                 Ok(facts) => qualify(path, record, marker, facts),
                 Err(reason) => ExecutionEvidence::unknown(State::Unsupported, marker, reason),
             }
@@ -429,7 +458,9 @@ fn read_facts(
     record: &J,
     entry: &J,
     root_hash: Option<&str>,
+    work: &mut Work,
 ) -> Result<Facts, String> {
+    work.budget.check()?;
     let (bytes, binding, kind, artifact_sha512) = if let Some(value) = entry.get("artifact") {
         if !registry(path) {
             return Err("project instance cannot use artifact evidence".into());
@@ -445,9 +476,17 @@ fn read_facts(
             root,
             value.as_str().ok_or("artifact locator must be a string")?,
         )?;
+        read_regular_into(
+            &file,
+            MAX_FILE,
+            &mut work.compressed,
+            Some(&mut work.budget),
+        )?;
         let archive = artifact::inspect(
-            &read_regular(&file, MAX_FILE)?,
+            &work.compressed,
             record.get("integrity").and_then(J::as_str).unwrap_or(""),
+            &mut work.expanded,
+            &mut work.budget,
         )?;
         (
             archive.manifest,
@@ -466,13 +505,27 @@ fn read_facts(
                 .and_then(J::as_str)
                 .ok_or("project manifest locator must be a string")?,
         )?;
-        let bytes = read_regular(&file, MAX_MANIFEST)?;
+        read_regular_into(
+            &file,
+            MAX_MANIFEST,
+            &mut work.compressed,
+            Some(&mut work.budget),
+        )?;
+        let bytes = work.compressed.clone();
         if path.is_empty() && root_hash.is_some_and(|h| h != sha256(&bytes)) {
             return Err("index root manifest differs from supplied root input".into());
         }
         let binding_file = file.parent().unwrap().join("binding.gyp");
         let binding = match fs::symlink_metadata(&binding_file) {
-            Ok(_) => Some(sha256(&read_regular(&binding_file, MAX_FILE)?)),
+            Ok(_) => {
+                read_regular_into(
+                    &binding_file,
+                    MAX_FILE,
+                    &mut work.compressed,
+                    Some(&mut work.budget),
+                )?;
+                Some(sha256(&work.compressed))
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => return Err(format!("cannot inspect source binding.gyp: {e}")),
         };
@@ -595,5 +648,90 @@ pub(crate) fn apply(evidence: &Evidence, graph: &mut DepGraph) {
             p.capabilities.sort();
             p.capabilities.dedup();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_regular_reads_recover_after_size_and_file_errors() {
+        let root = std::env::temp_dir().join(format!(
+            "tau-gate-regular-read-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&root).unwrap();
+        let large = root.join("large");
+        let small = root.join("small");
+        fs::write(&large, vec![42; 8192]).unwrap();
+        fs::write(&small, b"small").unwrap();
+        let mut bytes = Vec::new();
+        for (invalid, limit) in [(&large, 8191), (&root, 8192), (&root.join("missing"), 8192)] {
+            read_regular_into(&large, 8192, &mut bytes, None).unwrap();
+            assert_eq!(bytes, vec![42; 8192]);
+            assert!(read_regular_into(invalid, limit, &mut bytes, None).is_err());
+            read_regular_into(&small, 8192, &mut bytes, None).unwrap();
+            assert_eq!(bytes, b"small");
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn actual_reads_count_repeated_files_and_failed_file_limits() {
+        let root = std::env::temp_dir().join(format!("tau-evidence-budget-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let path = root.join("input");
+        fs::write(&path, b"12345").unwrap();
+        let mut bytes = Vec::new();
+        let mut budget = artifact::Budget::new();
+        budget.read_remaining = 10;
+        read_regular_into(&path, 5, &mut bytes, Some(&mut budget)).unwrap();
+        assert!(read_regular_into(&path, 4, &mut bytes, Some(&mut budget)).is_err());
+        assert_eq!(bytes, b"12345");
+        assert_eq!(budget.read_remaining, 0);
+        let error = read_regular_into(&path, 5, &mut bytes, Some(&mut budget)).unwrap_err();
+        assert_eq!(bytes.len(), 1);
+        fs::remove_file(&path).unwrap();
+        assert_eq!(
+            read_regular_into(&path, 5, &mut bytes, Some(&mut budget)).unwrap_err(),
+            error
+        );
+        assert!(bytes.is_empty());
+        fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn source_reads_recover_after_failure_and_exhaustion_has_no_facts() {
+        let root = std::env::temp_dir().join(format!("tau-facts-budget-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let bytes = br#"{"name":"root","version":"1"}"#;
+        fs::write(root.join("package.json"), bytes).unwrap();
+        let record = parse(bytes).unwrap();
+        let entry = parse(br#"{"project_manifest":"package.json"}"#).unwrap();
+        let mut work = Work {
+            compressed: Vec::new(),
+            expanded: Vec::new(),
+            budget: artifact::Budget::new(),
+        };
+        work.budget.read_remaining = 2 * bytes.len() as u64;
+        let invalid_entry = parse(br#"{"project_manifest":"missing.json"}"#).unwrap();
+        assert!(read_facts(&root, "", &record, &invalid_entry, None, &mut work).is_err());
+        let facts = read_facts(&root, "", &record, &entry, None, &mut work).unwrap();
+        assert_eq!(facts.manifest_sha256, sha256(bytes));
+        read_facts(&root, "", &record, &entry, None, &mut work).unwrap();
+        let reason = read_facts(&root, "", &record, &entry, None, &mut work).unwrap_err();
+        let evidence = ExecutionEvidence::unknown(State::Unsupported, None, &reason);
+        assert!(!evidence.qualified());
+        assert!(evidence.facts.is_none());
+        assert_eq!(
+            read_facts(&root, "", &record, &invalid_entry, None, &mut work).unwrap_err(),
+            reason
+        );
+        assert_eq!(facts.manifest_sha256, sha256(bytes));
+        fs::remove_dir_all(root).unwrap();
     }
 }

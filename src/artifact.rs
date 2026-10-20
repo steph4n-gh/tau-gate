@@ -6,6 +6,76 @@ const MAX_TAR: usize = 64 * 1024 * 1024;
 const MAX_MANIFEST: usize = 1024 * 1024;
 const MAX_ENTRIES: usize = 10_000;
 
+pub(crate) struct Budget {
+    pub(crate) read_remaining: u64,
+    expanded_remaining: u64,
+    entries_remaining: u64,
+    exhausted: Option<&'static str>,
+}
+
+impl Budget {
+    pub(crate) fn new() -> Self {
+        Self {
+            read_remaining: 2 * 1024 * 1024 * 1024,
+            expanded_remaining: 4 * 1024 * 1024 * 1024,
+            entries_remaining: 250_000,
+            exhausted: None,
+        }
+    }
+
+    pub(crate) fn check(&self) -> Result<(), String> {
+        self.exhausted.map_or(Ok(()), |reason| Err(reason.into()))
+    }
+
+    pub(crate) fn read(&mut self, count: usize) -> Result<(), String> {
+        self.check()?;
+        let result = Self::charge(
+            &mut self.read_remaining,
+            count,
+            &mut self.exhausted,
+            "snapshot evidence reads exceed 2 GiB",
+        );
+        if result.is_err() {
+            self.read_remaining = 0;
+        }
+        result
+    }
+
+    fn expand(&mut self, count: usize) -> Result<(), String> {
+        self.check()?;
+        Self::charge(
+            &mut self.expanded_remaining,
+            count,
+            &mut self.exhausted,
+            "snapshot expanded evidence exceeds 4 GiB",
+        )
+    }
+
+    fn entry(&mut self) -> Result<(), String> {
+        self.check()?;
+        Self::charge(
+            &mut self.entries_remaining,
+            1,
+            &mut self.exhausted,
+            "snapshot tar processing exceeds 250000 headers",
+        )
+    }
+
+    fn charge(
+        remaining: &mut u64,
+        count: usize,
+        exhausted: &mut Option<&'static str>,
+        reason: &'static str,
+    ) -> Result<(), String> {
+        if count as u64 > *remaining {
+            *exhausted = Some(reason);
+            return Err(reason.into());
+        }
+        *remaining -= count as u64;
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Artifact {
     pub manifest: Vec<u8>,
@@ -13,7 +83,14 @@ pub(crate) struct Artifact {
     pub sha512: String,
 }
 
-pub(crate) fn inspect(bytes: &[u8], integrity: &str) -> Result<Artifact, String> {
+pub(crate) fn inspect(
+    bytes: &[u8],
+    integrity: &str,
+    expanded: &mut Vec<u8>,
+    budget: &mut Budget,
+) -> Result<Artifact, String> {
+    expanded.clear();
+    budget.check()?;
     if bytes.len() > MAX_COMPRESSED {
         return Err("compressed artifact exceeds 64 MiB".into());
     }
@@ -21,8 +98,8 @@ pub(crate) fn inspect(bytes: &[u8], integrity: &str) -> Result<Artifact, String>
     if integrity != format!("sha512-{}", base64_digest(&digest)) {
         return Err("artifact requires one matching canonical SHA512 integrity".into());
     }
-    let tar = gunzip(bytes)?;
-    let (manifest, binding_gyp_sha256) = inspect_tar(&tar)?;
+    gunzip(bytes, expanded, budget)?;
+    let (manifest, binding_gyp_sha256) = inspect_tar(expanded, budget)?;
     Ok(Artifact {
         manifest,
         binding_gyp_sha256,
@@ -81,7 +158,8 @@ fn crc32(bytes: &[u8]) -> u32 {
     !crc
 }
 
-fn gunzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
+fn gunzip(bytes: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(), String> {
+    output.clear();
     if bytes.len() < 18 || bytes[..3] != [0x1f, 0x8b, 8] || bytes[3] & 0xe0 != 0 {
         return Err("invalid gzip header".into());
     }
@@ -114,14 +192,14 @@ fn gunzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
         start += 2;
     }
     let payload = bytes.get(start..end).ok_or("truncated gzip header")?;
-    let output = inflate(payload)?;
-    if crc32(&output) != u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) {
+    inflate(payload, output, budget)?;
+    if crc32(output) != u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) {
         return Err("gzip checksum mismatch".into());
     }
     if output.len() as u32 != u32::from_le_bytes(bytes[end + 4..].try_into().unwrap()) {
         return Err("gzip expanded size mismatch".into());
     }
-    Ok(output)
+    Ok(())
 }
 
 struct Bits<'a> {
@@ -248,12 +326,13 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman), String> {
     ))
 }
 
-fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
+fn inflate(payload: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(), String> {
+    output.clear();
+    budget.check()?;
     let mut bits = Bits {
         bytes: payload,
         position: 0,
     };
-    let mut output = Vec::new();
     loop {
         let final_block = bits.read(1)? != 0;
         match bits.read(2)? {
@@ -270,6 +349,7 @@ fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
                 let bytes = payload
                     .get(start..start + length)
                     .ok_or("truncated DEFLATE stored block")?;
+                budget.expand(bytes.len())?;
                 output.extend_from_slice(bytes);
                 bits.position += length * 8;
             }
@@ -285,7 +365,7 @@ fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
                 } else {
                     dynamic_trees(&mut bits)?
                 };
-                compressed_block(&mut bits, &literal_tree, &distance_tree, &mut output)?;
+                compressed_block(&mut bits, &literal_tree, &distance_tree, output, budget)?;
             }
             _ => return Err("reserved DEFLATE block type".into()),
         }
@@ -294,7 +374,7 @@ fn inflate(payload: &[u8]) -> Result<Vec<u8>, String> {
             if bits.position / 8 != payload.len() {
                 return Err("gzip contains trailing data or multiple members".into());
             }
-            return Ok(output);
+            return Ok(());
         }
     }
 }
@@ -304,6 +384,7 @@ fn compressed_block(
     literals: &Huffman,
     distances: &Huffman,
     output: &mut Vec<u8>,
+    budget: &mut Budget,
 ) -> Result<(), String> {
     const LENGTH_BASE: [usize; 29] = [
         3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115,
@@ -326,6 +407,7 @@ fn compressed_block(
                 if output.len() == MAX_TAR {
                     return Err("expanded artifact exceeds 64 MiB".into());
                 }
+                budget.expand(1)?;
                 output.push(byte as u8);
             }
             256 => return Ok(()),
@@ -343,6 +425,7 @@ fn compressed_block(
                 if output.len() + length > MAX_TAR {
                     return Err("expanded artifact exceeds 64 MiB".into());
                 }
+                budget.expand(length)?;
                 for _ in 0..length {
                     output.push(output[output.len() - distance]);
                 }
@@ -387,12 +470,24 @@ fn tar_number(field: &[u8]) -> Result<usize, String> {
     Ok(value)
 }
 
-fn inspect_tar(tar: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
+fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<String>), String> {
+    struct Seen<'a> {
+        path: String,
+        directory: bool,
+        data: &'a [u8],
+        metadata_before_checksum: &'a [u8],
+        metadata_after_checksum: &'a [u8],
+        dot_alias: bool,
+        paired: bool,
+    }
+
     if tar.len() % 512 != 0 {
         return Err("tar length is not block aligned".into());
     }
     let mut position = 0;
-    let mut paths = BTreeMap::new();
+    let mut paths: BTreeMap<String, Seen<'_>> = BTreeMap::new();
+    let mut entry_count = 0;
+    let mut root: Option<String> = None;
     let mut manifest = None;
     let mut binding = None;
     loop {
@@ -405,9 +500,11 @@ fn inspect_tar(tar: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
             }
             break;
         }
-        if paths.len() == MAX_ENTRIES {
+        budget.entry()?;
+        if entry_count == MAX_ENTRIES {
             return Err("tar exceeds 10000 entries".into());
         }
+        entry_count += 1;
         if &header[257..265] != b"ustar\x0000" {
             return Err("artifact requires POSIX ustar headers".into());
         }
@@ -452,16 +549,36 @@ fn inspect_tar(tar: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
             return Err("invalid tar entry size".into());
         }
         let name = tar_text(&header[..100])?;
-        let prefix = tar_text(&header[345..500])?;
+        let prefix = match tar_text(&header[345..500]) {
+            Ok(prefix) => prefix,
+            Err(_)
+                if header[345..476].iter().all(|byte| *byte == 0)
+                    && [&header[476..488], &header[488..500]].iter().all(|field| {
+                        field[..11].iter().all(|byte| matches!(byte, b'0'..=b'7')) && field[11] == 0
+                    }) =>
+            {
+                ""
+            }
+            Err(reason) => return Err(reason),
+        };
         let joined = if prefix.is_empty() {
             name.to_owned()
         } else {
             format!("{prefix}/{name}")
         };
-        let path = if directory {
+        let raw_path = if directory {
             joined.strip_suffix('/').unwrap_or(&joined)
         } else {
             &joined
+        };
+        let (path, dot_alias) = match raw_path.split_once("/./") {
+            Some((archive_root, rest))
+                if !archive_root.contains('/') && !rest.is_empty() && !rest.contains("/./") =>
+            {
+                (format!("{archive_root}/{rest}"), true)
+            }
+            Some(_) => return Err("unsupported dot tar path".into()),
+            None => (raw_path.to_owned(), false),
         };
         if path.split('/').any(|part| {
             let base = part.split('.').next().unwrap().to_ascii_uppercase();
@@ -469,8 +586,10 @@ fn inspect_tar(tar: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
                 || part == "."
                 || part == ".."
                 || part.ends_with('.')
+                || part.ends_with(' ')
                 || !part.bytes().all(|b| {
-                    b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'@' | b'+')
+                    (b.is_ascii_graphic() || b == b' ')
+                        && !matches!(b, b'\\' | b':' | b'*' | b'?' | b'"' | b'<' | b'>' | b'|')
                 })
                 || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
                 || (base.len() == 4
@@ -479,22 +598,30 @@ fn inspect_tar(tar: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
         }) {
             return Err("unsupported nonportable tar path".into());
         }
-        if path != "package" && !path.starts_with("package/") || path == "package" && !directory {
-            return Err("tar path is outside package directory".into());
+        let (member_root, relative) = path.split_once('/').unwrap_or((&path, ""));
+        if root
+            .as_deref()
+            .is_some_and(|expected| expected != member_root)
+        {
+            return Err("tar contains inconsistent archive roots".into());
         }
-        if directory && matches!(path, "package/package.json" | "package/binding.gyp") {
+        root.get_or_insert_with(|| member_root.to_owned());
+        if relative.is_empty() && !directory {
+            return Err("tar root is not a directory".into());
+        }
+        if directory && matches!(relative, "package.json" | "binding.gyp") {
             return Err("evidence path is not a regular tar file".into());
+        }
+        if dot_alias && (directory || matches!(relative, "package.json" | "binding.gyp")) {
+            return Err("dot aliases of directories or lifecycle evidence are unsupported".into());
         }
         let folded = path.to_ascii_lowercase();
         if matches!(
-            folded.as_str(),
-            "package/package.json" | "package/binding.gyp"
-        ) && path != folded
+            relative.to_ascii_lowercase().as_str(),
+            "package.json" | "binding.gyp"
+        ) && !matches!(relative, "package.json" | "binding.gyp")
         {
             return Err("noncanonical lifecycle evidence tar path".into());
-        }
-        if paths.insert(folded, directory).is_some() {
-            return Err("duplicate case-folded tar path".into());
         }
         let start = position + 512;
         let padded = size.div_ceil(512) * 512;
@@ -505,21 +632,57 @@ fn inspect_tar(tar: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
         if padding.iter().any(|byte| *byte != 0) {
             return Err("nonzero tar entry padding".into());
         }
-        match path {
-            "package/package.json" => {
+        if let Some(prior) = paths.get_mut(&folded) {
+            if prior.path != path
+                || prior.directory
+                || directory
+                || prior.paired
+                || prior.dot_alias == dot_alias
+            {
+                return Err("duplicate case-folded tar path".into());
+            }
+            if prior.data != data
+                || prior.metadata_before_checksum != &header[100..148]
+                || prior.metadata_after_checksum != &header[156..512]
+            {
+                return Err("conflicting dot-alias tar path".into());
+            }
+            prior.paired = true;
+        } else {
+            paths.insert(
+                folded,
+                Seen {
+                    path: path.clone(),
+                    directory,
+                    data,
+                    metadata_before_checksum: &header[100..148],
+                    metadata_after_checksum: &header[156..512],
+                    dot_alias,
+                    paired: false,
+                },
+            );
+        }
+        match relative {
+            "package.json" => {
                 if size > MAX_MANIFEST {
                     return Err("package manifest exceeds 1 MiB".into());
                 }
                 manifest = Some(data.to_vec());
             }
-            "package/binding.gyp" => binding = Some(sha256(data)),
+            "binding.gyp" => binding = Some(sha256(data)),
             _ => {}
         }
         position = start + padded;
     }
+    if paths.values().any(|entry| entry.dot_alias && !entry.paired) {
+        return Err("unpaired dot-alias tar path".into());
+    }
     for path in paths.keys() {
         for (offset, _) in path.match_indices('/') {
-            if paths.get(&path[..offset]) == Some(&false) {
+            if paths
+                .get(&path[..offset])
+                .is_some_and(|entry| !entry.directory)
+            {
                 return Err("tar file conflicts with a parent directory".into());
             }
         }
@@ -581,44 +744,115 @@ mod tests {
 
     #[test]
     fn artifact_content_is_bound_to_original_gzip_bytes() {
+        let mut expanded = Vec::new();
         let manifest = br#"{"name":"sample","version":"1.0.0"}"#;
         let bytes = gzip(&tar(&[
             ("package/", b'5', b""),
             ("package/package.json", b'0', manifest),
             ("package/binding.gyp", b'0', b"native"),
         ]));
-        let value = inspect(&bytes, &integrity(&bytes)).unwrap();
+        let value = inspect(
+            &bytes,
+            &integrity(&bytes),
+            &mut expanded,
+            &mut Budget::new(),
+        )
+        .unwrap();
         assert_eq!(value.manifest, manifest);
         assert_eq!(value.binding_gyp_sha256, Some(sha256(b"native")));
         assert_eq!(value.sha512, sha512(&bytes));
         let mut other_header = bytes.clone();
         other_header[4] = 1;
-        assert!(inspect(&other_header, &integrity(&bytes)).is_err());
-        assert!(inspect(&other_header, &integrity(&other_header)).is_ok());
+        assert!(inspect(
+            &other_header,
+            &integrity(&bytes),
+            &mut expanded,
+            &mut Budget::new()
+        )
+        .is_err());
+        assert!(inspect(
+            &other_header,
+            &integrity(&other_header),
+            &mut expanded,
+            &mut Budget::new()
+        )
+        .is_ok());
         for invalid in [
             format!(" {}", integrity(&bytes)),
             format!("{} {}", integrity(&bytes), integrity(&bytes)),
             integrity(&bytes).trim_end_matches('=').to_owned(),
             integrity(&bytes).replace("sha512-", "sha256-"),
         ] {
-            assert!(inspect(&bytes, &invalid).is_err());
+            assert!(inspect(&bytes, &invalid, &mut expanded, &mut Budget::new()).is_err());
+        }
+    }
+
+    #[test]
+    fn repeated_artifact_inspection_recovers_after_failed_integrity_crc_and_truncation() {
+        let large_manifest = br#"{"name":"large","version":"1.0.0"}"#;
+        let large = gzip(&tar(&[
+            ("package/package.json", b'0', large_manifest),
+            ("package/binding.gyp", b'0', b"native"),
+            ("package/data.bin", b'0', &vec![42; 4 * 1024 * 1024]),
+        ]));
+        let small_manifest = br#"{"name":"small","version":"2.0.0"}"#;
+        let small = gzip(&tar(&[("package/package.json", b'0', small_manifest)]));
+        let large_integrity = integrity(&large);
+        let small_integrity = integrity(&small);
+        let mut bad_crc = large.clone();
+        let crc_position = bad_crc.len() - 8;
+        bad_crc[crc_position] ^= 1;
+        let truncated = large[..large.len() - 10].to_vec();
+        let mut expanded = Vec::new();
+        for (invalid, invalid_integrity) in [
+            (large.as_slice(), small_integrity.clone()),
+            (bad_crc.as_slice(), integrity(&bad_crc)),
+            (truncated.as_slice(), integrity(&truncated)),
+        ] {
+            let first =
+                inspect(&large, &large_integrity, &mut expanded, &mut Budget::new()).unwrap();
+            assert_eq!(first.manifest, large_manifest);
+            assert_eq!(first.binding_gyp_sha256, Some(sha256(b"native")));
+            assert_eq!(first.sha512, sha512(&large));
+            assert!(inspect(
+                invalid,
+                &invalid_integrity,
+                &mut expanded,
+                &mut Budget::new()
+            )
+            .is_err());
+            let next =
+                inspect(&small, &small_integrity, &mut expanded, &mut Budget::new()).unwrap();
+            assert_eq!(next.manifest, small_manifest);
+            assert_eq!(next.binding_gyp_sha256, None);
+            assert_eq!(next.sha512, sha512(&small));
+            assert_eq!(first.manifest, large_manifest);
         }
     }
 
     #[test]
     fn stored_fixed_and_dynamic_deflate_match_external_zlib_vectors() {
+        let mut output = Vec::new();
         assert_eq!(crc32(b"123456789"), 0xcbf43926);
-        assert_eq!(gunzip(&gzip(b"stored")).unwrap(), b"stored");
-        assert_eq!(inflate(b"KLJNDB\0").unwrap(), b"abcabcabcabcabc");
+        gunzip(&gzip(b"stored"), &mut output, &mut Budget::new()).unwrap();
+        assert_eq!(output, b"stored");
+        inflate(b"KLJNDB\0", &mut output, &mut Budget::new()).unwrap();
+        assert_eq!(output, b"abcabcabcabcabc");
         let dynamic = b"\xed\xcaG\x01\x800\x10EA+_\x01jb\x80\x92\xd0\xd9\x10\x08M=\x88\xe0\xf8\xce3\xae\xf3Zs_\x8f\xaa\x92\x9d\x8b\x82]\x1a\xf2\x1c7\xd9\xe1\x93\xf6\x8f\xa7\xf2\xb9\xd5X[\xc8\x91\xc9d2\x99L&\x93\xc9d2\x99L&\x93\xff\xc8/";
+        inflate(dynamic, &mut output, &mut Budget::new()).unwrap();
         assert_eq!(
-            inflate(dynamic).unwrap(),
+            output,
             b"The quick brown fox jumps over the lazy dog. ".repeat(100)
         );
-        assert!(inflate(&dynamic[..dynamic.len() - 1]).is_err());
-        assert!(inflate(&[7]).is_err());
-        assert!(inflate(&[1, 1, 0, 0, 0, 1]).is_err());
-        assert!(inflate(&[3, 2, 0]).is_err());
+        assert!(inflate(
+            &dynamic[..dynamic.len() - 1],
+            &mut output,
+            &mut Budget::new()
+        )
+        .is_err());
+        assert!(inflate(&[7], &mut output, &mut Budget::new()).is_err());
+        assert!(inflate(&[1, 1, 0, 0, 0, 1], &mut output, &mut Budget::new()).is_err());
+        assert!(inflate(&[3, 2, 0], &mut output, &mut Budget::new()).is_err());
     }
 
     #[test]
@@ -654,26 +888,28 @@ mod tests {
 
     #[test]
     fn gzip_rejects_crc_size_reserved_flags_junk_and_multiple_members() {
+        let mut output = Vec::new();
         let bytes = gzip(b"payload");
         for position in [0, 2, bytes.len() - 8, bytes.len() - 4] {
             let mut changed = bytes.clone();
             changed[position] ^= 1;
-            assert!(gunzip(&changed).is_err());
+            assert!(gunzip(&changed, &mut output, &mut Budget::new()).is_err());
         }
         let mut reserved = bytes.clone();
         reserved[3] = 0x20;
-        assert!(gunzip(&reserved).is_err());
-        assert!(gunzip(&bytes[..bytes.len() - 1]).is_err());
+        assert!(gunzip(&reserved, &mut output, &mut Budget::new()).is_err());
+        assert!(gunzip(&bytes[..bytes.len() - 1], &mut output, &mut Budget::new()).is_err());
         let mut junk = bytes.clone();
         junk.push(0);
-        assert!(gunzip(&junk).is_err());
+        assert!(gunzip(&junk, &mut output, &mut Budget::new()).is_err());
         let mut concatenated = bytes.clone();
         concatenated.extend_from_slice(&bytes);
-        assert!(gunzip(&concatenated).is_err());
+        assert!(gunzip(&concatenated, &mut output, &mut Budget::new()).is_err());
     }
 
     #[test]
     fn gzip_optional_fields_require_valid_bounds_and_header_checksum() {
+        let mut output = Vec::new();
         let base = gzip(b"payload");
         let mut bytes = base[..10].to_vec();
         bytes[3] = 4 | 8 | 16 | 2;
@@ -681,17 +917,18 @@ mod tests {
         bytes.extend_from_slice(b"name\0comment\0");
         bytes.extend_from_slice(&(crc32(&bytes) as u16).to_le_bytes());
         bytes.extend_from_slice(&base[10..]);
-        assert_eq!(gunzip(&bytes).unwrap(), b"payload");
+        gunzip(&bytes, &mut output, &mut Budget::new()).unwrap();
+        assert_eq!(output, b"payload");
         bytes[14] ^= 1;
-        assert!(gunzip(&bytes).is_err());
+        assert!(gunzip(&bytes, &mut output, &mut Budget::new()).is_err());
         let mut truncated = base.clone();
         truncated[3] = 4;
         truncated[10..12].fill(255);
-        assert!(gunzip(&truncated).is_err());
+        assert!(gunzip(&truncated, &mut output, &mut Budget::new()).is_err());
         let mut unterminated = base;
         unterminated[3] = 8;
         unterminated[10..].fill(255);
-        assert!(gunzip(&unterminated).is_err());
+        assert!(gunzip(&unterminated, &mut output, &mut Budget::new()).is_err());
     }
 
     #[test]
@@ -704,53 +941,284 @@ mod tests {
             "package/./package.json",
             "package/C:manifest",
             "package/a\\b",
-            "other/package.json",
         ] {
-            assert!(inspect_tar(&tar(&[(path, b'0', b"{}")])).is_err(), "{path}");
+            assert!(
+                inspect_tar(&tar(&[(path, b'0', b"{}")]), &mut Budget::new()).is_err(),
+                "{path}"
+            );
         }
         for kind in [b'x', b'g', b'L', b'K', b'1', b'2', b'3', b'4', b'6', b'7'] {
-            assert!(inspect_tar(&tar(&[("package/package.json", kind, b"{}")])).is_err());
+            assert!(inspect_tar(
+                &tar(&[("package/package.json", kind, b"{}")]),
+                &mut Budget::new()
+            )
+            .is_err());
         }
-        assert!(inspect_tar(&tar(&[
-            ("package/package.json", b'0', b"{}"),
-            ("package/package.json", b'0', b"{}")
-        ]))
+        assert!(inspect_tar(
+            &tar(&[
+                ("package/package.json", b'0', b"{}"),
+                ("package/package.json", b'0', b"{}")
+            ]),
+            &mut Budget::new()
+        )
         .is_err());
-        assert!(inspect_tar(&tar(&[("package/package.json", b'5', b"")])).is_err());
-        assert!(inspect_tar(&tar(&[("package/README.md", b'0', b"readme")])).is_err());
-        assert!(inspect_tar(&tar(&[
-            ("package/package.json", b'0', b"{}"),
-            ("package/a", b'0', b"a"),
-            ("package/a/b", b'0', b"b")
-        ]))
+        assert!(inspect_tar(
+            &tar(&[("package/package.json", b'5', b"")]),
+            &mut Budget::new()
+        )
+        .is_err());
+        assert!(inspect_tar(
+            &tar(&[("package/README.md", b'0', b"readme")]),
+            &mut Budget::new()
+        )
+        .is_err());
+        assert!(inspect_tar(
+            &tar(&[
+                ("package/package.json", b'0', b"{}"),
+                ("package/a", b'0', b"a"),
+                ("package/a/b", b'0', b"b")
+            ]),
+            &mut Budget::new()
+        )
         .is_err());
         let valid = tar(&[("package/package.json", b'0', b"{}")]);
-        assert!(inspect_tar(&valid[..valid.len() - 512]).is_err());
-        assert!(inspect_tar(&valid[..valid.len() - 1]).is_err());
+        assert!(inspect_tar(&valid[..valid.len() - 512], &mut Budget::new()).is_err());
+        assert!(inspect_tar(&valid[..valid.len() - 1], &mut Budget::new()).is_err());
         let mut trailing = valid.clone();
         *trailing.last_mut().unwrap() = 1;
-        assert!(inspect_tar(&trailing).is_err());
+        assert!(inspect_tar(&trailing, &mut Budget::new()).is_err());
         let mut padded = valid.clone();
         padded[514] = 1;
-        assert!(inspect_tar(&padded).is_err());
+        assert!(inspect_tar(&padded, &mut Budget::new()).is_err());
         let mut bad_checksum = valid.clone();
         bad_checksum[100] ^= 1;
-        assert!(inspect_tar(&bad_checksum).is_err());
+        assert!(inspect_tar(&bad_checksum, &mut Budget::new()).is_err());
         let mut bad_size = valid.clone();
         bad_size[124] = 0x80;
         checksum(&mut bad_size[..512]);
-        assert!(inspect_tar(&bad_size).is_err());
+        assert!(inspect_tar(&bad_size, &mut Budget::new()).is_err());
         let mut hidden_name = valid;
         hidden_name[99] = b'x';
         checksum(&mut hidden_name[..512]);
-        assert!(inspect_tar(&hidden_name).is_err());
+        assert!(inspect_tar(&hidden_name, &mut Budget::new()).is_err());
     }
 
     #[test]
     fn manifest_size_limit_is_enforced_after_integrity_validation() {
         let allowed = tar(&[("package/package.json", b'0', &vec![b' '; MAX_MANIFEST])]);
-        assert_eq!(inspect_tar(&allowed).unwrap().0.len(), MAX_MANIFEST);
+        assert_eq!(
+            inspect_tar(&allowed, &mut Budget::new()).unwrap().0.len(),
+            MAX_MANIFEST
+        );
         let oversized = tar(&[("package/package.json", b'0', &vec![b' '; MAX_MANIFEST + 1])]);
-        assert!(inspect_tar(&oversized).unwrap_err().contains("1 MiB"));
+        assert!(inspect_tar(&oversized, &mut Budget::new())
+            .unwrap_err()
+            .contains("1 MiB"));
+    }
+    #[test]
+    fn cumulative_expansion_counts_repeated_archives_and_stops_after_exhaustion() {
+        let manifest = br#"{"name":"pkg","version":"1"}"#;
+        let plain = tar(&[("package/package.json", b'0', manifest)]);
+        let bytes = gzip(&plain);
+        let mut budget = Budget::new();
+        budget.expanded_remaining = 2 * plain.len() as u64;
+        let mut output = Vec::new();
+        let first = inspect(&bytes, &integrity(&bytes), &mut output, &mut budget).unwrap();
+        inspect(&bytes, &integrity(&bytes), &mut output, &mut budget).unwrap();
+        assert_eq!(budget.expanded_remaining, 0);
+        let error = inspect(&bytes, &integrity(&bytes), &mut output, &mut budget).unwrap_err();
+        assert!(error.contains("expanded evidence"));
+        assert!(output.is_empty());
+        assert_eq!(
+            inspect(b"not an archive", "", &mut output, &mut budget).unwrap_err(),
+            error
+        );
+        assert_eq!(first.manifest, manifest);
+    }
+
+    #[test]
+    fn expansion_limit_applies_to_stored_literals_and_backreferences() {
+        for (payload, expected) in [
+            (gzip(b"payload"), b"payload".as_slice()),
+            (gzip(b""), b"".as_slice()),
+        ] {
+            let mut output = Vec::new();
+            let mut budget = Budget::new();
+            budget.expanded_remaining = expected.len() as u64;
+            gunzip(&payload, &mut output, &mut budget).unwrap();
+            assert_eq!(output, expected);
+            if !expected.is_empty() {
+                let mut short = Budget::new();
+                short.expanded_remaining = expected.len() as u64 - 1;
+                assert!(gunzip(&payload, &mut output, &mut short).is_err());
+                assert!(output.is_empty());
+            }
+        }
+        let mut budget = Budget::new();
+        budget.expanded_remaining = 15;
+        let mut output = Vec::new();
+        inflate(b"KLJNDB\0", &mut output, &mut budget).unwrap();
+        assert_eq!(output, b"abcabcabcabcabc");
+        let mut short = Budget::new();
+        short.expanded_remaining = 14;
+        assert!(inflate(b"KLJNDB\0", &mut output, &mut short).is_err());
+        assert!(output.len() <= 14);
+        assert_eq!(14 - short.expanded_remaining, output.len() as u64);
+    }
+
+    #[test]
+    fn failed_crc_and_truncated_streams_keep_their_produced_byte_charge() {
+        let mut bad_crc = gzip(b"bad");
+        let end = bad_crc.len() - 8;
+        bad_crc[end] ^= 1;
+        let mut budget = Budget::new();
+        budget.expanded_remaining = 5;
+        let mut output = Vec::new();
+        assert!(gunzip(&bad_crc, &mut output, &mut budget).is_err());
+        assert_eq!(output, b"bad");
+        gunzip(&gzip(b"ok"), &mut output, &mut budget).unwrap();
+        assert_eq!(output, b"ok");
+        assert_eq!(budget.expanded_remaining, 0);
+
+        let mut budget = Budget::new();
+        budget.expanded_remaining = 65_537;
+        let bytes = gzip(&vec![42; 65_536]);
+        assert!(gunzip(&bytes[..bytes.len() - 1], &mut output, &mut budget).is_err());
+        assert_eq!(output.len(), 65_535);
+        assert_eq!(budget.expanded_remaining, 2);
+        gunzip(&gzip(b"ok"), &mut output, &mut budget).unwrap();
+        assert_eq!(output, b"ok");
+        assert_eq!(budget.expanded_remaining, 0);
+    }
+
+    #[test]
+    fn cumulative_headers_count_failed_and_repeated_tar_inspections() {
+        let bytes = tar(&[("package/package.json", b'0', b"{}")]);
+        let mut budget = Budget::new();
+        budget.entries_remaining = 2;
+        let mut bad = bytes.clone();
+        bad[100] ^= 1;
+        assert!(inspect_tar(&bad, &mut budget).is_err());
+        assert_eq!(inspect_tar(&bytes, &mut budget).unwrap().0, b"{}");
+        assert_eq!(budget.entries_remaining, 0);
+        assert!(inspect_tar(&bytes, &mut budget)
+            .unwrap_err()
+            .contains("headers"));
+        let mut short = Budget::new();
+        short.entries_remaining = 1;
+        assert!(inspect_tar(
+            &tar(&[
+                ("package/package.json", b'0', b"{}"),
+                ("package/readme", b'0', b"readme"),
+            ]),
+            &mut short
+        )
+        .unwrap_err()
+        .contains("headers"));
+    }
+
+    #[test]
+    fn one_consistent_archive_root_and_safe_printable_names() {
+        let manifest = br#"{"name":"sample","version":"1"}"#;
+        for root in ["json5", "cacheable-request", "node v24.12"] {
+            let root_dir = format!("{root}/");
+            let root_manifest = format!("{root}/package.json");
+            let ordinary = format!("{root}/array/#/_compare-by-length.js");
+            let tilde = format!("{root}/README.md~");
+            let bytes = tar(&[
+                (&root_dir, b'5', b""),
+                (&root_manifest, b'0', manifest),
+                (&ordinary, b'0', b"body"),
+                (&tilde, b'0', b"old"),
+            ]);
+            assert_eq!(inspect_tar(&bytes, &mut Budget::new()).unwrap().0, manifest);
+        }
+        let rejected: [Vec<(&str, u8, &[u8])>; 4] = [
+            vec![
+                ("json5/package.json", b'0', manifest),
+                ("other/README", b'0', b"readme"),
+            ],
+            vec![
+                ("json5/package.json", b'0', manifest),
+                ("JSON5/README", b'0', b"readme"),
+            ],
+            vec![("json5", b'0', manifest)],
+            vec![("json5/Package.json", b'0', manifest)],
+        ];
+        for entries in rejected {
+            assert!(inspect_tar(&tar(&entries), &mut Budget::new()).is_err());
+        }
+    }
+
+    #[test]
+    fn identical_nonlifecycle_dot_alias_requires_an_exact_canonical_partner() {
+        let manifest = br#"{"name":"sample","version":"1"}"#;
+        for (first, second) in [
+            ("package/./dist/index.js", "package/dist/index.js"),
+            ("package/dist/index.js", "package/./dist/index.js"),
+        ] {
+            let archive = tar(&[
+                ("package/package.json", b'0', manifest),
+                (first, b'0', b"same"),
+                (second, b'0', b"same"),
+            ]);
+            assert_eq!(
+                inspect_tar(&archive, &mut Budget::new()).unwrap().0,
+                manifest
+            );
+        }
+        for entries in [
+            vec![
+                ("package/package.json", b'0', manifest.as_slice()),
+                ("package/./dist/index.js", b'0', b"first".as_slice()),
+                ("package/dist/index.js", b'0', b"later".as_slice()),
+            ],
+            vec![
+                ("package/package.json", b'0', manifest.as_slice()),
+                ("package/./dist/index.js", b'0', b"same".as_slice()),
+            ],
+            vec![
+                ("package/./package.json", b'0', manifest.as_slice()),
+                ("package/package.json", b'0', manifest.as_slice()),
+            ],
+            vec![
+                ("package/package.json", b'0', manifest.as_slice()),
+                ("package/./Dist/index.js", b'0', b"same".as_slice()),
+                ("package/dist/index.js", b'0', b"same".as_slice()),
+            ],
+        ] {
+            assert!(inspect_tar(&tar(&entries), &mut Budget::new()).is_err());
+        }
+        let mut different_mode = tar(&[
+            ("package/package.json", b'0', manifest),
+            ("package/./dist/index.js", b'0', b"same"),
+            ("package/dist/index.js", b'0', b"same"),
+        ]);
+        different_mode[2048 + 100..2048 + 108].copy_from_slice(b"0000755\0");
+        checksum(&mut different_mode[2048..2560]);
+        assert!(inspect_tar(&different_mode, &mut Budget::new())
+            .unwrap_err()
+            .contains("conflicting dot-alias"));
+    }
+
+    #[test]
+    fn legacy_timestamp_tail_accepts_only_valid_octals_after_zero_padding() {
+        let manifest = br#"{"name":"sample","version":"1"}"#;
+        let mut bytes = tar(&[("cacheable-request/package.json", b'0', manifest)]);
+        bytes[476..488].copy_from_slice(b"14332753065\0");
+        bytes[488..500].copy_from_slice(b"14332753065\0");
+        checksum(&mut bytes[..512]);
+        assert_eq!(inspect_tar(&bytes, &mut Budget::new()).unwrap().0, manifest);
+
+        for offset in [345, 346, 475] {
+            let mut nonzero_padding = bytes.clone();
+            nonzero_padding[offset] = b'x';
+            checksum(&mut nonzero_padding[..512]);
+            assert!(inspect_tar(&nonzero_padding, &mut Budget::new()).is_err());
+        }
+        let mut malformed_time = bytes;
+        malformed_time[476] = b'8';
+        checksum(&mut malformed_time[..512]);
+        assert!(inspect_tar(&malformed_time, &mut Budget::new()).is_err());
     }
 }

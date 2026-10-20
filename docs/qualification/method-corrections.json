@@ -1,0 +1,9 @@
+[
+  {
+    "change": "Correct cutoff from inclusive end of October 20 to 2026-10-20T00:00:00Z.",
+    "reason": "Original brief requested events before October 20 UTC.",
+    "timing": "Before any Tau-Gate evaluation. Initial screens retained.",
+    "change2": "Append fixed 30-repository extension supplied by coordinator.",
+    "reason2": "Initial pool contains npm repositories that moved away from root package-lock.json. Preserve this screen failure and extend discovery without Tau-Gate outcome screening."
+  }
+]

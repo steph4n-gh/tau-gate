@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "purpose": "Freeze the M2 compatibility and parser candidate before opening holdout failures",
+  "source_commit": "481a4248c6afb0098bfce49a3a010a2bb11e3e02",
+  "source_tree": "82751fc6f8729b0d90e1a90a1587361bf76e821d",
+  "binary_sha256": "fc156ce0d59940fb4248410e01758ec8c256e08f0c7eed043828a28660d077b0",
+  "helper_sha256": {
+    "tools/npm_evidence.py": "82bdf19c88d081cdee89e366fc49b7029b477077bd8f7b1cbed849b36570016e",
+    "tools/qualification.py": "8ffc2c53795551de8aa2140231a076ebed7ce50765e61ebf9abcc8175ad4548d",
+    "tools/qualification_oracle.py": "d729e11633fa26623a4429ab345bdd9692399e455627dbdc811ca92bb11c572c"
+  },
+  "receipts_sha256": {
+    "development_summary": "4b06571425f2044889796bdb03dde9aaf1518bcb6c9bad491449c1801c88f1c2",
+    "development_implementation": "385e2db8e4826cfd7e38d6249c89bd57c197fb6e3cbd3b04fa0bcbbca75230ca",
+    "development_implementation_after": "df062c77291ffa1e0a2995d4dc542ae7997e1d3d1ad3e19e997c78abc900a398",
+    "core_controls": "fdac19b69738a7fc7f8ca11484f28a6f96af8a644ff8a90ae6703beb01a1c57b",
+    "pr_controls": "c7f03084e82924902b03348fea72fcc165af8418b784b81c7df565ce0cf81db4",
+    "fuzz": "e0c8e673be88e88f892e7f87909bda931a13fce565193b78442199fbee5fb370",
+    "five_original_archives": "ccbe85ebf956e0fa5471675b5706141ec898a33c82772b8154df7c9f22be1dd0"
+  },
+  "development_counts": {
+    "selected_pairs": 72,
+    "core_complete_pairs": 21,
+    "comparison_complete_pairs": 9,
+    "known_reporting_misses": 9,
+    "observed_approval_relevant_misses": 0,
+    "observed_fact_mismatches": 0
+  },
+  "holdout_pairs_unopened": 18
+}

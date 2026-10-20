@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 /// Specifically designed to handle configuration (TOML-like), JSON, and basic YAML metadata extraction.
 pub struct MiniParser;
 
+const MAX_JSON_VALUES: usize = 100_000;
+
 impl MiniParser {
     /// Parses a TOML-like string into a simple key-value map.
     pub fn parse_config(content: &str) -> Result<BTreeMap<String, ConfigValue>> {
@@ -92,6 +94,7 @@ impl MiniParser {
             text: json,
             bytes: json.as_bytes(),
             pos: 0,
+            remaining_values: MAX_JSON_VALUES,
         };
         let value = reader.value(0)?;
         reader.ws();
@@ -298,6 +301,7 @@ struct JsonReader<'a> {
     text: &'a str,
     bytes: &'a [u8],
     pos: usize,
+    remaining_values: usize,
 }
 impl JsonReader<'_> {
     fn error(&self) -> GateError {
@@ -379,12 +383,19 @@ impl JsonReader<'_> {
             .bytes
             .get(self.pos..self.pos + 4)
             .ok_or_else(|| self.error())?;
+        if !raw.iter().all(u8::is_ascii_hexdigit) {
+            return Err(self.error());
+        }
         let text = std::str::from_utf8(raw).map_err(|_| self.error())?;
         let n = u32::from_str_radix(text, 16).map_err(|_| self.error())?;
         self.pos += 4;
         Ok(n)
     }
     fn value(&mut self, depth: usize) -> Result<JsonNode> {
+        if self.remaining_values == 0 {
+            return Err(GateError::Generic("JSON exceeds 100000 values".into()));
+        }
+        self.remaining_values -= 1;
         if depth > 128 {
             return Err(self.error());
         }
@@ -602,6 +613,8 @@ mod strict_regressions {
     #[test]
     fn malformed_rejected() {
         for s in [
+            r#""\u+041""#,
+            r#""\u+000""#,
             "{a:1}",
             "[1 2]",
             "[1,]",
@@ -633,6 +646,41 @@ mod large_string_regression {
         assert_eq!(
             j.get("payload").and_then(JsonNode::as_str),
             Some(text.as_str())
+        );
+    }
+}
+
+#[cfg(test)]
+mod value_limit_regression {
+    use super::*;
+
+    #[test]
+    fn json_value_count_has_an_exact_boundary() {
+        let allowed = format!("[{}]", vec!["null"; 99_999].join(","));
+        assert_eq!(
+            MiniParser::parse_json(&allowed)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            99_999
+        );
+        let rejected = format!("[{}]", vec!["null"; 100_000].join(","));
+        assert!(MiniParser::parse_json(&rejected).is_err());
+        let object = format!(
+            "{{{}}}",
+            (0..99_999)
+                .map(|n| format!("\"k{n}\":null"))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        assert_eq!(
+            MiniParser::parse_json(&object)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .len(),
+            99_999
         );
     }
 }

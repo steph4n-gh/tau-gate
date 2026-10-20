@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "freeze": "evidence/m2-freeze.json",
+  "split": "holdout",
+  "pairs": 18,
+  "binary_sha256": "fc156ce0d59940fb4248410e01758ec8c256e08f0c7eed043828a28660d077b0",
+  "implementation_unchanged": true,
+  "receipts_sha256": {
+    "summary": "f5bb6d790b2dab0f8305c800ee55d429f8db56bec3dafd917c44b980de4e5512",
+    "implementation": "0689ec6fbf1b301454387851f2835936bafdf54f49defac5fd80a6cb98629d2c",
+    "implementation_after": "df062c77291ffa1e0a2995d4dc542ae7997e1d3d1ad3e19e997c78abc900a398"
+  },
+  "counts": {
+    "core_complete_pairs": 8,
+    "comparison_complete_pairs": 3,
+    "known_reporting_misses": 2,
+    "observed_approval_relevant_misses": 0,
+    "observed_fact_mismatches": 0
+  },
+  "known_misses": [
+    {"case": "socketio__socket.io-aaf2af36ec8a", "path": "node_modules/jake", "kind": "manifest_changed", "approval_relevant": false},
+    {"case": "socketio__socket.io-aaf2af36ec8a", "path": "node_modules/jake", "kind": "artifact_changed", "approval_relevant": false}
+  ]
+}

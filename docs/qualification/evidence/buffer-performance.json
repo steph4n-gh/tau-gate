@@ -1,0 +1,24 @@
+{
+  "claim": "Two reusable evidence buffers reduced peak resident memory for one frozen development review without changing the report",
+  "platform": "macOS arm64",
+  "sample": "npm/cli historical pair, five alternating baseline/candidate runs",
+  "baseline_peak_rss_bytes": {"median": 1203519488, "minimum": 1202667520, "maximum": 1205321728},
+  "candidate_peak_rss_bytes": {"median": 297877504, "minimum": 297353216, "maximum": 299335680},
+  "median_reduction_percent": 75.24946567379556,
+  "all_ten_reports_byte_identical": true,
+  "report_bytes": 2352222,
+  "report_sha256": "b6253f3e3436428988ccb121f8f521aa2bacfa9c9e0fc7012dd42fed184266cf",
+  "integrated_commit": "145abf03400419595329c66e075ee24c1f2847cd",
+  "integrated_peak_rss_bytes": 293650432,
+  "integrated_report_exit": 2,
+  "integrated_report_sha256": "b6253f3e3436428988ccb121f8f521aa2bacfa9c9e0fc7012dd42fed184266cf",
+  "source_receipts": {
+    "paired_runs": "/Volumes/Storage/taugate-qualification/buffer-repair/paired-runs/receipt.json",
+    "paired_runs_sha256": "b89e53e953faf883c11329b98d19d9b209644f37e42a5d05919db4878e0dd99e",
+    "commit_binding": "/Volumes/Storage/taugate-qualification/buffer-repair/commit-binding.json",
+    "commit_binding_sha256": "2236cbc4c90c7d1c7cc28fb5c347ca126e6ba548e51f9449e02b02908ca5a1d7",
+    "integration_check": "/Volumes/Storage/taugate-qualification/buffer-repair/integration-check/receipt.json",
+    "integration_check_sha256": "2146c399612ca68c591edcf4fa6ed1203dd722a914332de00083a4fa6b5c1267"
+  },
+  "limits": "One macOS arm64 case; no Linux memory or speed claim. Timed binary was built before commit; commit-binding checks measured source files match the committed source."
+}

@@ -268,3 +268,49 @@ fn incomplete_base_human_report_explains_reason() {
     assert!(text.contains("INCOMPLETE base: unresolved dependencies"));
     assert!(text.contains("Head snapshot: complete"));
 }
+
+#[test]
+fn oversized_npm_records_references_and_json_values_are_incomplete() {
+    let f = Fixture::new();
+    let records = (0..10_000)
+        .map(|n| format!("\"node_modules/p{n}\":{{\"version\":\"1\"}}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let refs = (0..50_001)
+        .map(|n| format!("\"p{n}\":\"1\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    let values = vec!["null"; 100_000].join(",");
+    for (lock, reason) in [
+        (
+            format!(r#"{{"lockfileVersion":3,"packages":{{"":{{}},{records}}}}}"#),
+            "10000 package records",
+        ),
+        (
+            format!(r#"{{"lockfileVersion":3,"packages":{{"":{{"dependencies":{{{refs}}}}}}}}}"#),
+            "50000 dependency references",
+        ),
+        (
+            format!(r#"{{"lockfileVersion":3,"packages":{{"":{{}}}},"extra":[{values}]}}"#),
+            "100000 values",
+        ),
+    ] {
+        f.put("lock.json", &lock);
+        let first = f.run(&["audit", "--lock", "lock.json", "--json"]);
+        assert_eq!(first.status.code(), Some(2), "{first:?}");
+        assert_eq!(
+            json(&first).get("status").and_then(J::as_str),
+            Some("incomplete")
+        );
+        assert!(
+            String::from_utf8_lossy(&first.stdout).contains(reason),
+            "{first:?}"
+        );
+        assert_eq!(
+            first.stdout,
+            f.run(&["audit", "--lock", "lock.json", "--json"]).stdout
+        );
+        assert_eq!(fs::read_to_string(f.0.join("lock.json")).unwrap(), lock);
+        assert_eq!(fs::read_dir(&f.0).unwrap().count(), 1);
+    }
+}
