@@ -5,6 +5,37 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+pub(crate) const MAX_NPM_RECORDS: usize = 10_000;
+const MAX_NPM_REFERENCES: usize = 50_000;
+const DEPENDENCY_KINDS: [&str; 4] = [
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+];
+
+pub(crate) fn npm_limits(packages: &BTreeMap<String, JsonNode>) -> Result<()> {
+    if packages.len() > MAX_NPM_RECORDS {
+        return Err(GateError::Graph(
+            "INCOMPLETE: npm snapshot exceeds 10000 package records".into(),
+        ));
+    }
+    let mut references = 0;
+    for record in packages.values() {
+        for kind in DEPENDENCY_KINDS {
+            if let Some(value) = record.get(kind) {
+                references += value.as_object().context("Invalid dependency map")?.len();
+                if references > MAX_NPM_REFERENCES {
+                    return Err(GateError::Graph(
+                        "INCOMPLETE: npm snapshot exceeds 50000 dependency references".into(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Supported package manager engines.
 #[derive(Debug, Clone, Copy)]
 pub enum EngineType {
@@ -90,6 +121,7 @@ impl DepGraph {
                 "INCOMPLETE: lockfile root package is missing".into(),
             ));
         }
+        npm_limits(packages)?;
         let mut graph = DiGraph::new();
         let mut indices = BTreeMap::new();
         let mut identities = BTreeMap::new();
@@ -192,12 +224,7 @@ impl DepGraph {
                     issues.push(format!("unresolved workspace link {path} -> {target}"));
                 }
             }
-            for kind in [
-                "dependencies",
-                "devDependencies",
-                "optionalDependencies",
-                "peerDependencies",
-            ] {
+            for kind in DEPENDENCY_KINDS {
                 if let Some(value) = details.get(kind) {
                     let deps = value.as_object().context("Invalid dependency map")?;
                     for (name, req) in deps {
@@ -461,5 +488,45 @@ mod exact_regressions {
         let d=DepGraph::parse_npm_lockfile(r#"{"lockfileVersion":3,"packages":{"":{"dependencies":{"a":"1"},"devDependencies":{"a":"1"},"optionalDependencies":{"a":"2"}},"node_modules/a":{"version":"2"}}}"#).unwrap();
         assert_eq!(d.graph.edges().len(), 1);
         assert_eq!(d.edge_kinds.values().next().unwrap().len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod npm_limit_tests {
+    use super::*;
+
+    #[test]
+    fn records_and_declared_references_have_exact_boundaries() {
+        let mut packages = BTreeMap::new();
+        for n in 0..MAX_NPM_RECORDS {
+            packages.insert(format!("p{n}"), JsonNode::Object(BTreeMap::new()));
+        }
+        npm_limits(&packages).unwrap();
+        packages.insert("one-more".into(), JsonNode::Null);
+        assert!(npm_limits(&packages)
+            .unwrap_err()
+            .to_string()
+            .contains("10000"));
+
+        let mut refs = BTreeMap::new();
+        for n in 0..MAX_NPM_REFERENCES {
+            refs.insert(format!("p{n}"), JsonNode::String("1".into()));
+        }
+        let mut record = BTreeMap::new();
+        record.insert("dependencies".into(), JsonNode::Object(refs));
+        let mut packages = BTreeMap::from([("".into(), JsonNode::Object(record.clone()))]);
+        npm_limits(&packages).unwrap();
+        record.insert(
+            "optionalDependencies".into(),
+            JsonNode::Object(BTreeMap::from([(
+                "p0".into(),
+                JsonNode::String("1".into()),
+            )])),
+        );
+        packages.insert("".into(), JsonNode::Object(record));
+        assert!(npm_limits(&packages)
+            .unwrap_err()
+            .to_string()
+            .contains("50000"));
     }
 }
