@@ -8,6 +8,8 @@ Each repository uses a `pull_request_target` workflow from its trusted base comm
 
 The pilots exercise a genuine lockfile update, a helper upgrade, and deliberately failing pull requests. A failing control stays open long enough to inspect its report and merge restriction, then closes without merging. The [pilot log](pilot-log.tsv) records exact heads, report outcomes, and policy transitions. Review minutes were not timed for the initial work.
 
+GitHub's [public-repository default](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target) is scheduled to block `pull_request_target` on 2026-11-02. Each pilot therefore has an active repository Actions policy that allows this event only for `.github/workflows/npm-pr-review.yml`. The [operator-collected policy receipt](evidence/pilot-event-policies.json) records the exact API responses, including IDs, enforcement, workflow paths, allowed events, and timestamps. The [Earthquake policy](https://github.com/steph4n-gh/earthquake-lab-publication/settings/actions/rules/8147) and [REA policy](https://github.com/steph4n-gh/rea/settings/actions/rules/8146) can be rechecked by repository admins; their settings can change after the receipt. The reviewed workflow uses a read-only token, checks out the trusted base, reads the PR head as Git data, and executes no head-side tool or public package lifecycle script. These policies do not enable the separate product CI workflows.
+
 The four-week observation window runs from 2026-10-20 through 2026-11-17. Each later update review should record the PR head, gate result, evidence gaps, reviewer minutes, and administrative policy changes. A week with no dependency update should say so instead of being counted as a successful review. The window can close only after actual use across the interval; elapsed time alone is insufficient.
 
 ## Earthquake Lab Publication
@@ -19,6 +21,8 @@ The [trusted helper upgrade](https://github.com/steph4n-gh/earthquake-lab-public
 The [merged-main build](https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39518344661) passed at merge commit `5f6fb05d60b4000534381d20ac983f9a1bdbb15f`.
 
 The [head-side approval control](https://github.com/steph4n-gh/earthquake-lab-publication/pull/4) changed only JSON formatting. Its [live report](https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39518372790) returned blocked, exit 1, and named `tau-gate.approvals.json` as a protected head change. The [missing-lock control](https://github.com/steph4n-gh/earthquake-lab-publication/pull/5) returned incomplete, exit 2, and named `package-lock.json` as the missing Git path in its [live report](https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39518391437). Both used the v4.2.1 checker and the new trusted helper from main. The `tau-gate` check is required with up-to-date status checks on `main`; both controls failed that required check and closed without merging.
+
+After policy 8147 was activated, reopening the missing-lock control triggered a new [trusted-base gate run](https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39526462828). It again returned incomplete, exit 2. The control closed without merging; this was a policy regression check, not a dependency-update review.
 
 ## REA
 
@@ -37,6 +41,8 @@ The [policy-only cleanup](https://github.com/steph4n-gh/rea/pull/8) removed only
 The REA `CI` workflow was found in the `disabled_manually` state after the staged-policy merge, so that merge has no main CI run. It was restored before PR #7 opened, and the PR #7 and final cleanup main CI runs passed. After the final green run, the workflow again changed to `disabled_manually`. No in-repository disable command was found, and the operator did not know the cause. It was restored to active, but the recurring toggle needs investigation before relying on product CI for future updates. The separate required `tau-gate` workflow remained active. The staged-policy merge has exact-tree, PR CI, and offline gate evidence, but no green merged-main CI claim.
 
 The [script-only control](https://github.com/steph4n-gh/rea/pull/5) changed `scripts/prepare.mjs` without changing `package.json`. The [live gate report](https://github.com/steph4n-gh/rea/actions/runs/39518895787) returned blocked, exit 1, with no input errors. It reported zero package and lifecycle-evidence changes and an unapproved tracked-tree digest. `tau-gate` is required with up-to-date status checks on `main`; the control failed that required check and closed without merging.
+
+After policy 8146 was activated, reopening the script-only control triggered a new [trusted-base gate run](https://github.com/steph4n-gh/rea/actions/runs/39526527388). It again blocked, exit 1. The control closed without merging; this was a policy regression check, not a dependency-update review.
 
 REA's separate [Release workflow](https://github.com/steph4n-gh/rea/actions/runs/39522987743) fails when `release-please-action` tries to create a pull request because repository Actions are not permitted to create or approve PRs. The same failure occurred on earlier main merges. This is distinct from Tau-Gate and the repository's CI workflow; no release was published from these pilot merges.
 

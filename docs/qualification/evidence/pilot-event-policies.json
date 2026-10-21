@@ -1,0 +1,65 @@
+{
+  "limitation": "Operator-collected snapshot. Policies are mutable and this is not independent evidence of their future state.",
+  "method": "Authenticated GitHub REST GET for each repository Actions policy",
+  "observed_at_utc": "2026-10-21T01:25:08+00:00",
+  "policies": [
+    {
+      "repository": "steph4n-gh/rea",
+      "request_path": "/repos/steph4n-gh/rea/actions/policies/8146",
+      "response": {
+        "conditions": {
+          "workflow_path": {
+            "exclude": [],
+            "include": [
+              ".github/workflows/npm-pr-review.yml"
+            ]
+          }
+        },
+        "created_at": "2026-10-20T21:17:13.966-04:00",
+        "enforcement": "active",
+        "id": 8146,
+        "name": "Allow trusted Tau-Gate PR review",
+        "rules": [
+          {
+            "parameters": {
+              "allowed_events": [
+                "pull_request_target"
+              ]
+            },
+            "type": "restrict_action_events"
+          }
+        ],
+        "updated_at": "2026-10-20T21:17:13.986-04:00"
+      }
+    },
+    {
+      "repository": "steph4n-gh/earthquake-lab-publication",
+      "request_path": "/repos/steph4n-gh/earthquake-lab-publication/actions/policies/8147",
+      "response": {
+        "conditions": {
+          "workflow_path": {
+            "exclude": [],
+            "include": [
+              ".github/workflows/npm-pr-review.yml"
+            ]
+          }
+        },
+        "created_at": "2026-10-20T21:17:21.682-04:00",
+        "enforcement": "active",
+        "id": 8147,
+        "name": "Allow trusted Tau-Gate PR review",
+        "rules": [
+          {
+            "parameters": {
+              "allowed_events": [
+                "pull_request_target"
+              ]
+            },
+            "type": "restrict_action_events"
+          }
+        ],
+        "updated_at": "2026-10-20T21:17:21.700-04:00"
+      }
+    }
+  ]
+}
