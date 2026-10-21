@@ -1,6 +1,6 @@
 date_utc	repository	pr	kind	head_commit	gate_outcome	gate_run	review_minutes	admin_merge	result
 2026-10-20	steph4n-gh/earthquake-lab-publication	2	postcss-8.5.30-to-8.5.31	f089c0b5ecb1156b6293a986becea0a843a7c5b1	allowed	https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39513417324	NA	no	merged
-2026-10-20	steph4n-gh/rea	3	approval-bootstrap	50c7a3ddf98e673080d24fbe808ade0aa2dc81af	blocked	https://github.com/steph4n-gh/rea/actions/runs/39515494010	NA	yes	merged-after-independent-review
+2026-10-20	steph4n-gh/rea	3	approval-bootstrap	50c7a3ddf98e673080d24fbe808ade0aa2dc81af	blocked	https://github.com/steph4n-gh/rea/actions/runs/39515494010/attempts/2	NA	yes	merged-after-independent-review
 2026-10-20	steph4n-gh/earthquake-lab-publication	3	trusted-helper-upgrade	f9c7c3aceb34e3e7aafcafe1b5c7584d1a62d559	allowed-under-prior-helper	https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39516765331	NA	no	merged-after-independent-review
 2026-10-20	steph4n-gh/rea	4	trusted-helper-upgrade	cdf2487ff0fea17b641d04ea731315ee07f920b0	allowed-under-prior-helper	https://github.com/steph4n-gh/rea/actions/runs/39517414366	NA	no	merged-after-independent-review
 2026-10-20	steph4n-gh/earthquake-lab-publication	4	head-policy-control	0dcff20646508cadaddeed56a4b3578034610675	blocked	https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39518372790	NA	no	closed-unmerged-required-check-blocked

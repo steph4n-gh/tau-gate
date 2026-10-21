@@ -107,7 +107,7 @@ Tests cover input preservation, missing/unsupported extraction, nested/workspace
 
 There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review.
 
-The [qualification record](docs/qualification/PROGRAM.md) accounts for 90 historical update pairs across 30 public npm projects. The frozen candidate completed core extraction for 29 pairs and comparison for 12. Eleven known reporting misses remain. The [v4.2.1 release receipt](docs/qualification/evidence/release-v4.2.1.json) records byte-identical local rebuilds, provenance, SBOM, installation, and tamper checks. [Owned-repository pilots](docs/qualification/pilots.md) have started. Sustained use, an independently operated rebuild, external maintainer feedback, and host installation agreement remain open. pnpm and Yarn execution evidence remains unqualified.
+The [qualification record](docs/qualification/PROGRAM.md) accounts for 90 historical update pairs across 30 public npm projects. The frozen v4.2.0 candidate completed core extraction for 29 pairs and comparison for 12; a later [v4.2.1 qualification replay](docs/qualification/evidence/marker-repair-replay.json) reached 38 and 17, respectively. Eleven known reporting misses remain. The [v4.2.1 release receipt](docs/qualification/evidence/release-v4.2.1.json) records byte-identical local rebuilds, provenance, SBOM, installation, and tamper checks. [Owned-repository pilots](docs/qualification/pilots.md) have started. Sustained use, an independently operated rebuild, external maintainer feedback, and host installation agreement remain open. pnpm and Yarn execution evidence remains unqualified.
 
 ## License
 
