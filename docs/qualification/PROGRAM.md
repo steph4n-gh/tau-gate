@@ -23,14 +23,14 @@ Independent design candidates precede implementation. Agreement proceeds without
 4. Rebuild a declared Linux x86_64 release payload in two clean environments. Compare bytes. Verify signatures, provenance, SBOM, installation, and tamper rejection. Distinguish independently provisioned builders from independently operated rebuilds.
 5. Deliver a pilot kit and start self-pilots in two owned npm projects, following the user steering on 2026-10-20. Exercise genuine dependency updates and record setup and review effort. Automated or historical runs do not satisfy sustained-use evidence. Four weeks of actual use and independent external maintainer feedback remain separate future evidence gates.
 
-All numerical targets are proposed qualification criteria, not existing results.
+These were qualification criteria. Measured results and remaining limits appear below.
 A milestone closes only with inspectable artifacts. An incomplete or unavailable result is never a pass.
 
 ## Milestone status
 
 - [x] M1 measurement. All 90 unchanged baseline reviews are accounted for, with independently checked input/output hashes and corrected event scoring. The product baseline is unqualified. See [the baseline](baseline.md).
 - [x] M2 repairs, differential controls, fuzzing, and resource qualification. The [frozen candidate and holdout](m2.md) preserve 11 known reporting misses and limited comparison coverage; mandatory controls found no false allowed outcome. A later [v4.2.1 qualification replay](evidence/marker-repair-replay.json) reached 38 core-complete and 17 comparison-complete pairs, with the same 11 misses.
-- [x] M3 trusted approvals and consumer CI lifecycle. Schema 2, the trusted-base workflow, and local stage/update/cleanup controls pass. Both owned consumers have v4.2.1 helpers and required `tau-gate` checks. The [live REA stage/update/cleanup sequence](pilots.md) and final merged-main CI passed. REA's separate product CI was disabled during the staged-policy merge and again after the final green run. It was restored, but the recurring toggle remains unexplained.
+- [x] M3 trusted approvals and consumer CI lifecycle. Schema 2, the trusted-base workflow, and local stage/update/cleanup controls pass. Both owned consumers have v4.2.1 helpers and required `tau-gate` checks. The [live REA stage/update/cleanup sequence](pilots.md) and final merged-main CI passed. REA's separate product CI was disabled during the staged-policy merge and again after the final green run. Its recurring `disabled_manually` state remains unexplained; the separate required `tau-gate` workflow is active.
 - [x] M4 final Linux release payload and verification. v4.2.1 is published at the exact merged source commit; two clean local builds and the GitHub candidate matched byte for byte. Signatures, provenance, CycloneDX schema, clean Debian 12 install, and tamper rejection passed. The [release receipt](evidence/release-v4.2.1.json) records hashes and the independent-operator limitation.
 - [ ] M5 two owned-repository self-pilots and a sustained-use record. The [pilot record](pilots.md) lists live results and open evidence; four weeks of use have not elapsed.
 
@@ -46,7 +46,7 @@ A milestone closes only with inspectable artifacts. An incomplete or unavailable
 
 Release recipe experiments may run independently before step 6. Final release qualification covers the final code.
 Do not run public package lifecycle scripts. Keep acquisition separate from the core.
-Self-pilots in owned projects are authorized. External maintainer recruitment is deferred. Prepare a reviewable release candidate before any final publication gate.
+Self-pilots in owned projects are authorized. External maintainer recruitment is deferred. The v4.2.1 release is published; sustained use and external feedback remain open evidence gates.
 
 ## Verification record
 
@@ -58,7 +58,7 @@ Committed manifests, receipts, and replay tools identify inputs and outcomes.
 
 Use immutable per-case receipts with advisory corpus replay. Public projects have no Tau-Gate policy, so primary coverage does not invent approvals. Preserve independent event labels and separate capture, acquisition, oracle, collector, core, and comparison statuses. Freeze original SRI-verified archives before strict profile validation. Each worker owns a separate worktree and each case owns its output directory.
 
-The architecture arena selected snapshot-first candidate B with acquisition and stage-status details from A. Both candidates converged on exact-path reviewed fingerprint sets for the later approval transition. Actual trusted automatic workflow enforcement remains an experiment to verify, not an assumption.
+The architecture arena selected snapshot-first candidate B with acquisition and stage-status details from A. Both candidates converged on exact-path reviewed fingerprint sets for the later approval transition. The owned-repository pilots now have live required-check and fail-closed controls; broader deployment remains unverified.
 
 For resource repairs, the second design arena selected two reusable byte vectors owned by the existing sequential evidence loader. Returned facts own their bytes. A new inspector object or artifact cache is unnecessary. Verify unchanged report bytes before adding cumulative work limits or changing archive compatibility. Charge failed and repeated inspection attempts. Choose fixed limits from the development census before opening holdout failure details.
 

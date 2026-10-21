@@ -1,4 +1,4 @@
-> **Outdated — do not cite as the current product.** This file is kept as historical research. It is not a description of τ-Gate 4.0.0.
+> **Historical research note.** The claims and commands below do not describe the current product. Use the [README](../README.md) and [review contract](review.md) for supported behavior.
 >
 > **Supported now:** read-only review of npm v3, pnpm v9, and Yarn Classic v1 lockfiles. Bun, Yarn Berry, Go, and the Cargo CLI are unsupported. Cargo metadata parsing is an incomplete library preview. There is no immunity, formal verification, or safety proof.
 >

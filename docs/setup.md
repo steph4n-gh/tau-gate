@@ -1,84 +1,53 @@
-> **Outdated — do not cite as the current product.** This file is kept as historical research. It is not a description of τ-Gate 4.0.0.
->
-> **Supported now:** read-only review of npm v3, pnpm v9, and Yarn Classic v1 lockfiles. Bun, Yarn Berry, Go, and the Cargo CLI are unsupported. Cargo metadata parsing is an incomplete library preview. There is no immunity, formal verification, or safety proof.
->
-> **License:** [Apache License 2.0](../LICENSE). Any argument below for the PolyForm Noncommercial License is withdrawn. Versions before 4.0.0 were released under PolyForm Noncommercial 1.0.0.
->
-> Current scope: [README](../README.md) and [review contract](review.md).
+# Install and run Tau-Gate
 
-# Installation & Operation Guide (v3.0.0)
+The published v4.2.1 binary is qualified for Debian 12 x86_64. Build from source for other environments; those builds are not covered by the published Linux release receipt.
 
-This document provides exhaustive instructions for installing $\tau$-Gate across different use cases.
+## Install the verified Linux release
 
----
+Download the archive, checksums, and provenance bundle from the [v4.2.1 release](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). Verify the checksum and workflow attestation before extracting the binary.
 
-## ⚡ Option 1: The "One-Click" Install
-Best for users who want to get started immediately without managing source code. This script clones, builds, and installs the binary to `/usr/local/bin`.
-
-```bash
-curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
+```sh
+mkdir tau-gate-v4.2.1
+cd tau-gate-v4.2.1
+gh release download v4.2.1 --repo steph4n-gh/tau-gate \
+	--pattern 'tau-gate-v4.2.1-linux-x86_64.tar.gz' \
+	--pattern 'tau-gate-v4.2.1-linux-x86_64.cdx.json' \
+	--pattern 'SHA256SUMS' \
+	--pattern 'provenance.sigstore.json'
+sha256sum --check SHA256SUMS
+gh attestation verify tau-gate-v4.2.1-linux-x86_64.tar.gz \
+	--repo steph4n-gh/tau-gate \
+	--signer-workflow steph4n-gh/tau-gate/.github/workflows/release.yml \
+	--source-digest 6c333b490747d79e51920a8d266bac22f0dcf777 \
+	--bundle provenance.sigstore.json
+tar -xzf tau-gate-v4.2.1-linux-x86_64.tar.gz
+./tau-gate --verify
 ```
 
----
+The checksum file covers both the archive and SBOM, so download both before running `sha256sum --check`. The [release verification guide](release-verification.md) gives the pinned independent rebuild and SBOM-attestation procedure. A matching checksum alone does not authenticate the publisher.
 
-## 🛠️ Option 2: The "Developer" Install (Manual)
-Best for contributors or users who want to audit the source code before building.
+## Build from source
 
-### 1. Download the Source
-```bash
+Use Rust 1.85.0 and the checked-in `Cargo.lock`. The core has no third-party Rust dependencies.
+
+```sh
 git clone https://github.com/steph4n-gh/tau-gate.git
 cd tau-gate
+git checkout v4.2.1
+cargo build --release --offline
+./target/release/tau-gate --verify
 ```
 
-### 2. Build & Link
-You can build the binary and create a global link manually:
+This local build is useful for development. It is not an independent byte-for-byte verification of the published Linux archive. Use the [release verification guide](release-verification.md) for that comparison.
 
-```bash
-# Build the optimized release
-cargo build --release
+## Review a lockfile
 
-# Link globally (MacOS/Linux)
-sudo ln -sf $(pwd)/target/release/tau-gate /usr/local/bin/tau-gate
+Run an advisory review with explicit input paths. The CLI reads inputs without installing dependencies, changing the project, or contacting a registry.
+
+```sh
+./target/release/tau-gate audit --lock package-lock.json --manifest package.json --json
+./target/release/tau-gate review --base base-lock.json --head head-lock.json \
+	--base-manifest base-package.json --head-manifest head-package.json --json
 ```
 
----
-
-## 🛡️ Option 3: High-Integrity Reproduction
-Best for security-conscious teams who require byte-for-byte identical binaries that match the public source.
-
-### 1. Requirements
-*   **Rustup:** Ensure you have `rustup` installed.
-*   **Toolchain:** The reproduction engine will automatically ensure you are using the pinned **Rust 1.85.0** version.
-
-### 2. Run Reproduction
-```bash
-# This builds the binary using strict deterministic flags
-./reproduce.sh
-```
-
----
-
-## 📖 CLI Usage Reference
-
-Just run `tau-gate` in your project root. It will automatically detect your lockfile and apply the audit.
-
-| Flag | Description |
-| :--- | :--- |
-| `--dry-run`, `-d` | **Passive Audit:** Runs the math and identifies threats without triggering a physical install. |
-| `--verify`, `-v` | **Integrity Check:** Displays the version and Git build hash of the binary. |
-| `--help`, `-h` | Displays the help menu. |
-
----
-
-## 🚀 CI/CD Integration
-
-We recommend integrating $\tau$-Gate using native system tools to maintain the zero-dependency security model.
-
-```yaml
-# GitHub Actions Example
-- name: Native τ-Gate Install
-  run: curl -L https://raw.githubusercontent.com/steph4n-gh/tau-gate/main/install.sh | bash
-
-- name: Security Gate
-  run: tau-gate
-```
+An npm review needs [original-archive evidence and bound approvals](execution-evidence.md) before `--enforce` can return allowed. For a pull-request gate, follow the [trusted Git-object workflow](pr-review.md). pnpm v9 and Yarn Classic v1 topology reports exit 2 because transitive execution metadata is unknown. See the [review contract](review.md) for supported input scopes and exit codes.

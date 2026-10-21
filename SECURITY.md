@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are considered for the latest code on `main`. Once `v4.0.0` is tagged, that is the supported release. Older tags, including releases under the PolyForm Noncommercial License, are not maintained.
+Security fixes are considered for the latest code on `main` and the latest published release, currently `v4.2.1`. Older tags, including releases under the PolyForm Noncommercial License, are not maintained.
 
 ## Reporting a vulnerability
 
@@ -14,4 +14,6 @@ There is no bug-bounty program and no guaranteed response window. A report will 
 
 ## Out of scope
 
-τ-Gate is a read-only lockfile reviewer. It does not inspect dependency script bodies, downloaded artifacts, or runtime behavior, and it does not certify that a dependency is safe. Those limits are documented in the README. A report that the tool failed to detect malware, or that a historical document overstated coverage, is not a vulnerability in the current reviewer.
+Tau-Gate is a read-only dependency-change reviewer. With explicit npm evidence, it verifies original archive bytes and inventories lifecycle script bodies and native-build inputs. It does not execute those scripts, simulate a host installation, or certify that a dependency is safe. The [README](README.md) describes the supported scope.
+
+Reports of an incorrect allowed result, an approval or evidence bypass, unsafe input handling, or resource exhaustion are in scope. A failure to detect malware without a violated documented review or enforcement rule is not, by itself, a security vulnerability in Tau-Gate.
