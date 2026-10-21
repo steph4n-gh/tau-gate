@@ -9,3 +9,5 @@ date_utc	repository	pr	kind	head_commit	gate_outcome	gate_run	review_minutes	adm
 2026-10-21	steph4n-gh/rea	6	stage-ignore-approvals	248fa192a2c521c68da844a39089a67131c46be7	blocked-protected-policy	https://github.com/steph4n-gh/rea/actions/runs/39519312916	NA	yes	merged-after-independent-review
 2026-10-21	steph4n-gh/rea	7	ignore-7.0.6-to-7.0.13	44f4b515fe0dd5a90d5f886b2ac5b015e05bc5a3	allowed	https://github.com/steph4n-gh/rea/actions/runs/39520796768	NA	no	merged-after-independent-review
 2026-10-21	steph4n-gh/rea	8	retire-old-ignore-approvals	392b67e06a51f164b083636679e2fac38820ff12	blocked-protected-policy	https://github.com/steph4n-gh/rea/actions/runs/39521932931	NA	yes	merged-after-independent-review
+2026-10-21	steph4n-gh/earthquake-lab-publication	5	post-event-policy-missing-lock-control	e7db791d307bd440a9921458a11e6cc4b129d229	incomplete	https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/39526462828	NA	no	closed-unmerged-gate-failed
+2026-10-21	steph4n-gh/rea	5	post-event-policy-script-control	124fe59a9562f55bc6b60b6b6bbf2de7772d5bff	blocked	https://github.com/steph4n-gh/rea/actions/runs/39526527388	NA	no	closed-unmerged-gate-failed
