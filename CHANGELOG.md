@@ -25,7 +25,7 @@
 
 ## 4.0.0
 
-τ-Gate 4.0.0 is the first release under the Apache License 2.0. The dependency-review behavior is the behavior already on `main` after the `v3.0.0` tag. The crate version was still `3.0.0` until this release. Git tags `v3.1.0` and `v3.2.0` point at older commits and are not this version. After merge, tag **`v4.0.0`**.
+Tau-Gate 4.0.0 was the first release under the Apache License 2.0. It versioned the dependency-review behavior added after `v3.0.0`. The crate version had remained `3.0.0` until that release. Git tags `v3.1.0` and `v3.2.0` point at older commits and are not this version.
 
 ### License
 
