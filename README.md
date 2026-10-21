@@ -4,6 +4,8 @@ Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before
 
 The latest published release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). See [installation](docs/setup.md) for the verified Debian 12 x86_64 archive and source-build instructions.
 
+The product is the Rust crate. Python in this repository collects npm evidence, runs the pull-request helper, and replays the evaluation corpus. See [Repository layout](#repository-layout).
+
 A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.2 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
 ## Try the review
@@ -110,6 +112,20 @@ Tests cover input preservation, missing/unsupported extraction, nested/workspace
 There is no formal safety proof, immunity claim, XZ detector, automatic quarantine or validated VRAM optimization here. The strongest current use is an explainable dependency-change review.
 
 The [qualification record](docs/qualification/PROGRAM.md) accounts for 90 historical update pairs across 30 public npm projects. The frozen v4.2.0 candidate completed core extraction for 29 pairs and comparison for 12; a later [v4.2.1 qualification replay](docs/qualification/evidence/marker-repair-replay.json) reached 38 and 17, respectively. Eleven known reporting misses remain. The [v4.2.1 release receipt](docs/qualification/evidence/release-v4.2.1.json) records byte-identical local rebuilds, provenance, SBOM, installation, and tamper checks. [Owned-repository pilots](docs/qualification/pilots.md) have started. Sustained use, an independently operated rebuild, external maintainer feedback, and host installation agreement remain open. pnpm and Yarn execution evidence remains unqualified.
+
+## Repository layout
+
+| Path | Role |
+| --- | --- |
+| `src/`, `include/tau_gate.h` | Rust reviewer and C ABI. Standard library only. This is the product. |
+| `tools/npm_evidence.py` | Collects npm archive evidence. The Rust auditor checks it offline. |
+| `tools/pr_review.py` | Reviews a pull request from Git objects. |
+| `tools/npm_reference.py`, `tools/verify_npm_evidence.py`, `tools/verify_pr_review.py` | Independent checks for that evidence and pull-request path. |
+| `tools/qualification.py`, `tools/qualification_oracle.py`, `tools/qualification_census.py`, `tests/test_qualification*.py` | Replay and score the frozen evaluation corpus. Not used by the reviewer binary. |
+
+`.gitattributes` marks the qualification files `-linguist-detectable` so GitHub's language bar follows the Rust core. Those files stay in the tree and in diffs. The collector, pull-request helper, and their checks remain detectable Python.
+
+Downloaded sources, registry archives, and raw replay output are not in Git. [The replay guide](docs/qualification/replay.md) takes a local directory you choose. Published docs refer to that directory as `<qualification-output>/`.
 
 ## License
 

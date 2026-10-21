@@ -1,0 +1,20 @@
+# The product is the Rust crate. These first-party Python files replay the
+# frozen qualification corpus. They are not vendored and not generated.
+# Keeping them out of language detection makes GitHub report Rust as the
+# primary language. Review diffs are unchanged.
+#
+# Product Python stays detectable:
+#   tools/npm_evidence.py
+#   tools/npm_reference.py
+#   tools/pr_review.py
+#   tools/verify_npm_evidence.py
+#   tools/verify_pr_review.py
+#   tests/test_pr_review.py
+#   fuzz/seeds.py
+tools/qualification.py -linguist-detectable
+tools/qualification_census.py -linguist-detectable
+tools/qualification_oracle.py -linguist-detectable
+tests/test_qualification.py -linguist-detectable
+tests/test_qualification_census.py -linguist-detectable
+tests/test_qualification_collector.py -linguist-detectable
+tests/test_qualification_oracle.py -linguist-detectable

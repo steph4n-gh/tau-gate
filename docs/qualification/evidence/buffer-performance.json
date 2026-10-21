@@ -13,11 +13,11 @@
   "integrated_report_exit": 2,
   "integrated_report_sha256": "b6253f3e3436428988ccb121f8f521aa2bacfa9c9e0fc7012dd42fed184266cf",
   "source_receipts": {
-    "paired_runs": "/Volumes/Storage/taugate-qualification/buffer-repair/paired-runs/receipt.json",
+    "paired_runs": "<qualification-output>/buffer-repair/paired-runs/receipt.json",
     "paired_runs_sha256": "b89e53e953faf883c11329b98d19d9b209644f37e42a5d05919db4878e0dd99e",
-    "commit_binding": "/Volumes/Storage/taugate-qualification/buffer-repair/commit-binding.json",
+    "commit_binding": "<qualification-output>/buffer-repair/commit-binding.json",
     "commit_binding_sha256": "2236cbc4c90c7d1c7cc28fb5c347ca126e6ba548e51f9449e02b02908ca5a1d7",
-    "integration_check": "/Volumes/Storage/taugate-qualification/buffer-repair/integration-check/receipt.json",
+    "integration_check": "<qualification-output>/buffer-repair/integration-check/receipt.json",
     "integration_check_sha256": "2146c399612ca68c591edcf4fa6ed1203dd722a914332de00083a4fa6b5c1267"
   },
   "limits": "One macOS arm64 case; no Linux memory or speed claim. Timed binary was built before commit; commit-binding checks measured source files match the committed source."

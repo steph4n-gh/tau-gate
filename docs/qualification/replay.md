@@ -4,14 +4,16 @@ Use this procedure to acquire original inputs and compare a specified Tau-Gate b
 
 ## Acquire original inputs
 
-Run from the repository root. Keep large inputs outside Git.
+Run from the repository root. Keep large inputs outside Git. `TAUGATE_QUALIFICATION_ROOT` is any local directory you control. Published notes call that directory `<qualification-output>/`. It is not a path in this repository, and its contents are not committed.
 
 ```sh
+out="${TAUGATE_QUALIFICATION_ROOT:?set this to a directory outside the repository}"
+
 python3 tools/qualification.py acquire \
 	--corpus docs/qualification/corpus.json \
-	--sources /Volumes/Storage/taugate-qualification/sources \
-	--archive-cache /Volumes/Storage/taugate-qualification/archives \
-	--discovery-cache /tmp/taugate-corpus-discovery/objects \
+	--sources "$out/sources" \
+	--archive-cache "$out/archives" \
+	--discovery-cache "${TMPDIR:-/tmp}/taugate-corpus-discovery/objects" \
 	--workers 4 \
 	--max-bytes 17179869184
 ```
@@ -33,11 +35,13 @@ Re-running acquisition reuses verified bytes. A corrupt cached input is reported
 Use a fresh output directory. The committed corpus binds the preserved macOS arm64 baseline binary to its SHA256. That binary is a measurement baseline, not the supported Linux release payload.
 
 ```sh
+out="${TAUGATE_QUALIFICATION_ROOT:?set this to a directory outside the repository}"
+
 python3 tools/qualification.py replay \
 	--corpus docs/qualification/corpus.json \
-	--sources /Volumes/Storage/taugate-qualification/sources \
-	--binary /Volumes/Storage/taugate-qualification/baseline/tau-gate-4.1.0 \
-	--output /Volumes/Storage/taugate-qualification/baseline-replay \
+	--sources "$out/sources" \
+	--binary "$out/baseline/tau-gate-4.1.0" \
+	--output "$out/baseline-replay" \
 	--jobs 2 \
 	--timeout 120
 ```
@@ -57,13 +61,15 @@ A `complete` core report does not establish zero misses. Read the comparison sta
 Give the candidate's independently recorded SHA256 explicitly. Keep baseline receipts unchanged.
 
 ```sh
+out="${TAUGATE_QUALIFICATION_ROOT:?set this to a directory outside the repository}"
+
 python3 tools/qualification.py replay \
 	--corpus docs/qualification/corpus.json \
-	--sources /Volumes/Storage/taugate-qualification/sources \
+	--sources "$out/sources" \
 	--binary target/release/tau-gate \
 	--expected-binary-sha256 ACTUAL_CANDIDATE_SHA256 \
 	--split development \
-	--output /Volumes/Storage/taugate-qualification/candidate-development
+	--output "$out/candidate-development"
 ```
 
 `--split` accepts `all`, `development`, or `holdout`. The default is `all`. Use `--case CASE_ID` for a first single-pair check. Repeat the option to select more cases. The summary retains every unrun frozen pair. Reserve holdout inputs until development repairs stop. Development-only runs still summarize all frozen pairs, with unrun pairs visible.
@@ -71,10 +77,12 @@ python3 tools/qualification.py replay \
 ## Account for every selected pair
 
 ```sh
+out="${TAUGATE_QUALIFICATION_ROOT:?set this to a directory outside the repository}"
+
 python3 tools/qualification.py summarize \
 	--corpus docs/qualification/corpus.json \
-	--receipts /Volumes/Storage/taugate-qualification/baseline-replay \
-	--output /Volumes/Storage/taugate-qualification/baseline-summary.json
+	--receipts "$out/baseline-replay" \
+	--output "$out/baseline-summary.json"
 ```
 
 The denominator includes every frozen pair, including missing receipts, unsupported archives, invalid captures, timeouts, and incomplete oracle facts. Package counts describe pair-side records. A revision reused by multiple pairs appears more than once. `core_complete_pairs` counts valid core reports with exit code zero. `complete_pairs` additionally requires complete capture, acquisition, collector validation, and oracle stages. Comparison misses remain separate. Core evidence states and oracle known-package counts remain separate. If oracle package records are unavailable, `package_denominator_complete` is false.
@@ -86,10 +94,12 @@ Review-decision counts are mechanical proxies. They are not human review minutes
 Use `rescore` after a comparison correction when the original observations remain valid. Keep the original replay unchanged and choose a fresh output directory outside the original replay.
 
 ```sh
+out="${TAUGATE_QUALIFICATION_ROOT:?set this to a directory outside the repository}"
+
 python3 tools/qualification.py rescore \
 	--corpus docs/qualification/corpus.json \
-	--receipts /Volumes/Storage/taugate-qualification/baseline-replay-v2 \
-	--output /Volumes/Storage/taugate-qualification/baseline-rescored-v2
+	--receipts "$out/baseline-replay-v2" \
+	--output "$out/baseline-rescored-v2"
 ```
 
 The command requires every frozen case, a stable original implementation, valid JSON core exit protocols, and matching original output and oracle fact hashes. It refuses partial runs and changed inputs before creating the output directory. It does not rerun acquisition, the collector, the core, or snapshot fact extraction.
