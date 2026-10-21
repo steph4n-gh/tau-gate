@@ -1,0 +1,42 @@
+{
+  "attestations_verified": {
+    "cyclonedx_sbom": true,
+    "provenance": true,
+    "source_digest_and_workflow_pinned": true
+  },
+  "builds_byte_identical": true,
+  "ci_run": "https://github.com/steph4n-gh/tau-gate/actions/runs/39516112242",
+  "clean_debian_12_x86_64_runtime_passed": true,
+  "commit": "6c333b490747d79e51920a8d266bac22f0dcf777",
+  "files": {
+    "SHA256SUMS": {
+      "bytes": 206,
+      "sha256": "23a7e2415a03792b6b2c2c290c79e47d25a59777f561cfb2219c3f3dd35ffd05"
+    },
+    "provenance.sigstore.json": {
+      "bytes": 11016,
+      "sha256": "53c75d171f66c5c44edb9ed5530b5a59fe7c4f407fd89b85665ce5abd68f94de"
+    },
+    "sbom.sigstore.json": {
+      "bytes": 11034,
+      "sha256": "85a24e4e2a273fe7913da69a6dcf24516f8b72a36aca1327208044514e130e75"
+    },
+    "tau-gate-v4.2.1-linux-x86_64.cdx.json": {
+      "bytes": 1031,
+      "sha256": "9fdf0e44ccc06dadd3ddefe04311ceb389c07f420a0ad8ba069d5ae9ee816257"
+    },
+    "tau-gate-v4.2.1-linux-x86_64.tar.gz": {
+      "bytes": 578800,
+      "sha256": "bb108bd1cb5e6d2f80849ab3e29ef5524ec1b7ea1e63417e15dd28b96ff2072e"
+    }
+  },
+  "github_candidate_matches_both_local_builds": true,
+  "independent_operator_rebuild": false,
+  "local_clean_builds": 2,
+  "official_cyclonedx_1_5_schema_sha256": "2d956c1d05c092695457a91f3b5c57c749793c013ec224a0935807cfc8ae4480",
+  "published_assets_match_candidate": true,
+  "release": "v4.2.1",
+  "release_candidate_run": "https://github.com/steph4n-gh/tau-gate/actions/runs/39516257032",
+  "sbom_schema_valid": true,
+  "tamper_rejected": true
+}

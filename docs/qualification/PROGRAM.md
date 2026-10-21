@@ -29,10 +29,10 @@ A milestone closes only with inspectable artifacts. An incomplete or unavailable
 ## Milestone status
 
 - [x] M1 measurement. All 90 unchanged baseline reviews are accounted for, with independently checked input/output hashes and corrected event scoring. The product baseline is unqualified. See [the baseline](baseline.md).
-- [x] M2 repairs, differential controls, fuzzing, and resource qualification. The [frozen candidate and holdout](m2.md) preserve 11 known reporting misses and limited comparison coverage; mandatory controls found no false allowed outcome.
-- [ ] M3 trusted approvals and consumer CI lifecycle. Schema 2, the trusted-base workflow, and local stage/update/cleanup controls pass; the two live consumer installs and required checks remain for M5 after the qualified release exists.
-- [ ] M4 final Linux release payload and verification.
-- [ ] M5 two owned-repository self-pilots and a sustained-use record.
+- [x] M2 repairs, differential controls, fuzzing, and resource qualification. The [frozen candidate and holdout](m2.md) preserve 11 known reporting misses and limited comparison coverage; mandatory controls found no false allowed outcome. A later [v4.2.1 qualification replay](evidence/marker-repair-replay.json) reached 38 core-complete and 17 comparison-complete pairs, with the same 11 misses.
+- [x] M3 trusted approvals and consumer CI lifecycle. Schema 2, the trusted-base workflow, and local stage/update/cleanup controls pass. Both owned consumers have v4.2.1 helpers and required `tau-gate` checks. The [live REA stage/update/cleanup sequence](pilots.md) and final merged-main CI passed. REA's separate product CI was disabled during the staged-policy merge and again after the final green run. It was restored, but the recurring toggle remains unexplained.
+- [x] M4 final Linux release payload and verification. v4.2.1 is published at the exact merged source commit; two clean local builds and the GitHub candidate matched byte for byte. Signatures, provenance, CycloneDX schema, clean Debian 12 install, and tamper rejection passed. The [release receipt](evidence/release-v4.2.1.json) records hashes and the independent-operator limitation.
+- [ ] M5 two owned-repository self-pilots and a sustained-use record. The [pilot record](pilots.md) lists live results and open evidence; four weeks of use have not elapsed.
 
 ## Execution order
 
