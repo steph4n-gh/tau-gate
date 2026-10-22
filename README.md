@@ -111,6 +111,10 @@ There is no formal safety proof, immunity claim, XZ detector, automatic quaranti
 
 The [qualification record](docs/qualification/PROGRAM.md) accounts for 90 historical update pairs across 30 public npm projects. The frozen v4.2.0 candidate completed core extraction for 29 pairs and comparison for 12; a later [v4.2.1 qualification replay](docs/qualification/evidence/marker-repair-replay.json) reached 38 and 17, respectively. Eleven known reporting misses remain. The [v4.2.1 release receipt](docs/qualification/evidence/release-v4.2.1.json) records byte-identical local rebuilds, provenance, SBOM, installation, and tamper checks. [Owned-repository pilots](docs/qualification/pilots.md) have started. Sustained use, an independently operated rebuild, external maintainer feedback, and host installation agreement remain open. pnpm and Yarn execution evidence remains unqualified.
 
+## Feedback and contributions
+
+Report ordinary bugs and propose enhancements in [GitHub Issues](https://github.com/steph4n-gh/tau-gate/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) for the pull-request process, test expectations, and contribution requirements. Report undisclosed vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 τ-Gate 4.0.0 and later are distributed under the [Apache License 2.0](LICENSE). Copyright 2026 Stephan Arrington / ORIOLETECH LLC. See [NOTICE](NOTICE).

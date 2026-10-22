@@ -6,7 +6,7 @@ Security fixes are considered for the latest code on `main` and the latest publi
 
 ## Reporting a vulnerability
 
-Email [stephan@orioletech.llc](mailto:stephan@orioletech.llc). Include the affected version or commit, what you expected, and a way to reproduce the issue if you have one.
+Submit a [private vulnerability report on GitHub](https://github.com/steph4n-gh/tau-gate/security/advisories/new) or email [stephan@orioletech.llc](mailto:stephan@orioletech.llc). Include the affected version or commit, what you expected, and a way to reproduce the issue if you have one.
 
 Do not open a public issue for an undisclosed vulnerability.
 
