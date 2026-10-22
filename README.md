@@ -1,5 +1,7 @@
 # Tau-Gate: Explainable dependency-change review
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15795/badge)](https://www.bestpractices.dev/projects/15795)
+
 Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
 The latest published release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). See [installation](docs/setup.md) for the verified Debian 12 x86_64 archive and source-build instructions.
