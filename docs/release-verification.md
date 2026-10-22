@@ -19,6 +19,10 @@ have been removed. The workflow creates signed Sigstore bundles for SLSA
 provenance and the SBOM assertion through GitHub's
 [`actions/attest`](https://github.com/actions/attest). It uploads a candidate
 workflow artifact and does not publish a GitHub Release.
+The provenance also covers `SHA256SUMS`. New candidates include an
+`*.intoto.jsonl` copy of the same signed provenance bundle so release tools can
+find it by filename. This copy is not a second signature. Published v4.2.1
+predates that filename and has only `provenance.sigstore.json`.
 
 To rebuild without trusting the published executable, clone the exact commit
 and run the [build script](../tools/release/build.sh) in the pinned image. For

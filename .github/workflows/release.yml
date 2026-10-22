@@ -89,6 +89,7 @@ jobs:
           subject-path: |
             ${{ steps.build.outputs.archive }}
             ${{ steps.build.outputs.sbom }}
+            ${{ steps.build.outputs.dist }}/SHA256SUMS
 
       - name: Sign the SBOM assertion
         id: sbom
@@ -100,12 +101,14 @@ jobs:
       - name: Preserve candidate and offline signature bundles
         env:
           DIST: ${{ steps.build.outputs.dist }}
+          ARCHIVE: ${{ steps.build.outputs.archive }}
           PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
           SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
         shell: bash
         run: |
           set -euo pipefail
           cp "$PROVENANCE_BUNDLE" "$DIST/provenance.sigstore.json"
+          cp "$PROVENANCE_BUNDLE" "$DIST/$(basename "${ARCHIVE%.tar.gz}").intoto.jsonl"
           cp "$SBOM_BUNDLE" "$DIST/sbom.sigstore.json"
           (cd "$DIST" && sha256sum --check SHA256SUMS)
 
