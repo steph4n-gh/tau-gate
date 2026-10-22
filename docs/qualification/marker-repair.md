@@ -28,8 +28,8 @@ approval fingerprints equal their pre-repair values. This is a coverage repair,
 not evidence that package scripts are safe or that a dependency update should
 be approved automatically.
 
-Local receipts and full reports are under
-`/Volumes/Storage/taugate-qualification/marker-repair/`. The repaired
+Local receipts and full reports are outside Git under
+`<qualification-output>/marker-repair/`. The repaired
 earthquake report SHA256 is
 `2eca553cba08cba249d755757a9d95e95c479e718617b0163cb958201532780d`;
 the repaired REA report SHA256 is

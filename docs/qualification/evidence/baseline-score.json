@@ -578,8 +578,8 @@
           "/usr/bin/time",
           "-l",
           "-o",
-          "/Volumes/Storage/taugate-qualification/baseline-replay-v2/binary-verify/process-metrics.txt",
-          "/Volumes/Storage/taugate-qualification/baseline/tau-gate-4.1.0",
+          "<qualification-output>/baseline-replay-v2/binary-verify/process-metrics.txt",
+          "<qualification-output>/baseline/tau-gate-4.1.0",
           "--verify"
         ],
         "elapsed_seconds": 0.005516707897186279,
@@ -597,7 +597,7 @@
         "peak_rss_bytes": 1933312,
         "peak_rss_measurement": "Darwin maximum resident set size in bytes",
         "program_argv": [
-          "/Volumes/Storage/taugate-qualification/baseline/tau-gate-4.1.0",
+          "<qualification-output>/baseline/tau-gate-4.1.0",
           "--verify"
         ],
         "termination": "exited",
@@ -635,7 +635,7 @@
         "implementation.json": "4d610ef3c8bf8c6d9796e4c77293afdf85e544a7f2cdd524568ab36d09f28f45"
       },
       "semantics_version": 2,
-      "source_replay": "/Volumes/Storage/taugate-qualification/baseline-replay-v2"
+      "source_replay": "<qualification-output>/baseline-replay-v2"
     }
   },
   "implementation_after": {
@@ -650,7 +650,7 @@
         "implementation.json": "4d610ef3c8bf8c6d9796e4c77293afdf85e544a7f2cdd524568ab36d09f28f45"
       },
       "semantics_version": 2,
-      "source_replay": "/Volumes/Storage/taugate-qualification/baseline-replay-v2"
+      "source_replay": "<qualification-output>/baseline-replay-v2"
     }
   },
   "measurement_accepted": true,

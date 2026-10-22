@@ -37,8 +37,8 @@ Each pair had identical file bytes and tar header fields apart from its name
 and checksum. The 27 affected development pairs were previously stopped by the
 evidence collector. A real `@rollup/plugin-commonjs` 29.0.0 archive was also
 extracted with npm's bundled tar implementation; both members resolved to the
-same file bytes. The reference receipt is at
-`/Volumes/Storage/taugate-qualification/dot-path-reference/receipt.json`.
+same file bytes. The reference receipt is outside Git at
+`<qualification-output>/dot-path-reference/receipt.json`.
 
 The core and collector now accept only this paired, byte-identical case for
 non-lifecycle regular files. Both physical headers count toward the 10,000-entry
@@ -47,11 +47,11 @@ directory alias, or alias of `package.json` or `binding.gyp` remains incomplete.
 This rule follows the measured archive behavior and does not imply that other
 path-normalization patterns are safe.
 
-The local replay script and exact result are retained at
-`/Volumes/Storage/taugate-qualification/compatibility-check/replay.py`
+The local replay script and exact result are retained outside Git at
+`<qualification-output>/compatibility-check/replay.py`
 (SHA256 `c45125bc3af59b6ccd272f7fda49bd54d43ee87db92b2cf90fbca69a287ad97d`)
 and `receipt-final.json`
 (SHA256 `cff599b99f130abaefe794ff43ed83e2d18c02d32f41af7ec125a96820909016`).
 The latter binds the binary hash and three original archive hashes. The
 source reference receipt is in
-`/Volumes/Storage/taugate-qualification/legacy-oracle-reference/receipt.json`.
+`<qualification-output>/legacy-oracle-reference/receipt.json`.

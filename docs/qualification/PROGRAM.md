@@ -3,17 +3,13 @@
 This program starts from v4.1 commit `4fcf535fd1b52922fd4b0d2584bc0d2fb8bbbbe0`.
 The Rust core remains offline, read-only, and free of runtime dependencies.
 
-## Workflow
+## Human review
 
-- [x] Read the Principles section of the poteto-mode skill.
-- [x] Phase A: Frame.
-- [x] Phase B: Design the workflow.
-- [ ] Phase C: Run the loop.
-- [ ] Phase D: Keep the audit trail.
-- [ ] Phase E: Verify and hand back.
+Recording an execution approval is a human step. Review the candidate fingerprints from an advisory report, then commit them on the trusted base. The automated check reads that base file only. A pull request that changes approvals, the review helper, or the workflow fails that check on purpose, and a repository administrator reviews the diff before merging it. See [the pull-request guide](../pr-review.md).
 
-Architectural changes follow Ground, Sketch, Agree, Implement, and Scrap.
-Independent design candidates precede implementation. Agreement proceeds without a human checkpoint.
+Owned-repository pilots have one operator. They exercise the procedure. They do not establish independent human approval. See [pilots](pilots.md).
+
+Written design comparisons preceded implementation. Those notes are in [the decision trail](decisions.tsv). A design comparison does not approve a dependency and does not replace the review above.
 
 ## Done predicates
 
@@ -53,13 +49,16 @@ Self-pilots in owned projects are authorized. External maintainer recruitment is
 The canonical decision trail is `docs/qualification/decisions.tsv`.
 Large downloaded source trees, archives, and raw experiment outputs stay outside Git.
 Committed manifests, receipts, and replay tools identify inputs and outcomes.
+`<qualification-output>/` is a placeholder for that external directory.
+`<local-scratch>/` is a placeholder for other uncommitted working files.
+Neither placeholder is a path in this repository. SHA-256 fields in committed receipts were not recomputed when machine-specific locations were replaced.
 
 ## Chosen design
 
 Use immutable per-case receipts with advisory corpus replay. Public projects have no Tau-Gate policy, so primary coverage does not invent approvals. Preserve independent event labels and separate capture, acquisition, oracle, collector, core, and comparison statuses. Freeze original SRI-verified archives before strict profile validation. Each worker owns a separate worktree and each case owns its output directory.
 
-The architecture arena selected snapshot-first candidate B with acquisition and stage-status details from A. Both candidates converged on exact-path reviewed fingerprint sets for the later approval transition. The owned-repository pilots now have live required-check and fail-closed controls; broader deployment remains unverified.
+A written comparison of two designs selected the snapshot-first candidate, and kept acquisition and stage-status details from the other. Both designs converged on exact-path reviewed fingerprint sets for the later approval transition. The owned-repository pilots now have live required-check and fail-closed controls; broader deployment remains unverified.
 
-For resource repairs, the second design arena selected two reusable byte vectors owned by the existing sequential evidence loader. Returned facts own their bytes. A new inspector object or artifact cache is unnecessary. Verify unchanged report bytes before adding cumulative work limits or changing archive compatibility. Charge failed and repeated inspection attempts. Choose fixed limits from the development census before opening holdout failure details.
+For resource repairs, a second written design comparison selected two reusable byte vectors owned by the existing sequential evidence loader. Returned facts own their bytes. A new inspector object or artifact cache is unnecessary. Verify unchanged report bytes before adding cumulative work limits or changing archive compatibility. Charge failed and repeated inspection attempts. Choose fixed limits from the development census before opening holdout failure details.
 
 The measured legacy archive repair keeps strict text parsing and accepts one consistent top-level directory. A narrow empty-prefix timestamp layout may be accepted only after validating its exact fields. Mixed roots, aliases, parent conflicts, links, extensions, original-byte integrity failures, and incomplete scans remain unsupported. The independent npm reference provides correspondence evidence for the specific legacy examples.
