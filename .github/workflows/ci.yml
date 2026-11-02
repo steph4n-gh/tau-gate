@@ -12,6 +12,8 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: 1.85.0
     steps:
       - name: Manual Checkout
         env:
@@ -27,6 +29,7 @@ jobs:
       - name: Setup Rust Environment
         run: |
           rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
+          rustup toolchain install 1.88.0 --profile minimal
 
       - name: Build CLI and Native Library
         run: |
@@ -55,6 +58,8 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_qualification*.py' -v
 
       - name: Check differential harness seeds
+        env:
+          RUSTUP_TOOLCHAIN: 1.88.0
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 fuzz/seeds.py
           cargo test --manifest-path fuzz/Cargo.toml --lib --locked

@@ -26,6 +26,13 @@ identical non-lifecycle dot-alias pair observed in registry archives.
 The generated corpus and crash artifacts are deliberately outside Git; the
 seed recipe and dependency lockfile are versioned.
 
+The fuzz crate uses Rust 1.88 or newer for its separately versioned oracle
+dependencies, including SHA-2 0.11. CI runs its seed checks with Rust 1.88
+while building and testing the dependency-free Tau-Gate core with Rust 1.85.
+Review Dependabot fuzz updates against the fuzz toolchain without raising the
+core or release toolchain. A green seed check exercises the reference harness;
+it does not qualify a release or replace a finite fuzz campaign.
+
 For a local build, use a Rust nightly with `rust-src` and a current
 `cargo-fuzz`:
 

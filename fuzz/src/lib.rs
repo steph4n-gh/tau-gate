@@ -37,6 +37,15 @@ mod archive {
 const INPUT: usize = 64 * 1024;
 const OUTPUT: usize = 64 * 1024 * 1024;
 
+fn hex_digest(bytes: impl IntoIterator<Item = u8>) -> String {
+    let mut hex = String::new();
+    for byte in bytes {
+        std::fmt::Write::write_fmt(&mut hex, format_args!("{byte:02x}"))
+            .expect("writing to String cannot fail");
+    }
+    hex
+}
+
 fn external_read(reader: impl Read) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     reader
@@ -84,8 +93,8 @@ pub fn json(data: &[u8]) {
         MiniParser::parse_json(&quoted).unwrap(),
         JsonNode::String(input.into())
     );
-    assert_eq!(digest::sha256(data), format!("{:x}", Sha256::digest(data)));
-    assert_eq!(digest::sha512(data), format!("{:x}", Sha512::digest(data)));
+    assert_eq!(digest::sha256(data), hex_digest(Sha256::digest(data)));
+    assert_eq!(digest::sha512(data), hex_digest(Sha512::digest(data)));
 }
 
 pub fn gzip(data: &[u8]) {
@@ -129,7 +138,7 @@ fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
         } else if relative == Some("binding.gyp") {
             let mut bytes = Vec::new();
             entry.read_to_end(&mut bytes).ok()?;
-            binding = Some(format!("{:x}", Sha256::digest(&bytes)));
+            binding = Some(hex_digest(Sha256::digest(&bytes)));
         }
     }
     Some((manifest?, binding))
@@ -177,7 +186,7 @@ pub fn artifact(data: &[u8]) {
         base64::engine::general_purpose::STANDARD.encode(Sha512::digest(&bytes))
     );
     if let Ok(actual) = archive::artifact(&bytes, &sri) {
-        assert_eq!(actual.sha512, format!("{:x}", Sha512::digest(&bytes)));
+        assert_eq!(actual.sha512, hex_digest(Sha512::digest(&bytes)));
         assert_eq!(
             Some((actual.manifest, actual.binding_gyp_sha256)),
             external_read(GzDecoder::new(&bytes[..])).and_then(|bytes| external_tar(&bytes))
@@ -314,6 +323,11 @@ pub fn review(data: &[u8]) {
 #[cfg(test)]
 mod seed_checks {
     use super::*;
+
+    #[test]
+    fn digest_bytes_have_stable_lowercase_hex() {
+        assert_eq!(hex_digest([0, 15, 16, 255]), "000f10ff");
+    }
 
     #[test]
     fn independently_generated_archive_seeds_reach_success_paths() {
