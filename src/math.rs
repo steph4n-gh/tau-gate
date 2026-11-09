@@ -3,9 +3,9 @@ use crate::graph_impl::DiGraph;
 
 /// Result of a graph bisection analysis.
 pub struct PartitionResult {
-    /// Nodes in the "Island" or Anomaly Partition.
+    /// Nodes on the smaller side of the selected diagnostic cut.
     pub partition_b: Vec<String>,
-    /// The calculated bisection point (Max Spectral Gap).
+    /// A threshold between the distinct coordinates defining the selected cut.
     pub tau: f64,
     /// A Rayleigh estimate; residual convergence does not certify the second eigenpair.
     /// Close to 0.0 indicates a severe structural bottleneck.
@@ -82,54 +82,71 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let used = estimate.iterations;
     let fiedler_vector = estimate.vector;
 
-    let mut indexed_fiedler: Vec<(usize, f64)> =
-        fiedler_vector.iter().copied().enumerate().collect();
-    indexed_fiedler.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut ordered: Vec<_> = fiedler_vector.iter().copied().enumerate().collect();
+    ordered.sort_by(|a, b| a.1.total_cmp(&b.1));
+    let cut = sweep_cut(&adj, &ordered).ok_or_else(|| {
+        GateError::Math("No distinct spectral threshold has positive volume".into())
+    })?;
+    let (low, high) = (ordered[cut].1, ordered[cut + 1].1);
+    let midpoint = low + (high - low) / 2.0;
+    let tau = if midpoint < high { midpoint } else { low };
+    let side = if cut + 1 <= n - cut - 1 {
+        &ordered[..=cut]
+    } else {
+        &ordered[cut + 1..]
+    };
+    Ok(PartitionResult {
+        partition_b: side
+            .iter()
+            .filter_map(|&(i, _)| graph.node_weight(i).cloned())
+            .collect(),
+        tau,
+        connectivity_score: fiedler_value,
+        converged,
+        residual,
+        iterations: used,
+    })
+}
 
-    let mut max_gap = -1.0;
-    let mut cut_idx = 0;
-    for i in 0..(n - 1) {
-        let gap = (indexed_fiedler[i + 1].1 - indexed_fiedler[i].1).abs();
-        if gap > max_gap {
-            max_gap = gap;
-            cut_idx = i;
-        }
-    }
-
-    let tau = (indexed_fiedler[cut_idx].1 + indexed_fiedler[cut_idx + 1].1) / 2.0;
-
-    let mut side_small = Vec::new();
-    let mut side_large = Vec::new();
-
-    for (i, val) in indexed_fiedler.iter().enumerate() {
-        if let Some(node_name) = graph.node_weight(val.0) {
-            if i <= cut_idx {
-                side_small.push(node_name.clone());
-            } else {
-                side_large.push(node_name.clone());
+// Sweep distinct-coordinate thresholds for the lowest ratio cut.
+// Equal ratio cuts prefer lower conductance, then the first threshold.
+fn sweep_cut(adj: &[Vec<usize>], ordered: &[(usize, f64)]) -> Option<usize> {
+    let n = adj.len();
+    let total_volume: usize = adj.iter().map(Vec::len).sum();
+    let mut inside = vec![false; n];
+    let mut cut_edges = 0;
+    let mut volume = 0;
+    let mut best: Option<(usize, f64, f64)> = None;
+    for (index, &(u, value)) in ordered.iter().take(n - 1).enumerate() {
+        cut_edges += adj[u].len();
+        for &v in &adj[u] {
+            if inside[v] {
+                cut_edges -= 2;
             }
         }
+        volume += adj[u].len();
+        inside[u] = true;
+        if value == ordered[index + 1].1 {
+            continue;
+        }
+        let denominator = volume.min(total_volume - volume);
+        if denominator == 0 {
+            continue;
+        }
+        let size = index + 1;
+        let ratio_cut = cut_edges as f64 * (1.0 / size as f64 + 1.0 / (n - size) as f64);
+        let conductance = cut_edges as f64 / denominator as f64;
+        let better = match best {
+            None => true,
+            Some((_, ratio, boundary)) => {
+                ratio_cut < ratio || (ratio_cut == ratio && conductance < boundary)
+            }
+        };
+        if better {
+            best = Some((index, ratio_cut, conductance));
+        }
     }
-
-    if side_small.len() > side_large.len() {
-        Ok(PartitionResult {
-            partition_b: side_large,
-            tau,
-            connectivity_score: fiedler_value,
-            converged,
-            residual,
-            iterations: used,
-        })
-    } else {
-        Ok(PartitionResult {
-            partition_b: side_small,
-            tau,
-            connectivity_score: fiedler_value,
-            converged,
-            residual,
-            iterations: used,
-        })
-    }
+    best.map(|(index, _, _)| index)
 }
 
 struct Estimate {
@@ -520,5 +537,93 @@ mod convergence_regressions {
         g.add_node("a".into());
         g.add_edge(99, 99);
         assert!(analyze_graph(&g).is_err());
+    }
+}
+
+#[cfg(test)]
+mod partition_regressions {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn rounding_finds_a_better_ratio_cut_without_changing_the_eigenvalue() {
+        let mut graph = DiGraph::new();
+        for i in 0..7 {
+            graph.add_node(i.to_string());
+        }
+        for (u, v) in [
+            (1, 0),
+            (2, 1),
+            (3, 0),
+            (4, 0),
+            (4, 2),
+            (4, 3),
+            (5, 1),
+            (5, 2),
+            (6, 2),
+            (6, 4),
+        ] {
+            graph.add_edge(u, v);
+        }
+        let result = analyze_graph(&graph).unwrap();
+        assert!(result.converged);
+        let side: BTreeSet<_> = result
+            .partition_b
+            .iter()
+            .map(|s| s.parse::<usize>().unwrap())
+            .collect();
+        let mut cut = 0;
+        for &(u, v) in graph.edges() {
+            cut += usize::from(side.contains(&u) != side.contains(&v));
+        }
+        let size = side.len();
+        let ratio_cut = cut as f64 * (1.0 / size as f64 + 1.0 / (7 - size) as f64);
+        assert!(
+            ratio_cut <= 1.75 + 1e-12,
+            "selected ratio cut {ratio_cut}; a spectral threshold attains 1.75"
+        );
+    }
+
+    #[test]
+    fn thresholds_do_not_split_equal_coordinates_or_invent_a_constant_cut() {
+        let adj = vec![vec![1], vec![0, 2], vec![1, 3], vec![2]];
+        assert_eq!(
+            sweep_cut(&adj, &[(0, -1.0), (1, -1.0), (2, 1.0), (3, 1.0)]),
+            Some(1)
+        );
+        assert_eq!(
+            sweep_cut(&adj, &[(0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0)]),
+            None
+        );
+    }
+
+    #[test]
+    fn sweep_quality_matches_enumerated_ratio_cuts_with_parallel_edges() {
+        let adj = vec![
+            vec![1, 1, 2],
+            vec![0, 0, 2],
+            vec![0, 1, 3],
+            vec![2, 4, 4],
+            vec![3, 3],
+        ];
+        let ordered = [(0, -2.0), (1, -1.0), (2, 0.0), (3, 1.0), (4, 2.0)];
+        let quality = |index: usize| {
+            let side: BTreeSet<_> = ordered[..=index].iter().map(|v| v.0).collect();
+            let cut = side
+                .iter()
+                .map(|&u| adj[u].iter().filter(|v| !side.contains(v)).count())
+                .sum::<usize>();
+            let volume = side.iter().map(|&u| adj[u].len()).sum::<usize>();
+            let total = adj.iter().map(Vec::len).sum::<usize>();
+            (
+                cut as f64 * (1.0 / side.len() as f64 + 1.0 / (adj.len() - side.len()) as f64),
+                cut as f64 / volume.min(total - volume) as f64,
+            )
+        };
+        let chosen = sweep_cut(&adj, &ordered).unwrap();
+        let expected = (0..ordered.len() - 1)
+            .min_by(|&a, &b| quality(a).partial_cmp(&quality(b)).unwrap())
+            .unwrap();
+        assert_eq!(quality(chosen), quality(expected));
     }
 }
