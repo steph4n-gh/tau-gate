@@ -898,31 +898,64 @@ fn workspace_range_matches(range: &str, version: &str) -> Option<bool> {
     fn parts(v: &str) -> Option<Vec<u64>> {
         v.split('.')
             .map(|s| {
-                if s.is_empty() || (s.len() > 1 && s.starts_with('0')) {
+                if s.is_empty()
+                    || !s.bytes().all(|c| c.is_ascii_digit())
+                    || (s.len() > 1 && s.starts_with('0'))
+                {
                     None
                 } else {
-                    s.parse().ok()
+                    s.parse::<u64>()
+                        .ok()
+                        .filter(|n| *n <= 9_007_199_254_740_991)
                 }
             })
             .collect()
     }
-    let stable = version.split('+').next()?;
-    let have = parts(stable.split('-').next()?)?;
-    if have.len() != 3 {
-        return None;
+    fn identifiers(v: &str, prerelease: bool) -> bool {
+        v.split('.').all(|s| {
+            !s.is_empty()
+                && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
+                && !(prerelease
+                    && s.len() > 1
+                    && s.starts_with('0')
+                    && s.bytes().all(|c| c.is_ascii_digit()))
+        })
     }
+    fn exact(v: &str) -> Option<(Vec<u64>, bool)> {
+        let stable = if let Some((stable, build)) = v.split_once('+') {
+            if !identifiers(build, false) {
+                return None;
+            }
+            stable
+        } else {
+            v
+        };
+        let (core, prerelease) = if let Some((core, pre)) = stable.split_once('-') {
+            if !identifiers(pre, true) {
+                return None;
+            }
+            (core, true)
+        } else {
+            (stable, false)
+        };
+        let version = parts(core)?;
+        (version.len() == 3).then_some((version, prerelease))
+    }
+    let (have, prerelease) = exact(version)?;
     if range == "*" {
-        return Some(!stable.contains('-'));
+        return Some(!prerelease);
     }
-    // Complex prerelease comparisons require semantics this bounded matcher does not implement.
-    if stable.contains('-') {
+    if range == version {
+        return Some(true);
+    }
+    if prerelease {
         return None;
     }
     let (kind, requested) = match range.as_bytes().first() {
         Some(b'^' | b'~') => (&range[..1], &range[1..]),
         _ => {
-            let want = parts(range.split('+').next()?)?;
-            return (want.len() == 3).then_some(want == have);
+            let (want, prerelease) = exact(range)?;
+            return (!prerelease).then_some(want == have);
         }
     };
     let want = parts(requested)?;
@@ -1225,5 +1258,27 @@ mod tests {
             .iter()
             .any(|s| s.contains("workspace version selection")));
         assert!(edge_names(&g).is_empty());
+    }
+    #[test]
+    fn exact_valid_prerelease_workspace_is_supported_but_invalid_numeric_identifier_is_unknown() {
+        for (version, expected) in [("0.0.0-development", true), ("1.0.0-01", false)] {
+            let root = manifest(&format!(
+                r#"{{"workspaces":["packages/a"],"dependencies":{{"a":"{version}"}}}}"#
+            ));
+            let source = format!(r#"{{"name":"a","version":"{version}"}}"#);
+            let inputs =
+                ProjectInputs::from([("packages/a/package.json".into(), source.into_bytes())]);
+            let g = parse_with_inputs(&fixture(""), Some(&root), &inputs).unwrap();
+            assert_eq!(
+                edge_names(&g).contains(&("root".into(), "yarn:workspace:packages/a".into())),
+                expected
+            );
+            assert_eq!(
+                g.issues
+                    .iter()
+                    .any(|s| s.contains("workspace version selection")),
+                !expected
+            );
+        }
     }
 }
