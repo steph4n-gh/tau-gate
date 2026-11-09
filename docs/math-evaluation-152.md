@@ -56,9 +56,9 @@ The four artifact cases are unchanged from the original study: jQuery, TypeScrip
 
 The root case is [SWC commit `56f4407`](https://github.com/swc-project/swc/commit/56f4407325fbda4f13e6db43232881c19d748707). Its `prepare` changes from `husky install . && …` to `husky && …`. Both graphs are disconnected, so global connectivity stays exactly zero. Partition membership changes, but neither scalar nor partition output explains the command change; the manifest diff does.
 
-The secondary partition signal was added **after inspecting the initial results and known cases**, because the shipped math exposes a partition as well as a scalar. It compares orientation-normalized sides using exact node identities; a side/complement flip alone is not a change. It is explicitly post-hoc and includes identity changes in resolution records. It does not establish new predictive accuracy or separate topological changes from changed record keys.
+The secondary partition signal was added **after inspecting the initial results and known cases**, because the shipped math exposes a partition as well as a scalar. It compares orientation-normalized pairs of both partition halves using exact node identities; a side/complement flip alone is not a change. Added, removed or relabelled nodes on either side change that membership signature. It is explicitly post-hoc and includes identity changes in resolution records. It does not establish new predictive accuracy or separate topological changes from changed record keys.
 
-Across the 57 labeled npm pairs, the scalar alert selects 12 additional cases outside the scoped target; scalar-or-partition selects 14. Those are not established false alarms: the labels do not cover all possible consequences. Across all 145 pairs, exact package/typed-edge/root-lifecycle comparison changes in 142, the scalar alerts in 41, and scalar-or-partition alerts in 71. Every math-alerted pair is already among the basic exact-change cases. Selectivity alone is not evidence of useful prioritization when known review facts are missed and most consequences are unlabelled.
+Across the 57 labeled npm pairs, the scalar alert selects 12 additional cases outside the scoped target; scalar-or-partition selects 14. Those are not established false alarms: the labels do not cover all possible consequences. Across all 145 pairs, exact package/typed-edge/root-lifecycle comparison changes in 142, the scalar alerts in 41, and scalar-or-partition alerts in 76. Every math-alerted pair is already among the basic exact-change cases. Selectivity alone is not evidence of useful prioritization when known review facts are missed and most consequences are unlabelled.
 
 Evidence: `updates.json`, `updates/*/receipt.json`, `update-value.json`, saved archives and targeted Rust evidence reports in `ecosystem_audit/math-comparison-152-20261109/`.
 
@@ -69,6 +69,8 @@ Five fresh native calls were run per frozen graph: **760 calls, all deterministi
 Both sides of all 145 complete historical pairs were also checked against independent numerical references: 290 reference comparisons, with all 145 scalar alert decisions agreeing with reference-derived decisions. The ABI does not expose the native eigenvector; this is not an independent reconstruction of every native-vector residual or a formal second-eigenpair certificate.
 
 Graph/report hashes, the original 152 input identities, candidate bytes and 5,802 historical context files were checked. Rust runtime source remains unchanged. Numerical dependencies remain external: NumPy 2.3.4, SciPy 1.16.3 and PyYAML 6.0.3. No scanned project was installed or executed.
+
+Independent review found that the initial secondary metric kept only one normalized half and could miss membership changes on the other half. Two failing regression cases reproduced the error; preserving both halves fixes it, while a side/complement-flip control still passes. Eight partition changes were initially missed, five of which increase the combined-alert count from 71 to 76. The primary structural/scalar and known-fact detection results are unchanged. The original secondary artifacts are preserved as `*-partition-v1.*`.
 
 The first historical runner attempt could not execute the copied checker because `copyfile` had dropped its executable mode. All 152 failures were harness failures before audit execution. That attempt and its receipts were preserved, candidate mode was restored, new copies use `copy2`, and the collector now preflights the executable. The final acquisition/audit results above come from the corrected run. This error did not affect the separately completed native-library structural measurements.
 
@@ -95,6 +97,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 "$runtime" \
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 "$runtime" \
   tools/math_full_comparison.py analyze-updates --output "$study"
 "$runtime" tools/math_full_comparison.py report --output "$study"
+"$runtime" -m unittest discover -s tests -p test_math_full_comparison.py -v
 ```
 
 The acquisition helper uses public pinned-commit files and authenticated GitHub tree/history APIs. Artifact analysis may acquire original archives and verifies them without installation or execution. No approval profile was widened.

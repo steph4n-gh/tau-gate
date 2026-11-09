@@ -31,6 +31,10 @@ def split_for(repo):
     return 'development' if int(sha(repo.lower().encode())[:8], 16) % 4 == 0 else 'holdout'
 
 
+def canonical_partition(universe, selected):
+    return tuple(sorted((tuple(sorted(selected)), tuple(sorted(set(universe) - set(selected))))))
+
+
 def structural_outcome(spectral, basic):
     if spectral is None or basic is None:
         return 'unavailable'
@@ -280,7 +284,7 @@ def analyze_updates(output):
             selected = set(native['partition'])
             universe = set(graph['nodes'])
             assert selected <= universe
-            partitions[side] = min(tuple(sorted(selected)), tuple(sorted(universe - selected)))
+            partitions[side] = canonical_partition(universe, selected)
         reference_alert = abs(reference_scores['head'] - reference_scores['base']) > 1e-8 + 1e-6 * max(abs(reference_scores['head']), abs(reference_scores['base']))
         if result['math_change_signal'] is not None:
             assert reference_alert == result['math_change_signal'], result['repository']
