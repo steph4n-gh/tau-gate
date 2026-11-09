@@ -186,10 +186,10 @@ def metadata_labels(folder, lock_name, output, cache):
             "positive": bool(root_changes or any(r["candidate"] for r in verified) or same_version)}
 
 
-def analyze(output, library):
+def analyze(output, library, corpus=None):
     index = json.loads((output / "updates.json").read_text())
     solver = Native(library)
-    corpus = Path(json.loads((output / "graphs.json").read_text())["corpus"])
+    corpus = corpus or Path(json.loads((output / "graphs.json").read_text())["corpus"])
     marked = json.loads((corpus / "marked-artifacts.json").read_text())["records"]
     cache = {(r["source"], r["integrity"]): corpus / r["archive"]
              for r in marked if r["status"] == "sri_verified_and_inspected"}

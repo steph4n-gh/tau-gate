@@ -1,5 +1,7 @@
 # Dependency-graph math evaluation
 
+The [expanded all-152-lockfile comparison](math-evaluation-152.md) follows the parser repair. The results below preserve the original 102-inventory solver study.
+
 The solver repair passes the numerical checks on the available graphs from the frozen 200-repository cohort. Spectral partitioning sometimes improves a structural cut objective over the tested basic graph methods. This study does not establish better security decisions or faster human reviews.
 
 Experiment date: November 9, 2026. Baseline source revision: `91728dd`. Reference runtime: NumPy 2.3.4 and SciPy 1.16.3, installed only in the ignored experiment directory. The Rust core retains zero external dependencies.

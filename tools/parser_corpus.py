@@ -52,14 +52,14 @@ def documents(text):
     return list(yaml.safe_load_all(text))
 
 
-def source_case(corpus, output, audit, snapshot):
+def source_case(corpus, output, audit, snapshot, origin=None):
     repo, lock = audit['repository'], audit['lockfile']
     cid = case_id(repo, lock)
     folder = output / 'sources' / cid
     done = folder / 'receipt.json'
     if done.exists():
         return json.loads(done.read_text())
-    origin = corpus / 'repositories' / repo.replace('/', '__')
+    origin = origin or corpus / 'repositories' / repo.replace('/', '__')
     base = str(PurePosixPath(lock).parent)
     base = '' if base == '.' else base
     records, errors, inputs = [], [], {}
