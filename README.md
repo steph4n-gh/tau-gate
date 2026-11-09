@@ -93,7 +93,7 @@ The helper writes deterministic `report.json` and `summary.md` into an explicit 
 
 ## Topology and native interface
 
-The sparse solver returns a bounded **Rayleigh estimate**, residual, convergence flag and iteration count. Residual convergence does not certify the second eigenpair. A disconnected graph's zero connectivity is handled exactly. Topology cannot distinguish benign and malicious code with the same dependency shape and is never used to hide execution candidates or certify safety.
+The sparse solver uses bounded, diagonally preconditioned block iteration and returns a **Rayleigh estimate**, residual, convergence flag and iteration count. Residual convergence does not certify the second eigenpair. A disconnected graph's zero connectivity is handled exactly. Topology cannot distinguish benign and malicious code with the same dependency shape and is never used to hide execution candidates or certify safety. The [200-repository math evaluation](docs/math-evaluation.md) records numerical-reference checks, basic graph baselines, and the limits of the observed review value.
 
 The C ABI is documented in [include/tau_gate.h](include/tau_gate.h). NULL names and invalid endpoints/counts are rejected; a NULL edge pointer is accepted for zero edges. Result ownership is explicit. The existing four-field result prefix and appended diagnostics are retained. v4.1 does not change this interface or the solver. Valid pointers remain the caller's responsibility. The former index-based daemon pruning policy is retired; no TSP/MLX workload benefit is claimed or validated by these tests.
 

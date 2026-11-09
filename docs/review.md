@@ -16,7 +16,7 @@ Reviews return complete base/head reports and package_changes keyed by the forma
 
 Limits: npm lockfileVersion 3, pnpm v9 and Yarn Classic v1 supported subsets; input JSON <=64 MiB with nesting <=128; strict grammar, duplicate-key rejection and finite numbers. Custom config supports three named keys with quoted strings/string arrays, comments and multiline arrays. Unsupported or invalid data fails visibly. The std-only SHA-256 identifies consumed bytes, not the publisher or artifact authenticity. Parser inputs are untrusted; arbitrary FFI pointers cannot be made safe by validation.
 
-Math is diagnostic: maximum-gap partition of a bounded sparse iteration, at most 5000 steps; residual convergence and iterations accompany every estimate. No exact lambda_2 or certified eigenpair claim is made. Candidate inventory and bound approval policy are independent of the cut. Disconnected graphs receive exact zero global connectivity but still retain every candidate in the report.
+Math is diagnostic: maximum-gap partition of a bounded, diagonally preconditioned two-vector iteration, at most 5000 steps; residual convergence and iterations accompany every estimate. Residuals are recomputed from the returned estimate, and exhausting the work bound remains explicitly nonconverged. No exact lambda_2 or certified eigenpair claim is made. Candidate inventory and bound approval policy are independent of the cut. Disconnected graphs receive exact zero global connectivity but still retain every candidate in the report. See the [numerical and incremental-value evaluation](math-evaluation.md).
 
 ## Migration
 
