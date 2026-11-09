@@ -5,10 +5,10 @@ use tau_gate::{
     review::{self, Snapshot},
 };
 const HELP:&str="tau-gate: read-only dependency review\n\
-Usage: tau-gate [audit] [--lock package-lock.json] [--manifest package.json] [--evidence INDEX] [--approvals FILE] [--json] [--enforce]\n\
-       tau-gate review --base BASE_LOCK --head HEAD_LOCK [--base-manifest FILE] [--head-manifest FILE] [--base-evidence INDEX] [--head-evidence INDEX] [--approvals FILE] [--enforce] [--json]\n\
+Usage: tau-gate [audit] [--lock package-lock.json] [--manifest package.json] [--project-inputs INDEX] [--evidence INDEX] [--approvals FILE] [--json] [--enforce]\n\
+       tau-gate review --base BASE_LOCK --head HEAD_LOCK [--base-manifest FILE] [--head-manifest FILE] [--base-project-inputs INDEX] [--head-project-inputs INDEX] [--base-evidence INDEX] [--head-evidence INDEX] [--approvals FILE] [--enforce] [--json]\n\
        tau-gate --verify | --help\n\
-Audit never resolves, installs, deletes inputs, or writes logs. Supported topology: npm v3, pnpm v9, Yarn Classic v1; pnpm/Yarn script metadata stays unknown.\n\
+Audit never resolves, installs, deletes inputs, or writes logs. Supported topology: npm v1/v2/v3, pnpm v6/v9, Yarn Classic/Berry; pnpm/Yarn script metadata stays unknown.\n\
 Exit: 0 completed advisory report; 1 explicit enforcement finding; 2 incomplete/invalid; 64 usage.\n\
 Enforcement requires explicit evidence and bound approvals. Legacy coordinate whitelists are advisory only.\n\
 --dry-run/-d is a compatibility alias for read-only audit. Network and legacy daemon are unsupported.";
@@ -82,24 +82,24 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
     let mut i = usize::from(args.first().is_some_and(|s| !s.starts_with('-')));
     while i < args.len() {
         let key = args[i].as_str();
-        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide a supported frozen lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"|"--evidence"|"--base-evidence"|"--head-evidence"|"--approvals"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
+        match key{"--json"|"--dry-run"|"-d"=>{},"--enforce"=>enforce=true,"--network"|"-n"=>return Err(("INCOMPLETE: network resolver cannot represent an exact installation snapshot; provide a supported frozen lock".into(),2)),"--lock"|"--manifest"|"--base"|"--head"|"--base-manifest"|"--head-manifest"|"--evidence"|"--base-evidence"|"--head-evidence"|"--approvals"|"--project-inputs"|"--base-project-inputs"|"--head-project-inputs"=>{i+=1;let value=args.get(i).filter(|v|!v.starts_with('-')).ok_or_else(||(format!("Missing value for {key}"),64))?;if opts.insert(key,value.as_str()).is_some(){return Err((format!("Duplicate option {key}"),64))}},_=>return Err((format!("Unknown argument {key}; use --help"),64))}
         i += 1;
     }
-    let load = |lock: &str, manifest: Option<&str>, evidence: Option<&str>| {
-        let result = match evidence {
-            Some(index) => Snapshot::load_with_evidence(
+    let load =
+        |lock: &str, manifest: Option<&str>, inputs: Option<&str>, evidence: Option<&str>| {
+            Snapshot::load_context(
                 Path::new(lock),
                 manifest.map(Path::new),
-                Path::new(index),
-            ),
-            None => Snapshot::load(Path::new(lock), manifest.map(Path::new)),
+                inputs.map(Path::new),
+                evidence.map(Path::new),
+            )
+            .map_err(|e| (e.to_string(), 2))
         };
-        result.map_err(|e| (e.to_string(), 2))
-    };
     if mode == "review" {
         if opts.contains_key("--lock")
             || opts.contains_key("--manifest")
             || opts.contains_key("--evidence")
+            || opts.contains_key("--project-inputs")
         {
             return Err(("lock/manifest options require audit".into(), 64));
         }
@@ -108,6 +108,7 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
                 .copied()
                 .ok_or_else(|| ("review requires --base".into(), 64))?,
             opts.get("--base-manifest").copied(),
+            opts.get("--base-project-inputs").copied(),
             opts.get("--base-evidence").copied(),
         )?;
         let head = load(
@@ -115,6 +116,7 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
                 .copied()
                 .ok_or_else(|| ("review requires --head".into(), 64))?,
             opts.get("--head-manifest").copied(),
+            opts.get("--head-project-inputs").copied(),
             opts.get("--head-evidence").copied(),
         )?;
         let report = review::compare(&base, &head);
@@ -160,7 +162,12 @@ fn run(args: &[String]) -> Result<(J, u8), (String, u8)> {
             None
         }
     });
-    let snapshot = load(lock, manifest, opts.get("--evidence").copied())?;
+    let snapshot = load(
+        lock,
+        manifest,
+        opts.get("--project-inputs").copied(),
+        opts.get("--evidence").copied(),
+    )?;
     SentinelConfig::load("tau-gate.toml").map_err(|e| (e.to_string(), 2))?;
     let report = snapshot.report();
     let policy = snapshot

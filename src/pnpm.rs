@@ -74,6 +74,12 @@ pub fn parse_with_inputs(
     let last = documents.len() - 1;
     for (doc_index, document) in documents.iter().enumerate() {
         let scope = scope(doc_index, last);
+        if let Some(version) = &document.version {
+            result.resolution_metadata.insert(
+                format!("pnpm:{scope}:lockfileVersion"),
+                JsonNode::String(version.clone()),
+            );
+        }
         for (key, value) in &document.metadata {
             result
                 .resolution_metadata

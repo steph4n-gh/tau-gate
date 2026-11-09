@@ -9,6 +9,7 @@ pub mod math;
 pub mod parser;
 pub mod pnpm;
 mod policy;
+mod project_inputs;
 pub mod review;
 pub mod semver;
 pub mod telemetry;

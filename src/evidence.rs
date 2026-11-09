@@ -224,7 +224,7 @@ fn read_regular_into(
     }
     Ok(())
 }
-fn safe_relative(value: &str, empty: bool) -> Result<(), String> {
+pub(crate) fn safe_relative(value: &str, empty: bool) -> Result<(), String> {
     if value.is_empty() && empty {
         return Ok(());
     }
@@ -242,7 +242,7 @@ fn safe_relative(value: &str, empty: bool) -> Result<(), String> {
     }
     Ok(())
 }
-fn confined(root: &Path, value: &str) -> Result<PathBuf, String> {
+pub(crate) fn confined(root: &Path, value: &str) -> Result<PathBuf, String> {
     safe_relative(value, false)?;
     let mut path = root.to_path_buf();
     for component in value.split('/') {

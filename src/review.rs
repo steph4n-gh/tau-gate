@@ -26,7 +26,7 @@ fn package(p: &PackageInfo, format: SnapshotFormat) -> J {
         ("identity_kind", string(format.identity_kind())),
         (
             "installed_path",
-            if format == SnapshotFormat::Npm {
+            if format.installed_instances() {
                 string(&p.path)
             } else {
                 J::Null
@@ -42,28 +42,49 @@ fn package(p: &PackageInfo, format: SnapshotFormat) -> J {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotFormat {
     Npm,
+    NpmV1,
+    NpmV2,
     Pnpm,
+    PnpmV6,
     Yarn,
+    YarnBerry,
 }
 impl SnapshotFormat {
     pub fn label(self) -> &'static str {
         match self {
             Self::Npm => "npm_v3",
+            Self::NpmV1 => "npm_v1",
+            Self::NpmV2 => "npm_v2",
             Self::Pnpm => "pnpm_v9",
+            Self::PnpmV6 => "pnpm_v6",
             Self::Yarn => "yarn_classic_v1",
+            Self::YarnBerry => "yarn_berry",
         }
     }
     fn identity_kind(self) -> &'static str {
         match self {
-            Self::Npm => "installed_package_instance",
-            Self::Pnpm => "pnpm_contextual_resolution_snapshot",
-            Self::Yarn => "yarn_descriptor_record",
+            Self::Npm | Self::NpmV1 | Self::NpmV2 => "installed_package_instance",
+            Self::Pnpm | Self::PnpmV6 => "pnpm_contextual_resolution_snapshot",
+            Self::Yarn | Self::YarnBerry => "yarn_descriptor_record",
         }
+    }
+    fn installed_instances(self) -> bool {
+        matches!(self, Self::Npm | Self::NpmV1 | Self::NpmV2)
+    }
+    fn pnpm(self) -> bool {
+        matches!(self, Self::Pnpm | Self::PnpmV6)
     }
     fn detect(text: &str) -> Result<Self> {
         let t = text.trim_start();
         if t.starts_with('{') {
-            return Ok(Self::Npm);
+            return match MiniParser::parse_json(text)?.get("lockfileVersion") {
+                Some(J::Number(1.0)) => Ok(Self::NpmV1),
+                Some(J::Number(2.0)) => Ok(Self::NpmV2),
+                Some(J::Number(3.0)) => Ok(Self::Npm),
+                _ => Err(GateError::Graph(
+                    "INCOMPLETE: supported npm lockfileVersion values are 1, 2 and 3".into(),
+                )),
+            };
         }
         if text.lines().any(|l| l.trim() == "# yarn lockfile v1") {
             return Ok(Self::Yarn);
@@ -78,10 +99,10 @@ impl SnapshotFormat {
             .lines()
             .any(|l| l.trim_start().starts_with("__metadata:"))
         {
-            return Err(GateError::Graph("INCOMPLETE: Yarn Berry lockfiles are unsupported; supported Yarn format is Classic v1".into()));
+            return Ok(Self::YarnBerry);
         }
         Err(GateError::Graph(
-            "INCOMPLETE: unsupported lockfile format; provide npm v3, pnpm v9 or Yarn Classic v1"
+            "INCOMPLETE: unsupported lockfile format; provide npm v1/v2/v3, pnpm v6/v9 or Yarn Classic/Berry"
                 .into(),
         ))
     }
@@ -93,19 +114,60 @@ pub struct Snapshot {
     pub manifest_hash: Option<String>,
     pub(crate) evidence: Option<crate::evidence::Evidence>,
     evidence_hash: Option<String>,
+    project_input_hashes: BTreeMap<String, J>,
+    project_inputs_index_hash: Option<String>,
 }
 impl Snapshot {
     pub fn load(lock: &Path, manifest: Option<&Path>) -> Result<Self> {
+        Self::load_context(lock, manifest, None, None)
+    }
+    pub fn load_context(
+        lock: &Path,
+        manifest: Option<&Path>,
+        project_inputs: Option<&Path>,
+        evidence: Option<&Path>,
+    ) -> Result<Self> {
+        let mut snapshot = Self::load_inputs(lock, manifest, project_inputs)?;
+        if let Some(index) = evidence {
+            snapshot.attach_evidence(lock, index)?;
+        }
+        Ok(snapshot)
+    }
+    fn load_inputs(
+        lock: &Path,
+        manifest: Option<&Path>,
+        project_inputs: Option<&Path>,
+    ) -> Result<Self> {
+        let supplied = project_inputs
+            .map(crate::project_inputs::load)
+            .transpose()
+            .map_err(|e| GateError::Graph(format!("Invalid project inputs: {e}")))?;
+        let mut inputs = supplied
+            .as_ref()
+            .map(|s| s.files.clone())
+            .unwrap_or_default();
         let bytes = read_input(lock)?;
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| GateError::Graph("Lockfile must be UTF-8".into()))?;
-        let format = SnapshotFormat::detect(text)?;
+        let mut format = SnapshotFormat::detect(text)?;
         let mut manifest_hash = None;
-        let m = if let Some(path) = manifest {
-            let b = read_input(path)?;
-            manifest_hash = Some(sha256(&b));
+        let manifest_bytes = manifest.map(read_input).transpose()?;
+        if let (Some(explicit), Some(bundled)) =
+            (manifest_bytes.as_ref(), inputs.get("package.json"))
+        {
+            if explicit != bundled {
+                return Err(GateError::Graph(
+                    "Explicit manifest and project input package.json disagree".into(),
+                ));
+            }
+        }
+        if let Some(bytes) = manifest_bytes {
+            inputs.insert("package.json".into(), bytes);
+        }
+        let m = if let Some(b) = inputs.get("package.json") {
+            manifest_hash = Some(sha256(b));
             let m = MiniParser::parse_json(
-                std::str::from_utf8(&b)
+                std::str::from_utf8(b)
                     .map_err(|_| GateError::Graph("Manifest must be UTF-8".into()))?,
             )?;
             if m.as_object().is_none() {
@@ -116,12 +178,26 @@ impl Snapshot {
             None
         };
         let mut graph = match format {
-            SnapshotFormat::Npm => DepGraph::parse_npm_lockfile(text)?,
-            SnapshotFormat::Pnpm => crate::pnpm::parse(text, m.as_ref())?,
-            SnapshotFormat::Yarn => crate::yarn::parse(text, m.as_ref())?,
+            SnapshotFormat::Npm | SnapshotFormat::NpmV1 | SnapshotFormat::NpmV2 => {
+                DepGraph::parse_npm_lockfile_with_manifest(text, m.as_ref())?
+            }
+            SnapshotFormat::Pnpm | SnapshotFormat::PnpmV6 => {
+                crate::pnpm::parse_with_inputs(text, m.as_ref(), &inputs)?
+            }
+            SnapshotFormat::Yarn => crate::yarn::parse_with_inputs(text, m.as_ref(), &inputs)?,
+            SnapshotFormat::YarnBerry => crate::yarn::berry::parse(text, m.as_ref(), &inputs)?,
         };
+        if format.pnpm()
+            && graph
+                .resolution_metadata
+                .get("pnpm:project:lockfileVersion")
+                .and_then(J::as_str)
+                == Some("6.0")
+        {
+            format = SnapshotFormat::PnpmV6;
+        }
         if let Some(m) = m.as_ref() {
-            if format == SnapshotFormat::Npm {
+            if matches!(format, SnapshotFormat::Npm | SnapshotFormat::NpmV2) {
                 let root = MiniParser::parse_json(text)?;
                 let locked = root.get("packages").and_then(|p| p.get("")).unwrap();
                 for kind in [
@@ -174,11 +250,19 @@ impl Snapshot {
             manifest_hash,
             evidence: None,
             evidence_hash: None,
+            project_input_hashes: supplied
+                .as_ref()
+                .map(|s| s.hashes.clone())
+                .unwrap_or_default(),
+            project_inputs_index_hash: supplied.map(|s| s.index_hash),
         })
     }
     /// Verify a locator bundle without extraction, installation, network access or writes.
     pub fn load_with_evidence(lock: &Path, manifest: Option<&Path>, index: &Path) -> Result<Self> {
-        let mut snapshot = Self::load(lock, manifest)?;
+        Self::load_context(lock, manifest, None, Some(index))
+    }
+    fn attach_evidence(&mut self, lock: &Path, index: &Path) -> Result<()> {
+        let snapshot = self;
         if snapshot.format != SnapshotFormat::Npm {
             return Err(GateError::Graph(
                 "Execution evidence is qualified only for npm v3".into(),
@@ -210,7 +294,7 @@ impl Snapshot {
         }
         snapshot.evidence_hash = Some(index_hash);
         snapshot.evidence = Some(evidence);
-        Ok(snapshot)
+        Ok(())
     }
     pub fn is_complete(&self) -> bool {
         self.graph.issues.is_empty()
@@ -336,6 +420,35 @@ impl Snapshot {
         object([
             ("schema_version", J::Number(1.0)),
             ("format", string(self.format.label())),
+            ("parsing_status", string("complete")),
+            (
+                "dependency_kind_status",
+                string(
+                    if d.issues
+                        .iter()
+                        .any(|s| s.starts_with("Dependency kinds unknown:"))
+                    {
+                        "unknown_transitive_kinds"
+                    } else {
+                        "declared_kinds"
+                    },
+                ),
+            ),
+            (
+                "resolution_metadata",
+                J::Object(d.resolution_metadata.clone()),
+            ),
+            (
+                "project_input_hashes",
+                J::Object(self.project_input_hashes.clone()),
+            ),
+            (
+                "project_inputs_index_sha256",
+                self.project_inputs_index_hash
+                    .as_ref()
+                    .map(string)
+                    .unwrap_or(J::Null),
+            ),
             ("identity_kind", string(self.format.identity_kind())),
             (
                 "introducer_roots",
@@ -347,8 +460,13 @@ impl Snapshot {
             ),
             (
                 "introducer_path_scope",
-                string(if self.format == SnapshotFormat::Pnpm {
+                string(if self.format.pnpm() {
                     "all_known_importers"
+                } else if matches!(
+                    self.format,
+                    SnapshotFormat::Yarn | SnapshotFormat::YarnBerry
+                ) {
+                    "all_known_workspaces"
                 } else {
                     "project_root"
                 }),
@@ -359,6 +477,9 @@ impl Snapshot {
                     if d.issues.iter().any(|s| {
                         !s.starts_with("Execution capabilities unknown:")
                             && !s.starts_with("Root attribution incomplete:")
+                            && !s.starts_with("Peer placement unknown:")
+                            && !s.starts_with("Input consistency unknown:")
+                            && !s.starts_with("Dependency kinds unknown:")
                     }) {
                         "incomplete"
                     } else {
@@ -566,6 +687,10 @@ pub fn compare(base: &Snapshot, head: &Snapshot) -> J {
         ("head", head.report()),
         ("package_changes", J::Array(changes)),
         (
+            "resolution_metadata_changed",
+            J::Bool(base.graph.resolution_metadata != head.graph.resolution_metadata),
+        ),
+        (
             "execution_evidence_changes",
             evidence_changes(base, head, &ap, &bp),
         ),
@@ -701,9 +826,16 @@ fn known_roots(s: &Snapshot) -> Vec<usize> {
         .filter(|&i| {
             let name = g.node_weight(i).unwrap();
             name == "root"
-                || (s.format == SnapshotFormat::Pnpm
+                || (s.format.pnpm()
                     && (name.starts_with("pnpm:project:importer:")
                         || name.starts_with("pnpm:environment:importer:")))
+                || (s.format == SnapshotFormat::Yarn && name.starts_with("yarn:workspace:"))
+                || (s.format == SnapshotFormat::YarnBerry
+                    && s.graph
+                        .resolution_metadata
+                        .get(name)
+                        .and_then(|m| m.get("sourcePath"))
+                        .is_some())
         })
         .collect::<Vec<_>>();
     roots.sort_by(|&a, &b| {
