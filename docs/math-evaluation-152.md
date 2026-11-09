@@ -1,5 +1,7 @@
 # Math versus basic dependency analysis on all 152 lockfiles
 
+The [subsequent cut-selection improvement](math-cut-improvement.md) diagnoses these losses and validates a new source-branch rounding rule. This page preserves the original fixed-method comparison.
+
 The expanded experiment supports **occasional additional structural grouping**. It does **not establish better dependency-risk decisions or human review outcomes than basic dependency analysis**. The strongest measured review facts still come from exact changes and verified artifacts.
 
 All 152 frozen lockfile inventories were measured. All matched independent numerical reference values and repeated deterministically. The main structural comparison contains 118 complete, connected graphs: math beat the tested basic methods on 19 graphs, tied on roughly half, and lost more often than it won.

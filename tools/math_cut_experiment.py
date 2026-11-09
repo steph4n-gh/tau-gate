@@ -10,7 +10,8 @@ import statistics
 import numpy as np
 
 import math_corpus as core
-from math_full_comparison import structural_outcome
+from math_full_comparison import structural_outcome, canonical_partition
+import math_update_study as history
 
 
 def read(path):
@@ -231,17 +232,145 @@ def evaluate(study, output, library, split, repeats, objective):
     print(json.dumps(summary),flush=True)
 
 
+def audit_replay(study, output, binary):
+    settings=read(study/'settings.json')
+    parser_run=Path(settings['parser_run'])
+    original_corpus=Path(read(Path(settings['previous_study'])/'graphs.json')['corpus'])
+    receipt=read(parser_run/'replay.json')
+    results=[]
+    for case in receipt['cases']:
+        command=[str(binary),*case['command'][1:]]
+        run=subprocess.run(command,cwd=original_corpus,capture_output=True,text=True,timeout=180)
+        before=read(parser_run/case['report'])
+        after=json.loads(run.stdout)
+        core.save(output/'candidate-audits'/(case['id']+'.json'),after)
+        assert run.returncode==case['exit_code'],case['repository']
+        for key in ['score','residual','residual_converged','iterations']:
+            assert before['topology'].get(key)==after['topology'].get(key),(case['repository'],key)
+        before.pop('topology');after.pop('topology')
+        assert before==after,case['repository']
+        results.append({'id':case['id'],'repository':case['repository'],'lockfile':case['lockfile'],
+                        'exit_code':run.returncode,'non_math_report_unchanged':True,'connectivity_diagnostics_unchanged':True})
+    core.save(output/'audit-replay.json',{'binary_sha256':core.digest(binary.read_bytes()),'cases':results})
+    print(json.dumps({'unchanged_non_math_audits':len(results)}),flush=True)
+
+
+def historical(study, output, library):
+    original=read(study/'update-value.json')
+    solver=core.Native(library)
+    results=[]
+    for pair in original['pairs']:
+        folder=study/'updates'/pair['id']
+        maths={};partitions={}
+        for side in ['base','head']:
+            report=read(folder/(side+'-report.json'))
+            graph=history.graph_from_report(report)
+            value=solver.run(graph)
+            assert value['converged'] and value['residual']<1e-9
+            for key in ['score','converged','residual','iterations']:
+                assert value[key]==pair['math'][side][key],(pair['repository'],side,key)
+            maths[side]=value
+            partitions[side]=canonical_partition(set(graph['nodes']),set(value['partition']))
+        a,b=maths['base']['score'],maths['head']['score']
+        scalar=abs(a-b)>1e-8+1e-6*max(abs(a),abs(b))
+        assert scalar==pair['math_change_signal']
+        changed=partitions['base']!=partitions['head']
+        results.append({'id':pair['id'],'repository':pair['repository'],'split':pair['split'],
+                        'label_available':pair['labels']['available'],'known_artifact_event':pair['labels'].get('positive'),
+                        'root_event':pair.get('root_lifecycle_event'),
+                        'basic_review_signal':pair['basic_review_signal'],'basic_exact_change':pair['basic_change_signal'],
+                        'before_scalar':pair['math_change_signal'],'before_combined':pair['math_scalar_or_partition_signal'],
+                        'after_scalar':scalar,'after_partition_changed':changed,'after_combined':scalar or changed,
+                        'math':maths})
+    def counts(rows,key,truth):
+        result=Counter()
+        for row in rows:
+            result[('known_flagged' if row[key] else 'known_missed') if row[truth] else ('outside_scoped_target' if row[key] else 'no_scoped_event_no_alert')]+=1
+        return dict(result)
+    summary={}
+    for split in ['all','holdout']:
+        selected=[r for r in results if split=='all' or r['split']==split]
+        labelled=[r for r in selected if r['label_available']]
+        root=[r for r in selected if r['root_event'] is not None]
+        summary[split]={'complete_pairs':len(selected),'labelled_npm_pairs':len(labelled),
+                       'known_artifact_events':sum(bool(r['known_artifact_event']) for r in labelled),
+                       'before_scalar':counts(labelled,'before_scalar','known_artifact_event'),
+                       'before_combined':counts(labelled,'before_combined','known_artifact_event'),
+                       'after_scalar':counts(labelled,'after_scalar','known_artifact_event'),
+                       'after_combined':counts(labelled,'after_combined','known_artifact_event'),
+                       'root_events':sum(bool(r['root_event']) for r in root),
+                       'after_combined_root':counts(root,'after_combined','root_event'),
+                       'scalar_alerts':sum(r['after_scalar'] for r in selected),
+                       'combined_alerts':sum(r['after_combined'] for r in selected),
+                       'extra_alerts_beyond_exact_changes':sum(r['after_combined'] and not r['basic_exact_change'] for r in selected)}
+    core.save(output/'historical-value.json',{'library_sha256':solver.sha256,'summary':summary,'cases':results})
+    print(json.dumps(summary),flush=True)
+
+
+def report(output):
+    evaluation=read(output/'all-evaluation.json')
+    frozen=read(output/'frozen-method.json')
+    assert evaluation['after_library_sha256']==frozen['library_sha256']
+    assert len(evaluation['cases'])==152
+    primary=[c for c in evaluation['cases'] if c['topology_complete'] and c['components']==1 and c['nodes']>1]
+    tradeoffs=[];remaining=[]
+    for case in primary:
+        before=case['before']['metrics'];after=case['after']['metrics']
+        if structural_outcome(after['conductance'],before['conductance'])=='basic_better':
+            tradeoffs.append({'id':case['id'],'repository':case['repository'],'old_conductance':before['conductance'],
+                             'new_conductance':after['conductance'],'old_ratio_cut':before['ratio_cut'],'new_ratio_cut':after['ratio_cut']})
+        if structural_outcome(after['ratio_cut'],case['basic']['ratio_cut']['metrics']['ratio_cut'])=='basic_better':
+            remaining.append(case['repository'])
+    audit=read(output/'audit-replay.json');historical=read(output/'historical-value.json')
+    assert len(audit['cases'])==152
+    assert all(c['non_math_report_unchanged'] and c['connectivity_diagnostics_unchanged'] for c in audit['cases'])
+    result={'method':frozen,'summary':evaluation['summary'],'conductance_tradeoffs':tradeoffs,
+            'remaining_ratio_losses':remaining,'unchanged_non_math_audits':len(audit['cases']),
+            'historical_summary':historical['summary'],
+            'limits':['Fixed repo split on an already studied cohort; method chosen using development cases before new holdout outcomes',
+                      'Ratio-cut grouping improvement does not establish better security or human review outcomes',
+                      'The scalar ignores package contents and stays zero for disconnected graphs',
+                      'Conductance may worsen because the chosen primary objective is ratio cut']}
+    core.save(output/'results.json',result)
+    lines=['# Spectral cut improvement: all152 inventories','',
+           'The selected rule sweeps every distinct-coordinate threshold for minimum ratio cut, with conductance as a tiebreaker. Eigenvalue solver and execution evidence are unchanged.','',
+           '| Primary objective | Before: math/equal/basic wins | After: math/equal/basic wins |', '| --- | --- | --- |']
+    for objective in ['ratio_cut','conductance']:
+        data=evaluation['summary']['complete_connected'][objective]
+        def counts(side):return '/'.join(str(data[side].get(k,0)) for k in ['math_better','equal','basic_better'])
+        lines.append(f"| {objective} | {counts('before')} | {counts('after')} |")
+    lines+=['','Primary scope:118completeconnected graphs. All152 appear below, including32disconnected/singletons and4incomplete inventories (categories overlap).', '',
+            '| Repository | Lock | Split | Nodes | Components | Topology | Old ratio cut | New ratio cut | Old conductance | New conductance |',
+            '| --- | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |']
+    for case in evaluation['cases']:
+        def metric(side,key):
+            value=case[side]['metrics'][key] if case[side]['metrics'] else None
+            return 'undefined' if value is None else f'{value:.8g}'
+        lines.append(f"| {case['repository']} | {case['lockfile']} | {case['split']} | {case['nodes']} | {case['components']} | {'complete' if case['topology_complete'] else 'incomplete'} | {metric('before','ratio_cut')} | {metric('after','ratio_cut')} | {metric('before','conductance')} | {metric('after','conductance')} |")
+    (output/'REPORT.md').write_text('\n'.join(lines)+'\n')
+    print(json.dumps({'cases':len(evaluation['cases']),'primary':len(primary),'conductance_regressions':len(tradeoffs),'remaining_ratio_losses':len(remaining)}),flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['diagnose','evaluate-development','evaluate-all'])
+    parser.add_argument('mode', choices=['diagnose','evaluate-development','evaluate-all','audit-replay','historical','report'])
     parser.add_argument('--study', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--library',type=Path)
+    parser.add_argument('--binary',type=Path)
     parser.add_argument('--repeats',type=int,default=5)
     parser.add_argument('--objective',choices=['ratio_cut','conductance'],default='ratio_cut')
     args = parser.parse_args()
     if args.mode=='diagnose':
         diagnose(args.study.resolve(), args.output.resolve())
+    elif args.mode=='report':
+        report(args.output.resolve())
+    elif args.mode=='audit-replay':
+        if not args.binary:parser.error('audit replay requires binary')
+        audit_replay(args.study.resolve(),args.output.resolve(),args.binary.resolve())
+    elif args.mode=='historical':
+        if not args.library:parser.error('historical requires library')
+        historical(args.study.resolve(),args.output.resolve(),args.library.resolve())
     else:
         if not args.library or args.repeats<5:parser.error('evaluation requires library and at least5 repetitions')
         evaluate(args.study.resolve(),args.output.resolve(),args.library.resolve(), 'development' if args.mode=='evaluate-development' else 'all',args.repeats,args.objective)
