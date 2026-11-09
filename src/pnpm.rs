@@ -54,6 +54,7 @@ pub fn parse(lock: &str, manifest: Option<&JsonNode>) -> Result<DepGraph> {
         issues: vec!["Execution capabilities unknown: pnpm v9 packages and workspace importers whose manifests were not inspected; absent build markers do not establish absence of lifecycle execution".into()],
         optional_omissions: Vec::new(),
         edge_kinds: BTreeMap::new(),
+        resolution_metadata: BTreeMap::new(),
     };
     let mut indices = BTreeMap::new();
     let last = documents.len() - 1;

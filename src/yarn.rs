@@ -203,6 +203,7 @@ impl MiniParser {
             issues,
             optional_omissions,
             edge_kinds,
+            resolution_metadata: BTreeMap::new(),
         })
     }
 }

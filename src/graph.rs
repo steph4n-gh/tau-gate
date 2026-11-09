@@ -14,6 +14,9 @@ const DEPENDENCY_KINDS: [&str; 4] = [
     "peerDependencies",
 ];
 
+/// Explicitly supplied project-relative manifests and package-manager configuration.
+pub type ProjectInputs = BTreeMap<String, Vec<u8>>;
+
 pub(crate) fn npm_limits(packages: &BTreeMap<String, JsonNode>) -> Result<()> {
     if packages.len() > MAX_NPM_RECORDS {
         return Err(GateError::Graph(
@@ -69,6 +72,7 @@ pub struct DepGraph {
     pub issues: Vec<String>,
     pub optional_omissions: Vec<String>,
     pub edge_kinds: BTreeMap<(usize, usize), BTreeSet<String>>,
+    pub resolution_metadata: BTreeMap<String, JsonNode>,
 }
 
 impl DepGraph {
@@ -295,6 +299,7 @@ impl DepGraph {
             issues,
             optional_omissions,
             edge_kinds,
+            resolution_metadata: BTreeMap::new(),
         })
     }
 
@@ -379,6 +384,7 @@ impl DepGraph {
             ],
             optional_omissions: Vec::new(),
             edge_kinds: BTreeMap::new(),
+            resolution_metadata: BTreeMap::new(),
         })
     }
 }
