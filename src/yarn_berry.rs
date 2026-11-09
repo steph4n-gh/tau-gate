@@ -257,7 +257,16 @@ pub fn parse(lock: &str, manifest: Option<&JsonNode>, inputs: &ProjectInputs) ->
                 } else {
                     "dependencies"
                 };
-                let mut kinds = BTreeSet::from([kind.to_owned()]);
+                let mut kinds =
+                    if parent_range.starts_with("workspace:") && source_manifest.is_none() {
+                        let mut unknown = BTreeSet::from(["workspaceDependencies".to_owned()]);
+                        if optional {
+                            unknown.insert("optionalDependencies".into());
+                        }
+                        unknown
+                    } else {
+                        BTreeSet::from([kind.to_owned()])
+                    };
                 if source_manifest.is_some() {
                     if let Some(requirements) = declared.get(name) {
                         let matches = requirements.iter().any(|(_, requirement)| {
@@ -998,6 +1007,9 @@ mod tests {
             .issues
             .iter()
             .any(|s| s.starts_with("Dependency kinds unknown:")));
+        let unknown = missing.edge_kinds.values().next().unwrap();
+        assert!(unknown.contains("workspaceDependencies"));
+        assert!(!unknown.contains("dependencies"));
         let stale =
             MiniParser::parse_json(r#"{"name":"app","devDependencies":{"leaf":"^2"}}"#).unwrap();
         let stale = parse(&lock(&records), Some(&stale), &ProjectInputs::new()).unwrap();

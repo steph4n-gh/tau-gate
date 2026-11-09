@@ -707,15 +707,14 @@ fn check_manifest(
                 if !names.insert(name) {
                     return Err(incomplete("duplicate manifest runtime name"));
                 }
-                if runtime.get("onFail").and_then(JsonNode::as_str) == Some("download") {
-                    if declared
+                if runtime.get("onFail").and_then(JsonNode::as_str) == Some("download")
+                    && declared
                         .insert(name.into(), format!("runtime:{version}"))
                         .is_some()
-                    {
-                        return Err(incomplete(
-                            "manifest runtime conflicts with explicit dependency",
-                        ));
-                    }
+                {
+                    return Err(incomplete(
+                        "manifest runtime conflicts with explicit dependency",
+                    ));
                 }
             }
         }
@@ -1324,10 +1323,7 @@ fn validate_resolution(value: &JsonNode, in_variant: bool) -> Result<()> {
                     if !bins.is_empty()
                         && bins
                             .values()
-                            .all(|v| v.as_str().is_some_and(|s| !s.is_empty())) =>
-                {
-                    ()
-                }
+                            .all(|v| v.as_str().is_some_and(|s| !s.is_empty())) => {}
                 _ => return Err(incomplete("pnpm binary resolution requires bin paths")),
             }
         }

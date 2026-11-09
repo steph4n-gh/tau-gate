@@ -311,6 +311,30 @@ fn parse_classic(
         }
         resolution_metadata.insert("root".into(), manifest.clone());
         retain_peers("root", manifest, &mut resolution_metadata)?;
+        if let Some(value) = manifest.get("workspaces") {
+            let patterns = value
+                .get("packages")
+                .unwrap_or(value)
+                .as_array()
+                .ok_or_else(|| incomplete("invalid workspace patterns"))?;
+            for (index, pattern) in patterns.iter().enumerate() {
+                let pattern = pattern
+                    .as_str()
+                    .ok_or_else(|| incomplete("invalid workspace pattern"))?;
+                if pattern.starts_with('!') || pattern.contains(['*', '?']) {
+                    continue;
+                }
+                let path = project_path(pattern.trim_end_matches('/'))?;
+                let excluded = patterns[index + 1..]
+                    .iter()
+                    .filter_map(JsonNode::as_str)
+                    .filter_map(|p| p.strip_prefix('!'))
+                    .any(|p| glob(p.trim_end_matches('/'), &path));
+                if !excluded && !packages.contains_key(&format!("yarn:workspace:{path}")) {
+                    issues.push(format!("Root attribution incomplete: Yarn Classic declared workspace manifest not supplied: {path}/package.json"));
+                }
+            }
+        }
         if manifest.get("workspaces").is_some() && workspaces.is_empty() {
             issues.push("Root attribution incomplete: Yarn Classic workspace manifests are not supplied; their edges cannot be attributed".into());
         }
@@ -420,10 +444,18 @@ fn add_reference(
 ) -> Result<()> {
     let selector = format!("{name}@{range}");
     descriptor(&selector)?;
-    let workspace = workspaces
-        .get(name)
-        .filter(|(_, version)| workspace_range_matches(range, version))
-        .map(|(idx, _)| *idx);
+    let workspace = if let Some((idx, version)) = workspaces.get(name) {
+        match workspace_range_matches(range, version) {
+            Some(true) => Some(*idx),
+            Some(false) => None,
+            None => {
+                issues.push(format!("unresolved workspace version selection: {label} -> {selector}; supplied workspace version {version} needs unsupported semver evaluation"));
+                return Ok(());
+            }
+        }
+    } else {
+        None
+    };
     if let Some(to) = workspace.or_else(|| selectors.get(&selector).copied()) {
         edges.entry((from, to)).or_default().insert(kind.into());
     } else {
@@ -859,25 +891,43 @@ fn glob(pattern: &str, value: &str) -> bool {
     }
     previous[v.len()]
 }
-fn workspace_range_matches(range: &str, version: &str) -> bool {
-    if version.is_empty() {
-        return false;
+fn workspace_range_matches(range: &str, version: &str) -> Option<bool> {
+    if version.is_empty() || range.contains(':') {
+        return Some(false);
     }
-    if range == "*" || range == version {
-        return true;
+    fn parts(v: &str) -> Option<Vec<u64>> {
+        v.split('.')
+            .map(|s| {
+                if s.is_empty() || (s.len() > 1 && s.starts_with('0')) {
+                    None
+                } else {
+                    s.parse().ok()
+                }
+            })
+            .collect()
+    }
+    let stable = version.split('+').next()?;
+    let have = parts(stable.split('-').next()?)?;
+    if have.len() != 3 {
+        return None;
+    }
+    if range == "*" {
+        return Some(!stable.contains('-'));
+    }
+    // Complex prerelease comparisons require semantics this bounded matcher does not implement.
+    if stable.contains('-') {
+        return None;
     }
     let (kind, requested) = match range.as_bytes().first() {
         Some(b'^' | b'~') => (&range[..1], &range[1..]),
-        _ => return false,
+        _ => {
+            let want = parts(range.split('+').next()?)?;
+            return (want.len() == 3).then_some(want == have);
+        }
     };
-    fn parts(v: &str) -> Option<Vec<u64>> {
-        v.split('.').map(|s| s.parse().ok()).collect()
-    }
-    let (Some(want), Some(have)) = (parts(requested), parts(version)) else {
-        return false;
-    };
-    if want.is_empty() || want.len() > 3 || have.len() != 3 {
-        return false;
+    let want = parts(requested)?;
+    if want.is_empty() || want.len() > 3 {
+        return None;
     }
     let mut lower = [0; 3];
     for (i, n) in want.iter().enumerate() {
@@ -894,14 +944,11 @@ fn workspace_range_matches(range: &str, version: &str) -> bool {
             .unwrap_or(want.len() - 1)
             .min(want.len() - 1)
     };
-    let Some(bound) = upper[index].checked_add(1) else {
-        return false;
-    };
-    upper[index] = bound;
+    upper[index] = upper[index].checked_add(1)?;
     for n in &mut upper[index + 1..] {
         *n = 0;
     }
-    have >= lower && have < upper
+    Some(have >= lower && have < upper)
 }
 
 fn manifest_reference_count(manifest: &JsonNode) -> Result<usize> {
@@ -1130,5 +1177,53 @@ mod tests {
         assert_eq!(parse(&lock, None).unwrap().packages.len(), 10_001);
         lock.push_str("overflow@1:\n  version \"1\"\n");
         assert!(parse(&lock, None).is_err());
+    }
+    #[test]
+    fn partially_supplied_exact_workspaces_remain_incomplete() {
+        let root = manifest(r#"{"workspaces":["packages/a","packages/b"]}"#);
+        let inputs = ProjectInputs::from([(
+            "packages/a/package.json".into(),
+            br#"{"name":"a","version":"1.0.0"}"#.to_vec(),
+        )]);
+        let g = parse_with_inputs(&fixture(""), Some(&root), &inputs).unwrap();
+        assert!(g
+            .issues
+            .iter()
+            .any(|s| s.starts_with("Root attribution incomplete:") && s.contains("packages/b")));
+    }
+    #[test]
+    fn star_excludes_prerelease_workspace_and_uses_the_locked_registry_record() {
+        let root = manifest(r#"{"workspaces":["packages/a"],"dependencies":{"a":"*"}}"#);
+        let inputs = ProjectInputs::from([(
+            "packages/a/package.json".into(),
+            br#"{"name":"a","version":"1.0.0-beta.1"}"#.to_vec(),
+        )]);
+        let g = parse_with_inputs(
+            &fixture("a@*:\n  version \"0.9.0\"\n"),
+            Some(&root),
+            &inputs,
+        )
+        .unwrap();
+        assert!(edge_names(&g).contains(&("root".into(), label("a@*"))));
+        assert!(!edge_names(&g).contains(&("root".into(), "yarn:workspace:packages/a".into())));
+    }
+    #[test]
+    fn unsupported_workspace_range_cannot_choose_a_registry_fallback() {
+        let root = manifest(r#"{"workspaces":["packages/a"],"dependencies":{"a":">=1"}}"#);
+        let inputs = ProjectInputs::from([(
+            "packages/a/package.json".into(),
+            br#"{"name":"a","version":"2.0.0"}"#.to_vec(),
+        )]);
+        let g = parse_with_inputs(
+            &fixture("\"a@>=1\":\n  version \"1.0.0\"\n"),
+            Some(&root),
+            &inputs,
+        )
+        .unwrap();
+        assert!(g
+            .issues
+            .iter()
+            .any(|s| s.contains("workspace version selection")));
+        assert!(edge_names(&g).is_empty());
     }
 }
