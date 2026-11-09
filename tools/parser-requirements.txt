@@ -1,0 +1,2 @@
+# External frozen-corpus acquisition and independent YAML verification only.
+PyYAML==6.0.3

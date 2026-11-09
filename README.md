@@ -2,9 +2,9 @@
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15795/badge)](https://www.bestpractices.dev/projects/15795)
 
-Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
+Tau-Gate reviews frozen **npm v1/v2/v3, pnpm v6/v9, Yarn Classic v1 and Yarn Berry lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-The latest published release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). See [installation](docs/setup.md) for the verified Debian 12 x86_64 archive and source-build instructions.
+The latest published release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). See [installation](docs/setup.md) for the verified Debian 12 x86_64 archive and source-build instructions. The expanded parsers below require this source branch; the published v4.2.1 release predates them.
 
 A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.2 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
@@ -26,24 +26,35 @@ For a project with an existing npm lockfile:
 
 Capture base/head lockfiles and their root manifests from the revisions you intend to review. Providing both manifests also detects root lifecycle script body changes; omitting manifests is explicitly a format-specific `*_lock_snapshot_only` scope. Reports contain SHA-256 hashes of every consumed lockfile and manifest, full package identities, dependency edge kinds, declared execution candidates and shortest introducer paths. Changed packages also show their before/after introducing paths. JSON output is deterministic for the same bytes and options.
 
-Audit is read-only: it never resolves, installs, deletes inputs or writes logs. `--dry-run` remains a compatibility alias. Missing inputs, malformed data, manifest disagreement, unresolved required dependencies and unqualified formats produce an incomplete report and exit 2. Network resolution and the old daemon are retired. Bun, Go, Cargo CLI and Yarn Berry are unsupported. Cargo metadata parsing remains an incomplete library preview. Multiple detected lockfiles require an explicit --lock.
+Audit is read-only: it never resolves, installs, deletes inputs or writes logs. `--dry-run` remains a compatibility alias. Missing inputs, malformed data, manifest disagreement, unresolved required dependencies and unqualified formats produce an incomplete report and exit 2. Network resolution and the old daemon are retired. Bun, Go and Cargo CLI are unsupported. Yarn Berry metadata versions 6, 8 and 10 are supported within the emitted subset documented below. Cargo metadata parsing remains an incomplete library preview. Multiple detected lockfiles require an explicit --lock.
 
-## pnpm and Yarn coverage
+## Lockfile coverage
 
 | Format | Identity and supported topology | Execution metadata |
 | --- | --- | --- |
+| npm v1 | Recursive installed hierarchy and exact nearest targets; supplied manifest gives root edges; transitive `requires` kinds remain unknown | Unqualified |
+| npm v2 | Authoritative `packages` instances, nearest targets and local links | Unqualified |
 | npm v3 | Installed lockfile instances, nearest node_modules targets, workspace links | Original archive and source-snapshot evidence when supplied; otherwise advisory markers |
-| pnpm v9 | Namespaced environment/project documents, importer/workspace links, exact snapshot versions, aliases, peer/patch contexts and observed resolution metadata | Transitive scripts unknown; positive build markers retained |
-| Yarn Classic v1 | Exact descriptor groups, aliases, version/resolved/integrity and dependency/optional maps; supplied root manifest gives root edges | Transitive scripts unknown |
+| pnpm v6/v9 | Namespaced environment/project documents, importer/workspace links, exact snapshot versions, aliases, peer/patch contexts and observed resolution metadata | Transitive scripts unknown; positive build markers retained |
+| Yarn Classic v1 | Exact descriptor groups, aliases, version/resolved/integrity and dependency/optional maps; supplied manifests give root/workspace/local-link edges | Transitive scripts unknown |
+| Yarn Berry | Exact grouped descriptors and resolution locators, source-derived workspace kinds, aliases, optional maps, patches and peer constraints; cache checksums kept separate from npm SRI | Transitive scripts and installed peer placement unknown |
 
-pnpm/Yarn snapshots are resolution records, not an installed node_modules tree; `installed_path` is null. Yarn root attribution is incomplete without a manifest, and workspace manifests/peer placement are not inferred. Classic records with rarer unsupported fields (including permissions/prebuiltVariants/uid/registry) are rejected visibly. See [supported contract](docs/review.md).
+pnpm/Yarn snapshots are resolution records; `installed_path` is null. Explicit source context supplies workspace manifests and manager configuration. Peer constraints are retained without guessing installed peer placement. Classic supports the observed `uid` field; rarer unrecognized fields remain visibly unsupported. See the [supported contract](docs/review.md) and [frozen 200-project parser replay](docs/parser-coverage.md).
+
+For workspace links, source catalogs, or override rules, supply a project-input index:
+
+```json
+{"schema_version":1,"files":[{"path":"package.json","file":"files/root.json"},{"path":"pnpm-workspace.yaml","file":"files/workspace.yaml"},{"path":"packages/child/package.json","file":"files/child.json"}]}
+```
+
+Pass `--project-inputs index.json` to audit, or `--base-project-inputs` / `--head-project-inputs` to review. Logical paths are project-relative; file locators are relative to the index directory. Files must be regular, confined paths without symlinks or parent traversal. The report hashes every supplied source file and the index. The core reads only these explicit files and never discovers or downloads missing workspace context. Source inputs provide resolution context; execution qualification still requires the separate npm v3 evidence bundle.
 
 ```sh
 ./target/release/tau-gate review --base base-pnpm.yaml --head head-pnpm.yaml --json
 ./target/release/tau-gate audit --lock yarn.lock --manifest package.json --json
 ```
 
-These emit useful graphs/diffs but **exit 2** because dependency execution metadata is unknown, including with --enforce. A topology-complete pnpm/Yarn report explicitly contains:
+Legacy npm, pnpm and Yarn emit useful graphs/diffs but **exit 2** because dependency execution metadata is unknown, including with --enforce. A topology-complete pnpm/Yarn report explicitly contains:
 
 ```json
 {"status":"incomplete","topology_status":"complete","execution_metadata_status":"unknown_transitive_scripts"}
