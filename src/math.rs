@@ -90,7 +90,7 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let (low, high) = (ordered[cut].1, ordered[cut + 1].1);
     let midpoint = low + (high - low) / 2.0;
     let tau = if midpoint < high { midpoint } else { low };
-    let side = if cut + 1 <= n - cut - 1 {
+    let side = if cut < n / 2 {
         &ordered[..=cut]
     } else {
         &ordered[cut + 1..]
