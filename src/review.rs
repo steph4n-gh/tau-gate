@@ -17,6 +17,26 @@ pub fn string(s: impl Into<String>) -> J {
 pub fn object<const N: usize>(items: [(&str, J); N]) -> J {
     J::Object(items.into_iter().map(|(k, v)| (k.into(), v)).collect())
 }
+fn alternative_cut(cut: crate::math::AlternativeCut) -> J {
+    object([
+        ("partition", strings(cut.partition_b)),
+        ("source", string(cut.origin.kind())),
+        (
+            "projection",
+            cut.origin.projection().map(string).unwrap_or(J::Null),
+        ),
+        (
+            "tau",
+            cut.origin
+                .projection()
+                .map(|_| J::Number(cut.tau))
+                .unwrap_or(J::Null),
+        ),
+        ("ratio_cut", J::Number(cut.ratio_cut)),
+        ("conductance", J::Number(cut.conductance)),
+    ])
+}
+
 fn strings(items: impl IntoIterator<Item = String>) -> J {
     J::Array(items.into_iter().map(string).collect())
 }
@@ -412,8 +432,12 @@ impl Snapshot {
                     m.cut_diagnostics
                         .map(|cut| {
                             object([
-                                ("method", string("four_fixed_ritz_projections_ratio_cut")),
-                                ("projection", string(cut.projection)),
+                                ("method", string("spectral_and_exact_bridge_candidates")),
+                                ("source", string(cut.origin.kind())),
+                                (
+                                    "projection",
+                                    cut.origin.projection().map(string).unwrap_or(J::Null),
+                                ),
                                 ("ratio_cut", J::Number(cut.ratio_cut)),
                                 ("conductance", J::Number(cut.conductance)),
                                 (
@@ -425,15 +449,13 @@ impl Snapshot {
                                 (
                                     "conductance_alternative",
                                     cut.conductance_alternative
-                                        .map(|alternative| {
-                                            object([
-                                                ("partition", strings(alternative.partition_b)),
-                                                ("tau", J::Number(alternative.tau)),
-                                                ("projection", string(alternative.projection)),
-                                                ("ratio_cut", J::Number(alternative.ratio_cut)),
-                                                ("conductance", J::Number(alternative.conductance)),
-                                            ])
-                                        })
+                                        .map(alternative_cut)
+                                        .unwrap_or(J::Null),
+                                ),
+                                (
+                                    "spectral_alternative",
+                                    cut.spectral_alternative
+                                        .map(alternative_cut)
                                         .unwrap_or(J::Null),
                                 ),
                             ])

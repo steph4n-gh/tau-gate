@@ -5,7 +5,7 @@ use crate::graph_impl::DiGraph;
 pub struct PartitionResult {
     /// Nodes on the smaller side of the selected diagnostic cut.
     pub partition_b: Vec<String>,
-    /// A threshold on the selected projection of the Ritz search directions.
+    /// Threshold on the selected Ritz projection, or zero for a structural cut.
     pub tau: f64,
     /// A Rayleigh estimate; residual convergence does not certify the second eigenpair.
     /// Close to 0.0 indicates a severe structural bottleneck.
@@ -18,20 +18,43 @@ pub struct PartitionResult {
 }
 
 pub struct CutDiagnostics {
-    pub projection: &'static str,
+    pub origin: CutOrigin,
     pub ratio_cut: f64,
     pub conductance: f64,
     /// The second search direction need not have converged to an eigenvector.
     pub secondary_direction_residual: Option<f64>,
     pub conductance_alternative: Option<AlternativeCut>,
+    pub spectral_alternative: Option<AlternativeCut>,
 }
 
 pub struct AlternativeCut {
     pub partition_b: Vec<String>,
     pub tau: f64,
-    pub projection: &'static str,
+    pub origin: CutOrigin,
     pub ratio_cut: f64,
     pub conductance: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CutOrigin {
+    Spectral(&'static str),
+    Bridge,
+}
+
+impl CutOrigin {
+    pub fn kind(self) -> &'static str {
+        match self {
+            Self::Spectral(_) => "spectral",
+            Self::Bridge => "bridge",
+        }
+    }
+
+    pub fn projection(self) -> Option<&'static str> {
+        match self {
+            Self::Spectral(name) => Some(name),
+            Self::Bridge => None,
+        }
+    }
 }
 
 /// Estimates a Fiedler vector using a bounded, diagonally preconditioned block
@@ -114,9 +137,22 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         .ok_or_else(|| {
             GateError::Math("No distinct spectral threshold has positive volume".into())
         })?;
-    let alternative = (boundary.quality.conductance < primary.quality.conductance)
-        .then(|| boundary.describe(graph));
-    let selected = primary.describe(graph);
+    let mut selected = primary.describe(graph);
+    let mut boundary = boundary.describe(graph);
+    let mut spectral_alternative = None;
+    if let Some((ratio_bridge, boundary_bridge)) = bridge_cuts(graph, &adj) {
+        if (ratio_bridge.ratio_cut, ratio_bridge.conductance)
+            < (selected.ratio_cut, selected.conductance)
+        {
+            spectral_alternative = Some(std::mem::replace(&mut selected, ratio_bridge));
+        }
+        if (boundary_bridge.conductance, boundary_bridge.ratio_cut)
+            < (boundary.conductance, boundary.ratio_cut)
+        {
+            boundary = boundary_bridge;
+        }
+    }
+    let alternative = (boundary.conductance < selected.conductance).then_some(boundary);
     Ok(PartitionResult {
         partition_b: selected.partition_b,
         tau: selected.tau,
@@ -125,11 +161,12 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
         residual,
         iterations: used,
         cut_diagnostics: Some(CutDiagnostics {
-            projection: selected.projection,
+            origin: selected.origin,
             ratio_cut: selected.ratio_cut,
             conductance: selected.conductance,
             secondary_direction_residual,
             conductance_alternative: alternative,
+            spectral_alternative,
         }),
     })
 }
@@ -163,11 +200,89 @@ impl SelectedCut {
                 .filter_map(|&(i, _)| graph.node_weight(i).cloned())
                 .collect(),
             tau: if midpoint < high { midpoint } else { low },
-            projection: self.projection,
+            origin: CutOrigin::Spectral(self.projection),
             ratio_cut: self.quality.ratio_cut,
             conductance: self.quality.conductance,
         }
     }
+}
+
+// Iterative low-link DFS: skip exactly one parent occurrence so parallel and
+// reciprocal edges cannot be mistaken for bridges. DFS subtrees are intervals.
+fn bridge_cuts(graph: &DiGraph, adj: &[Vec<usize>]) -> Option<(AlternativeCut, AlternativeCut)> {
+    let n = adj.len();
+    let total: usize = adj.iter().map(Vec::len).sum();
+    let mut discovery = vec![usize::MAX; n];
+    let mut low = vec![0; n];
+    let mut parent = vec![None; n];
+    let mut skipped_parent = vec![false; n];
+    let mut volume: Vec<_> = adj.iter().map(Vec::len).collect();
+    let mut order = vec![0];
+    let mut stack = vec![(0, 0)];
+    discovery[0] = 0;
+    // start/end of the DFS interval and its two objective values.
+    let mut ratio: Option<(usize, usize, f64, f64)> = None;
+    let mut boundary: Option<(usize, usize, f64, f64)> = None;
+    while let Some((u, next)) = stack.last_mut() {
+        let u = *u;
+        if *next < adj[u].len() {
+            let v = adj[u][*next];
+            *next += 1;
+            if parent[u] == Some(v) && !skipped_parent[u] {
+                skipped_parent[u] = true;
+                continue;
+            }
+            if discovery[v] == usize::MAX {
+                parent[v] = Some(u);
+                discovery[v] = order.len();
+                low[v] = discovery[v];
+                order.push(v);
+                stack.push((v, 0));
+            } else {
+                low[u] = low[u].min(discovery[v]);
+            }
+        } else {
+            stack.pop();
+            if let Some(p) = parent[u] {
+                if low[u] > discovery[p] {
+                    let size = order.len() - discovery[u];
+                    let r = 1.0 / size as f64 + 1.0 / (n - size) as f64;
+                    let c = 1.0 / volume[u].min(total - volume[u]) as f64;
+                    let cut = (discovery[u], order.len(), r, c);
+                    if ratio.is_none_or(|old| (r, c) < (old.2, old.3)) {
+                        ratio = Some(cut);
+                    }
+                    if boundary.is_none_or(|old| (c, r) < (old.3, old.2)) {
+                        boundary = Some(cut);
+                    }
+                }
+                low[p] = low[p].min(low[u]);
+                volume[p] += volume[u];
+            }
+        }
+    }
+    let describe = |(start, end, ratio_cut, conductance): (usize, usize, f64, f64)| {
+        let side: Vec<_> = if end - start <= n - (end - start) {
+            order[start..end].to_vec()
+        } else {
+            order[..start]
+                .iter()
+                .chain(&order[end..])
+                .copied()
+                .collect()
+        };
+        AlternativeCut {
+            partition_b: side
+                .iter()
+                .filter_map(|&i| graph.node_weight(i).cloned())
+                .collect(),
+            tau: 0.0,
+            origin: CutOrigin::Bridge,
+            ratio_cut,
+            conductance,
+        }
+    };
+    ratio.zip(boundary).map(|(r, c)| (describe(r), describe(c)))
 }
 
 fn select_cuts(
@@ -706,6 +821,143 @@ mod partition_regressions {
     }
 
     #[test]
+    fn bridge_branch_is_recovered_when_projection_cuts_miss_it() {
+        let mut graph = DiGraph::new();
+        for i in 0..36 {
+            graph.add_node(i.to_string());
+        }
+        for (i, parent) in [
+            0, 0, 2, 2, 4, 2, 4, 2, 4, 0, 6, 2, 5, 7, 2, 3, 13, 13, 0, 14, 5, 20, 2, 8, 9, 15, 15,
+            11, 15, 17, 2, 31, 16, 9, 31,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            graph.add_edge(i + 1, parent);
+        }
+        for (u, v) in [
+            (6, 0),
+            (10, 2),
+            (10, 5),
+            (11, 3),
+            (12, 11),
+            (13, 6),
+            (14, 2),
+            (14, 12),
+            (18, 4),
+            (19, 11),
+            (20, 2),
+            (21, 11),
+            (23, 13),
+            (25, 16),
+            (29, 14),
+            (30, 5),
+            (31, 28),
+            (33, 21),
+            (34, 10),
+        ] {
+            graph.add_edge(u, v);
+        }
+        let result = analyze_graph(&graph).unwrap();
+        let side: BTreeSet<_> = result.partition_b.iter().cloned().collect();
+        let edges = graph
+            .edges()
+            .iter()
+            .filter(|&&(u, v)| side.contains(&u.to_string()) != side.contains(&v.to_string()))
+            .count();
+        let ratio = edges as f64 * (1.0 / side.len() as f64 + 1.0 / (36 - side.len()) as f64);
+        assert!((ratio - 36.0 / 68.0).abs() < 1e-12, "ratio cut {ratio}");
+        let diagnostics = result.cut_diagnostics.unwrap();
+        assert_eq!(diagnostics.origin, CutOrigin::Bridge);
+        assert_eq!(result.tau, 0.0);
+        assert!(diagnostics.spectral_alternative.unwrap().ratio_cut > ratio);
+    }
+
+    #[test]
+    fn exact_bridge_objectives_match_all_one_edge_cuts() {
+        let pairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
+        for mask in 0..64 {
+            for extra in [None, Some((0, 0)), Some((0, 1))] {
+                let mut graph = DiGraph::new();
+                for i in 0..4 {
+                    graph.add_node(i.to_string());
+                }
+                let mut adj = vec![vec![]; 4];
+                for (i, (u, v)) in pairs.into_iter().enumerate() {
+                    if mask & (1 << i) != 0 {
+                        graph.add_edge(u, v);
+                    }
+                }
+                if let Some((u, v)) = extra {
+                    graph.add_edge(u, v);
+                }
+                for &(u, v) in graph.edges() {
+                    if u != v {
+                        adj[u].push(v);
+                        adj[v].push(u);
+                    }
+                }
+                let mut seen = BTreeSet::from([0]);
+                for _ in 0..4 {
+                    let neighbors: Vec<_> =
+                        seen.iter().flat_map(|&u| adj[u].iter().copied()).collect();
+                    seen.extend(neighbors);
+                }
+                if seen.len() != 4 {
+                    continue;
+                }
+                let mut expected = vec![];
+                for subset in 1..15 {
+                    let inside = |u| subset & (1 << u) != 0;
+                    let crossing = graph
+                        .edges()
+                        .iter()
+                        .filter(|&&(u, v)| inside(u) != inside(v))
+                        .count();
+                    if crossing != 1 {
+                        continue;
+                    }
+                    let size = (0..4).filter(|&u| inside(u)).count();
+                    let volume: usize = (0..4).filter(|&u| inside(u)).map(|u| adj[u].len()).sum();
+                    let total: usize = adj.iter().map(Vec::len).sum();
+                    expected.push((
+                        1.0 / size as f64 + 1.0 / (4 - size) as f64,
+                        1.0 / volume.min(total - volume) as f64,
+                    ));
+                }
+                let observed = bridge_cuts(&graph, &adj);
+                assert_eq!(observed.is_none(), expected.is_empty());
+                if let Some((ratio, boundary)) = observed {
+                    let best_r = expected
+                        .iter()
+                        .copied()
+                        .min_by(|a, b| a.partial_cmp(b).unwrap())
+                        .unwrap();
+                    let best_c = expected
+                        .iter()
+                        .map(|&(r, c)| (c, r))
+                        .min_by(|a, b| a.partial_cmp(b).unwrap())
+                        .unwrap();
+                    assert_eq!((ratio.ratio_cut, ratio.conductance), best_r);
+                    assert_eq!((boundary.conductance, boundary.ratio_cut), best_c);
+                    for cut in [ratio, boundary] {
+                        let inside: BTreeSet<_> = cut.partition_b.into_iter().collect();
+                        assert_eq!(
+                            graph
+                                .edges()
+                                .iter()
+                                .filter(|&&(u, v)| inside.contains(&u.to_string())
+                                    != inside.contains(&v.to_string()))
+                                .count(),
+                            1
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn combined_search_direction_recovers_a_cut_missing_from_both_axes() {
         let mut graph = DiGraph::new();
         for i in 0..8 {
@@ -737,7 +989,7 @@ mod partition_regressions {
         let ratio = crossing as f64 * (1.0 / side.len() as f64 + 1.0 / (8 - side.len()) as f64);
         assert!((ratio - 4.0 / 3.0).abs() < 1e-12, "ratio cut {ratio}");
         let diagnostics = result.cut_diagnostics.unwrap();
-        assert_eq!(diagnostics.projection, "sum");
+        assert_eq!(diagnostics.origin, CutOrigin::Spectral("sum"));
         assert!((diagnostics.ratio_cut - ratio).abs() < 1e-12);
         let alternative = diagnostics.conductance_alternative.unwrap();
         assert!(alternative.conductance < diagnostics.conductance);
@@ -755,7 +1007,7 @@ mod partition_regressions {
         graph.add_edge(0, 1);
         graph.add_edge(1, 1);
         let diagnostics = analyze_graph(&graph).unwrap().cut_diagnostics.unwrap();
-        assert_eq!(diagnostics.projection, "primary");
+        assert_eq!(diagnostics.origin, CutOrigin::Spectral("primary"));
         assert_eq!(diagnostics.ratio_cut, 2.0);
         assert_eq!(diagnostics.conductance, 1.0);
         assert!(diagnostics.secondary_direction_residual.is_none());
