@@ -305,7 +305,7 @@ def evaluate_fresh(output):
             if len(graph['nodes'])>frozen['protocol']['max_nodes'] or len(graph['edges'])>frozen['protocol']['max_edges']:
                 row['status']='study_resource_limit';rows.append(row);continue
             row.update(compare_graph(graph,baseline,candidate))
-            row['cut_diagnostics']=reports['candidate']['topology'].get('cut_diagnostics')
+            row['cli_cut_diagnostics']=reports['candidate']['topology'].get('cut_diagnostics')
             if row['components']==1 and row['nodes']>1:
                 positions={p:i for i,p in enumerate(graph['nodes'])}
                 profiles={}
@@ -314,11 +314,19 @@ def evaluate_fresh(output):
                     alternative=diagnostics['conductance_alternative']
                     part=alternative['partition'] if alternative else topology['partition']
                     profiles[name]=core.partition_metrics({positions[p] for p in part},adjacency(graph))
-                row['conductance_profiles']=profiles
+                row['cli_conductance_profiles']=profiles
                 assert profiles['candidate']['conductance']<=profiles['baseline']['conductance']+1e-12
                 metrics=[row[name]['metrics'] for name in ['spectral','hybrid']]
                 origin='bridge' if (metrics[1]['ratio_cut'],metrics[1]['conductance'])<(metrics[0]['ratio_cut'],metrics[0]['conductance']) else 'spectral'
-                assert row['cut_diagnostics']['source']==origin
+                row['canonical_selected_source']=origin
+                cli_before=reports['baseline']['topology']['cut_diagnostics']
+                cli_after=row['cli_cut_diagnostics']
+                cli_origin='bridge' if (cli_after['ratio_cut'],cli_after['conductance'])<(cli_before['ratio_cut'],cli_before['conductance']) else 'spectral'
+                assert cli_after['source']==cli_origin
+                cli_primary=core.partition_metrics({positions[p] for p in reports['candidate']['topology']['partition']},adjacency(graph))
+                assert abs(cli_primary['ratio_cut']-cli_after['ratio_cut'])<1e-10
+                assert abs(cli_primary['conductance']-cli_after['conductance'])<1e-10
+                row['cli_primary_metrics']=cli_primary
             row['overlaps_original_topology']=row['topology_fingerprint'] in original_hashes
             row['duplicate_fresh_primary_topology']=row['topology_fingerprint'] in seen
             row['primary_eligible']=row['preselected_repository_lock'] and row['topology_complete'] and row['components']==1 and row['nodes']>1 and not row['overlaps_original_topology'] and not row['duplicate_fresh_primary_topology']
@@ -344,8 +352,9 @@ def evaluate_fresh(output):
             'snapshot_status_counts':dict(Counter(s['status'] for s in snapshots)),
             'case_status_counts':dict(Counter(r['status'] for r in rows)),
             'old_repository_overlap':0,'all_eligible_locks':summary(all_eligible),'fresh_primary':summary(primary),'cases':rows}
-    result['fresh_primary']['selected_sources']=dict(Counter(r['cut_diagnostics']['source'] for r in primary))
-    result['fresh_primary']['conductance_profile_versus_basic']=dict(Counter(structural_outcome(r['conductance_profiles']['candidate']['conductance'],r['basic']['conductance']['metrics']['conductance']) for r in primary))
+    result['fresh_primary']['canonical_selected_sources']=dict(Counter(r['canonical_selected_source'] for r in primary))
+    result['fresh_primary']['cli_selected_sources']=dict(Counter(r['cli_cut_diagnostics']['source'] for r in primary))
+    result['fresh_primary']['cli_conductance_profile_versus_basic']=dict(Counter(structural_outcome(r['cli_conductance_profiles']['candidate']['conductance'],r['basic']['conductance']['metrics']['conductance']) for r in primary))
     core.save(output/'fresh-evaluation.json',result)
     print(json.dumps({k:v for k,v in result.items() if k!='cases'}),flush=True)
 
