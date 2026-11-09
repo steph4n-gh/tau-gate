@@ -407,6 +407,39 @@ impl Snapshot {
                 ("residual_converged", J::Bool(m.converged)),
                 ("residual", J::Number(m.residual)),
                 ("iterations", J::Number(m.iterations as f64)),
+                (
+                    "cut_diagnostics",
+                    m.cut_diagnostics
+                        .map(|cut| {
+                            object([
+                                ("method", string("four_fixed_ritz_projections_ratio_cut")),
+                                ("projection", string(cut.projection)),
+                                ("ratio_cut", J::Number(cut.ratio_cut)),
+                                ("conductance", J::Number(cut.conductance)),
+                                (
+                                    "secondary_direction_residual",
+                                    cut.secondary_direction_residual
+                                        .map(J::Number)
+                                        .unwrap_or(J::Null),
+                                ),
+                                (
+                                    "conductance_alternative",
+                                    cut.conductance_alternative
+                                        .map(|alternative| {
+                                            object([
+                                                ("partition", strings(alternative.partition_b)),
+                                                ("tau", J::Number(alternative.tau)),
+                                                ("projection", string(alternative.projection)),
+                                                ("ratio_cut", J::Number(alternative.ratio_cut)),
+                                                ("conductance", J::Number(alternative.conductance)),
+                                            ])
+                                        })
+                                        .unwrap_or(J::Null),
+                                ),
+                            ])
+                        })
+                        .unwrap_or(J::Null),
+                ),
                 ("partition", strings(m.partition_b)),
             ]),
             Err(e) => object([("error", string(e.to_string()))]),

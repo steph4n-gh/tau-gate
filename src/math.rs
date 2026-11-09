@@ -5,7 +5,7 @@ use crate::graph_impl::DiGraph;
 pub struct PartitionResult {
     /// Nodes on the smaller side of the selected diagnostic cut.
     pub partition_b: Vec<String>,
-    /// A threshold between the distinct coordinates defining the selected cut.
+    /// A threshold on the selected projection of the Ritz search directions.
     pub tau: f64,
     /// A Rayleigh estimate; residual convergence does not certify the second eigenpair.
     /// Close to 0.0 indicates a severe structural bottleneck.
@@ -13,6 +13,25 @@ pub struct PartitionResult {
     pub converged: bool,
     pub residual: f64,
     pub iterations: usize,
+    /// Absent for the exact component fallback. These are cut diagnostics only.
+    pub cut_diagnostics: Option<CutDiagnostics>,
+}
+
+pub struct CutDiagnostics {
+    pub projection: &'static str,
+    pub ratio_cut: f64,
+    pub conductance: f64,
+    /// The second search direction need not have converged to an eigenvector.
+    pub secondary_direction_residual: Option<f64>,
+    pub conductance_alternative: Option<AlternativeCut>,
+}
+
+pub struct AlternativeCut {
+    pub partition_b: Vec<String>,
+    pub tau: f64,
+    pub projection: &'static str,
+    pub ratio_cut: f64,
+    pub conductance: f64,
 }
 
 /// Estimates a Fiedler vector using a bounded, diagonally preconditioned block
@@ -72,6 +91,7 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
             converged: true,
             residual: 0.0,
             iterations: 0,
+            cut_diagnostics: None,
         });
     }
     let iterations = 5000.min((20_000_000usize / (n + graph.edges().len()).max(1)).max(1));
@@ -80,43 +100,132 @@ pub fn analyze_graph(graph: &DiGraph) -> Result<PartitionResult> {
     let residual = estimate.residual;
     let converged = residual < 1e-9;
     let used = estimate.iterations;
-    let fiedler_vector = estimate.vector;
-
-    let mut ordered: Vec<_> = fiedler_vector.iter().copied().enumerate().collect();
-    ordered.sort_by(|a, b| a.1.total_cmp(&b.1));
-    let cut = sweep_cut(&adj, &ordered).ok_or_else(|| {
-        GateError::Math("No distinct spectral threshold has positive volume".into())
-    })?;
-    let (low, high) = (ordered[cut].1, ordered[cut + 1].1);
-    let midpoint = low + (high - low) / 2.0;
-    let tau = if midpoint < high { midpoint } else { low };
-    let side = if cut < n / 2 {
-        &ordered[..=cut]
-    } else {
-        &ordered[cut + 1..]
-    };
-    Ok(PartitionResult {
-        partition_b: side
+    let secondary_direction_residual = estimate.secondary.as_ref().map(|vector| {
+        let image = multiply(&adj, vector);
+        let value = dot(vector, &image);
+        image
             .iter()
-            .filter_map(|&(i, _)| graph.node_weight(i).cloned())
-            .collect(),
-        tau,
+            .zip(vector)
+            .map(|(av, v)| (av - value * v).powi(2))
+            .sum::<f64>()
+            .sqrt()
+    });
+    let (primary, boundary) = select_cuts(&adj, &estimate.vector, estimate.secondary.as_deref())
+        .ok_or_else(|| {
+            GateError::Math("No distinct spectral threshold has positive volume".into())
+        })?;
+    let alternative = (boundary.quality.conductance < primary.quality.conductance)
+        .then(|| boundary.describe(graph));
+    let selected = primary.describe(graph);
+    Ok(PartitionResult {
+        partition_b: selected.partition_b,
+        tau: selected.tau,
         connectivity_score: fiedler_value,
         converged,
         residual,
         iterations: used,
+        cut_diagnostics: Some(CutDiagnostics {
+            projection: selected.projection,
+            ratio_cut: selected.ratio_cut,
+            conductance: selected.conductance,
+            secondary_direction_residual,
+            conductance_alternative: alternative,
+        }),
     })
 }
 
-// Sweep distinct-coordinate thresholds for the lowest ratio cut.
-// Equal ratio cuts prefer lower conductance, then the first threshold.
-fn sweep_cut(adj: &[Vec<usize>], ordered: &[(usize, f64)]) -> Option<usize> {
+#[derive(Clone, Copy)]
+struct CutQuality {
+    index: usize,
+    ratio_cut: f64,
+    conductance: f64,
+}
+
+struct SelectedCut {
+    ordered: Vec<(usize, f64)>,
+    quality: CutQuality,
+    projection: &'static str,
+}
+
+impl SelectedCut {
+    fn describe(&self, graph: &DiGraph) -> AlternativeCut {
+        let cut = self.quality.index;
+        let (low, high) = (self.ordered[cut].1, self.ordered[cut + 1].1);
+        let midpoint = low + (high - low) / 2.0;
+        let side = if cut < self.ordered.len() / 2 {
+            &self.ordered[..=cut]
+        } else {
+            &self.ordered[cut + 1..]
+        };
+        AlternativeCut {
+            partition_b: side
+                .iter()
+                .filter_map(|&(i, _)| graph.node_weight(i).cloned())
+                .collect(),
+            tau: if midpoint < high { midpoint } else { low },
+            projection: self.projection,
+            ratio_cut: self.quality.ratio_cut,
+            conductance: self.quality.conductance,
+        }
+    }
+}
+
+fn select_cuts(
+    adj: &[Vec<usize>],
+    primary: &[f64],
+    secondary: Option<&[f64]>,
+) -> Option<(SelectedCut, SelectedCut)> {
+    let mut ratio: Option<SelectedCut> = None;
+    let mut boundary: Option<SelectedCut> = None;
+    for (projection, a, b) in [
+        ("primary", 1.0, 0.0),
+        ("secondary", 0.0, 1.0),
+        ("sum", 1.0, 1.0),
+        ("difference", 1.0, -1.0),
+    ] {
+        if b != 0.0 && secondary.is_none() {
+            continue;
+        }
+        let mut ordered: Vec<_> = primary
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| (i, a * x + b * secondary.map_or(0.0, |y| y[i])))
+            .collect();
+        ordered.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let Some((r, c)) = sweep_cuts(adj, &ordered) else {
+            continue;
+        };
+        if ratio.as_ref().is_none_or(|old| {
+            (r.ratio_cut, r.conductance) < (old.quality.ratio_cut, old.quality.conductance)
+        }) {
+            ratio = Some(SelectedCut {
+                ordered: ordered.clone(),
+                quality: r,
+                projection,
+            });
+        }
+        if boundary.as_ref().is_none_or(|old| {
+            (c.conductance, c.ratio_cut) < (old.quality.conductance, old.quality.ratio_cut)
+        }) {
+            boundary = Some(SelectedCut {
+                ordered,
+                quality: c,
+                projection,
+            });
+        }
+    }
+    ratio.zip(boundary)
+}
+
+// One pass measures every distinct-coordinate threshold under both objectives.
+fn sweep_cuts(adj: &[Vec<usize>], ordered: &[(usize, f64)]) -> Option<(CutQuality, CutQuality)> {
     let n = adj.len();
     let total_volume: usize = adj.iter().map(Vec::len).sum();
     let mut inside = vec![false; n];
     let mut cut_edges = 0;
     let mut volume = 0;
-    let mut best: Option<(usize, f64, f64)> = None;
+    let mut ratio: Option<CutQuality> = None;
+    let mut boundary: Option<CutQuality> = None;
     for (index, &(u, value)) in ordered.iter().take(n - 1).enumerate() {
         cut_edges += adj[u].len();
         for &v in &adj[u] {
@@ -134,22 +243,32 @@ fn sweep_cut(adj: &[Vec<usize>], ordered: &[(usize, f64)]) -> Option<usize> {
             continue;
         }
         let size = index + 1;
-        let ratio_cut = cut_edges as f64 * (1.0 / size as f64 + 1.0 / (n - size) as f64);
-        let conductance = cut_edges as f64 / denominator as f64;
-        let better = match best {
-            None => true,
-            Some((_, ratio, boundary)) => {
-                ratio_cut < ratio || (ratio_cut == ratio && conductance < boundary)
-            }
+        let quality = CutQuality {
+            index,
+            ratio_cut: cut_edges as f64 * (1.0 / size as f64 + 1.0 / (n - size) as f64),
+            conductance: cut_edges as f64 / denominator as f64,
         };
-        if better {
-            best = Some((index, ratio_cut, conductance));
+        if ratio
+            .is_none_or(|r| (quality.ratio_cut, quality.conductance) < (r.ratio_cut, r.conductance))
+        {
+            ratio = Some(quality);
+        }
+        if boundary
+            .is_none_or(|c| (quality.conductance, quality.ratio_cut) < (c.conductance, c.ratio_cut))
+        {
+            boundary = Some(quality);
         }
     }
-    best.map(|(index, _, _)| index)
+    ratio.zip(boundary)
+}
+
+#[cfg(test)]
+fn sweep_cut(adj: &[Vec<usize>], ordered: &[(usize, f64)]) -> Option<usize> {
+    sweep_cuts(adj, ordered).map(|(r, _)| r.index)
 }
 
 struct Estimate {
+    secondary: Option<Vec<f64>>,
     vector: Vec<f64>,
     value: f64,
     residual: f64,
@@ -275,6 +394,7 @@ fn solve(adj: &[Vec<usize>], degrees: &[f64], limit: usize) -> Estimate {
         used = step + 1;
     }
     let vector = vectors.remove(0);
+    let secondary = vectors.pop();
     let image = multiply(adj, &vector);
     let value = dot(&vector, &image);
     let residual = image
@@ -284,6 +404,7 @@ fn solve(adj: &[Vec<usize>], degrees: &[f64], limit: usize) -> Estimate {
         .sum::<f64>()
         .sqrt();
     Estimate {
+        secondary,
         vector,
         value,
         residual,
@@ -582,6 +703,63 @@ mod partition_regressions {
             ratio_cut <= 1.75 + 1e-12,
             "selected ratio cut {ratio_cut}; a spectral threshold attains 1.75"
         );
+    }
+
+    #[test]
+    fn combined_search_direction_recovers_a_cut_missing_from_both_axes() {
+        let mut graph = DiGraph::new();
+        for i in 0..8 {
+            graph.add_node(i.to_string());
+        }
+        for (u, v) in [
+            (1, 0),
+            (2, 0),
+            (3, 2),
+            (4, 0),
+            (5, 3),
+            (6, 5),
+            (7, 0),
+            (2, 0),
+            (2, 1),
+            (6, 4),
+            (7, 4),
+            (7, 6),
+        ] {
+            graph.add_edge(u, v);
+        }
+        let result = analyze_graph(&graph).unwrap();
+        let side: BTreeSet<_> = result.partition_b.iter().cloned().collect();
+        let crossing = graph
+            .edges()
+            .iter()
+            .filter(|&&(u, v)| side.contains(&u.to_string()) != side.contains(&v.to_string()))
+            .count();
+        let ratio = crossing as f64 * (1.0 / side.len() as f64 + 1.0 / (8 - side.len()) as f64);
+        assert!((ratio - 4.0 / 3.0).abs() < 1e-12, "ratio cut {ratio}");
+        let diagnostics = result.cut_diagnostics.unwrap();
+        assert_eq!(diagnostics.projection, "sum");
+        assert!((diagnostics.ratio_cut - ratio).abs() < 1e-12);
+        let alternative = diagnostics.conductance_alternative.unwrap();
+        assert!(alternative.conductance < diagnostics.conductance);
+        assert!(alternative.ratio_cut > diagnostics.ratio_cut);
+        assert!(diagnostics.secondary_direction_residual.is_some());
+    }
+
+    #[test]
+    fn one_direction_and_component_fallback_keep_their_scope() {
+        let mut graph = DiGraph::new();
+        graph.add_node("a".into());
+        assert!(analyze_graph(&graph).unwrap().cut_diagnostics.is_none());
+        graph.add_node("b".into());
+        assert!(analyze_graph(&graph).unwrap().cut_diagnostics.is_none());
+        graph.add_edge(0, 1);
+        graph.add_edge(1, 1);
+        let diagnostics = analyze_graph(&graph).unwrap().cut_diagnostics.unwrap();
+        assert_eq!(diagnostics.projection, "primary");
+        assert_eq!(diagnostics.ratio_cut, 2.0);
+        assert_eq!(diagnostics.conductance, 1.0);
+        assert!(diagnostics.secondary_direction_residual.is_none());
+        assert!(diagnostics.conductance_alternative.is_none());
     }
 
     #[test]

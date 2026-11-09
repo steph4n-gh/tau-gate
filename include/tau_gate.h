@@ -5,7 +5,10 @@
 extern "C" {
 #endif
 /* The first four fields retain the v3 prefix. Rebuild bindings to access appended fields.
- * Results are estimates, not certified eigenpairs or a validated VRAM pruning policy. */
+ * Results are estimates, not certified eigenpairs or a validated VRAM pruning policy.
+ * nodes is the primary ratio-cut partition. tau is a threshold on its selected
+ * Ritz projection; the audit JSON exposes projection and conductance alternatives.
+ * This C layout is unchanged and does not expose those additional diagnostics. */
 typedef struct {
     char **nodes;
     size_t nodes_count;
