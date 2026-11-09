@@ -61,6 +61,8 @@ All 152 actual CLI audits retained the same exit codes and every report field ou
 
 The seven-node rounding regression failed under the old implementation at ratio cut `2.33333`, versus a threshold attaining `1.75`, and passes with the sweep. Additional tests cover equal/constant coordinates and independently enumerated parallel-edge cuts. All existing math tests, including connected-leaf isolation and bounded nonconvergence, pass. The release Rust suite passes 135 tests; formatting and Clippy pass. CLI/FFI fixtures and Python helper checks are retained in the study logs.
 
+Final narrative review found a serialization-only metadata error: a summary-loop variable shadowed the selected objective, labeling three frozen measurement headers `conductance`. Their native algorithm, threshold checks and results used **ratio cut**, as the source and freeze records establish. The frozen files and hashes are preserved; `objective-metadata-erratum.json` identifies the incorrect labels and correct method, and `results.json` carries the erratum. The future writer is fixed. A separate fresh 36-case serialization check writes `ratio_cut` correctly and reproduces every non-timing result. No scientific count or production code changed for this correction.
+
 The solver source region is byte-identical to the frozen baseline. The current parser/evidence/approval paths are unchanged. Local validation does not establish release qualification, host installation agreement, actual execution, or faster/more accurate human reviews. Native timings are preserved as local observations; no speedup claim is made.
 
 ## Evidence and reproduction

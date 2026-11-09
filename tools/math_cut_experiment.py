@@ -219,14 +219,14 @@ def evaluate(study, output, library, split, repeats, objective):
               'complete_connected_holdout':[r for r in rows if r['topology_complete'] and r['components']==1 and r['nodes']>1 and r['split']=='holdout']}
     for name, selected in groups.items():
         summary[name]={'cases':len(selected)}
-        for objective in ['ratio_cut','conductance']:
+        for metric in ['ratio_cut','conductance']:
             record={}
             for side in ['before','after']:
-                record[side]=dict(Counter(structural_outcome(r[side]['metrics'][objective] if r[side]['metrics'] else None,
-                        r['basic'][objective]['metrics'][objective] if r['basic'][objective] else None) for r in selected))
-            record['candidate_vs_shipped']=dict(Counter(structural_outcome(r['after']['metrics'][objective] if r['after']['metrics'] else None,
-                    r['before']['metrics'][objective] if r['before']['metrics'] else None) for r in selected))
-            summary[name][objective]=record
+                record[side]=dict(Counter(structural_outcome(r[side]['metrics'][metric] if r[side]['metrics'] else None,
+                        r['basic'][metric]['metrics'][metric] if r['basic'][metric] else None) for r in selected))
+            record['candidate_vs_shipped']=dict(Counter(structural_outcome(r['after']['metrics'][metric] if r['after']['metrics'] else None,
+                    r['before']['metrics'][metric] if r['before']['metrics'] else None) for r in selected))
+            summary[name][metric]=record
     core.save(output/(split+'-evaluation.json'),{'scope':split,'before_library_sha256':baseline.sha256,
               'after_library_sha256':candidate.sha256,'repeats':repeats,'objective':objective,'summary':summary,'cases':rows})
     print(json.dumps(summary),flush=True)
@@ -311,6 +311,12 @@ def report(output):
     evaluation=read(output/'all-evaluation.json')
     frozen=read(output/'frozen-method.json')
     assert evaluation['after_library_sha256']==frozen['library_sha256']
+    erratum=None
+    if evaluation.get('objective')!=frozen['objective']:
+        erratum=read(output/'objective-metadata-erratum.json')
+        for name,item in erratum['files'].items():
+            assert core.digest((output/name).read_bytes())==item['sha256']
+            assert item['actual_objective']==frozen['objective']
     assert len(evaluation['cases'])==152
     primary=[c for c in evaluation['cases'] if c['topology_complete'] and c['components']==1 and c['nodes']>1]
     tradeoffs=[];remaining=[]
@@ -324,7 +330,7 @@ def report(output):
     audit=read(output/'audit-replay.json');historical=read(output/'historical-value.json')
     assert len(audit['cases'])==152
     assert all(c['non_math_report_unchanged'] and c['connectivity_diagnostics_unchanged'] for c in audit['cases'])
-    result={'method':frozen,'summary':evaluation['summary'],'conductance_tradeoffs':tradeoffs,
+    result={'method':frozen,'measurement_metadata_erratum':erratum,'summary':evaluation['summary'],'conductance_tradeoffs':tradeoffs,
             'remaining_ratio_losses':remaining,'unchanged_non_math_audits':len(audit['cases']),
             'historical_summary':historical['summary'],
             'limits':['Fixed repo split on an already studied cohort; method chosen using development cases before new holdout outcomes',
