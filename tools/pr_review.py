@@ -310,11 +310,15 @@ def review_view(report, output):
         for label, side in (("base", "before"), ("head", "after")):
             item = change.get(side)
             route = typed_route(core.get(label, {}), change.get(side + "_introducer_path"))
+            verified_archive = item.get("verified_artifact_sha512") if item else None
+            if (verified_archive is None and item and item.get("state") == "qualified"
+                    and (item.get("facts") or {}).get("kind") == "artifact"):
+                verified_archive = item["facts"].get("artifact_sha512")
             row[side] = {"state": item.get("state") if item else "absent",
                          "reason": item.get("reason") if item else None,
                          "facts": item.get("facts") if item else None,
                          "fingerprint": item.get("approval_fingerprint") if item else None,
-                         "verified_artifact_sha512": item.get("verified_artifact_sha512") if item else None,
+                         "verified_artifact_sha512": verified_archive,
                          "commands": command_text(output, label, item),
                          "route": route}
         rows.append(row)

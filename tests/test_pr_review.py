@@ -17,7 +17,7 @@ BINARY = Path(os.environ.get("TAU_GATE", ROOT / "target/release/tau-gate")).reso
 WRAPPER = ROOT / "tools/pr_review.py"
 sys.path.insert(0, str(ROOT / "tools"))
 from npm_evidence import collect_evidence
-from pr_review import GitObjects, approval_request
+from pr_review import GitObjects, approval_request, review_view, summary
 
 
 def json_data(value):
@@ -203,6 +203,24 @@ class PullRequestReview(unittest.TestCase):
         self.assertIn("`root` --dependencies--> `node_modules/pkg`", text)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", text)
         self.assertNotIn("<script>", text)
+
+    def test_older_checker_digest_field_uses_qualified_archive_facts(self):
+        archive = self.archive({"name": "pkg", "version": "1.0.0", "scripts": {"install": "echo changed"}})
+        digest = hashlib.sha512(archive).digest()
+        (self.cache / (digest.hex() + ".tgz")).write_bytes(archive)
+        self.lock["packages"]["node_modules/pkg"]["integrity"] = "sha512-" + base64.b64encode(digest).decode()
+        self.write("package-lock.json", json_data(self.lock))
+        report, output = self.run_review(head=self.commit("change archive bytes"), expected=1)
+        for change in report["core"]["execution_evidence_changes"]:
+            for side in ("before", "after"):
+                if change.get(side):
+                    change[side].pop("verified_artifact_sha512", None)
+        report["review"] = review_view(report, output)
+        after = next(row["after"] for row in report["review"]["execution_changes"]
+                     if row["path"] == "node_modules/pkg")
+        self.assertEqual(after["verified_artifact_sha512"], digest.hex())
+        self.assertIn(f"verified archive SHA-512 `{digest.hex()}`", summary(report))
+        self.assertNotIn("verified archive SHA-512 `None`", summary(report))
 
     def test_one_trusted_action_approves_exact_head_and_stale_head_blocks(self):
         store = self.root / "trusted-approval-store"
