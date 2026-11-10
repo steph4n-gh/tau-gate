@@ -465,6 +465,7 @@ def summary(report):
             lines.append(f"Exact approval subject `{request['subject_sha256']}` was recorded by the trusted store.")
         else:
             lines.append(f"Exact approval subject: `{request['subject_sha256']}`. A trusted maintainer can record this subject with `--approval-store` and `--approve-subject`; rerun the exact head afterward.")
+            lines.append(f"GitHub pilot approval comment: `tau-gate approve {request['subject_sha256']}` from a different maintainer with write access.")
         lines.append("")
     for label in ("base", "head"):
         if report[label] is not None:
@@ -632,6 +633,9 @@ def review(args):
             "pr_review_sha256": sha256(read_limited(Path(__file__))),
             "npm_evidence_sha256": sha256(read_limited(Path(__file__).with_name("npm_evidence.py"))),
         }
+        github_bridge = Path(__file__).with_name("github_pr_approval.py")
+        if github_bridge.is_file():
+            report["trusted_tools"]["github_pr_approval_sha256"] = sha256(read_limited(github_bridge))
         for label in ("base", "head"):
             stage = label + "_revision"
             snapshots[label] = Snapshot(git.commit(getattr(args, label)), project)

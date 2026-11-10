@@ -102,7 +102,7 @@ The separate [PR helper](docs/pr-review.md) captures lockfiles, source manifests
 
 The helper writes deterministic `report.json` and `summary.md` into an explicit output directory outside the repository. It preserves allowed, blocked, and incomplete outcomes. [The CI example](docs/examples/npm-pr-review.yml) uses read-only permissions and trusted base tools. It requires a supplied checker binary with a pinned hash and a trusted workflow configuration. It is an example for npm applications, not an active npm job in this Rust repository.
 
-The current development helper also presents exact qualified command text and typed dependency routes, and supports a single trusted approval action through an external store. The [local product milestone](docs/qualification/product-pr-review.md) verifies an exact real update and the five-run tar memory gate. A hosted approval store, new prospective PR qualification, and outside-maintainer study remain required before a product release.
+The current development helper also presents exact qualified command text and typed dependency routes, and supports a single trusted approval action through an external store. A GitHub comment-backed approval workflow is available as a [pilot example](docs/pr-review.md#use-a-github-maintainer-comment-as-the-approval-record); it still needs a live pilot. The [local product milestone](docs/qualification/product-pr-review.md) verifies an exact real update and the five-run tar memory gate. New prospective PR qualification and an outside-maintainer study remain required before a product release.
 
 ## Topology and native interface
 
