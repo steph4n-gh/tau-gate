@@ -201,14 +201,14 @@ def snapshot_canaries(canaries):
     return {path.name: path.read_text() for path in sorted(canaries.iterdir())}
 
 
-def native_run(case, kind, project, canaries, env, output, npm_cmd, trusted_policy):
+def native_run(case, kind, project, canaries, env, output, npm_cmd, allow_scripts):
     head = json.loads((project / "package.json").read_bytes())
     if case.self_edit:
         head["allowScripts"] = native_policy(kind, Case("head", "", version=case.version, fresh=True), env["npm_config_registry"])
     else:
-        head["allowScripts"] = trusted_policy
+        head["allowScripts"] = allow_scripts
     write_json(output / "proposed-package.json", head)
-    head["allowScripts"] = trusted_policy
+    head["allowScripts"] = allow_scripts
     write_json(project / "package.json", head)
     write_json(output / "effective-package.json", head)
     before = snapshot_canaries(canaries)
@@ -224,7 +224,7 @@ def native_run(case, kind, project, canaries, env, output, npm_cmd, trusted_poli
         path.unlink()
     outcome = "executed" if markers else "blocked" if receipt["returncode"] else "no_execution"
     result = {"outcome": outcome, "exit_code": receipt["returncode"], "markers": markers,
-              "trusted_policy": trusted_policy, "head_policy_replaced": case.self_edit,
+              "head_policy_replaced": case.self_edit,
               "installed_manifest_sha256": installed_hash,
               "installed_manifest_matches_fixture": installed_hash == expected_hash if receipt["returncode"] == 0 else None,
               "pre_run_canaries": before, "command_receipt": "npm-ci.json"}
@@ -362,8 +362,8 @@ def run_comparison(output, npm, node, binary):
                           "acquisition_error": error, "head_policy_replaced": case.self_edit}
             native = {}
             for kind in POLICIES:
-                trusted = native_policy(kind, case, base_url) if case.fresh else json.loads((baselines[case.baseline]["directory"] / (kind + "-policy.json")).read_bytes())
-                native[kind] = native_run(case, kind, project, canaries, env, directory / kind, npm_cmd, trusted)
+                allow_scripts = native_policy(kind, case, base_url) if case.fresh else json.loads((baselines[case.baseline]["directory"] / (kind + "-policy.json")).read_bytes())
+                native[kind] = native_run(case, kind, project, canaries, env, directory / kind, npm_cmd, allow_scripts)
             (project / "package.json").write_bytes(canonical_manifest)
             expected = {"exact_version": case.expected_version, "exact_source_url": case.expected_source, "tau_gate": case.expected_tau}
             observed = {kind: value["outcome"] for kind, value in native.items()} | {"tau_gate": tau_result["outcome"]}
