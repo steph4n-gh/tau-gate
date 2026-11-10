@@ -12,8 +12,8 @@ import sys
 import time
 import urllib.parse
 
-import math_update_study
 import npm_evidence
+import npm_repo_experiment
 import qualification as q
 import qualification_oracle as oracle
 
@@ -86,7 +86,7 @@ def history(repository, commit, lockfile, receipt):
     if receipt.exists():
         return q.load(receipt)
     query = urllib.parse.urlencode({"sha": commit, "path": lockfile, "per_page": 3})
-    value = math_update_study.gh(f"repos/{repository}/commits?{query}")
+    value = npm_repo_experiment.gh(f"repos/{repository}/commits?{query}")
     frozen(receipt, value)
     return value
 

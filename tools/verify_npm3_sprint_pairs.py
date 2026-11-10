@@ -50,7 +50,7 @@ def main():
         return [{"sha": head, "parents": [{"sha": base}], "html_url": "https://github.com/" + repo + "/commit/" + head,
                  "commit": {"committer": {"date": f"2026-11-{9-number:02d}T00:00:00Z"}}} for number, (head, base) in enumerate(histories[repo])]
     case_output = output / "study"
-    with patch.object(sprint.math_update_study, "gh", github), patch.object(q, "raw_source", lambda url: raw[url]), contextlib.redirect_stdout(io.StringIO()):
+    with patch.object(sprint.npm_repo_experiment, "gh", github), patch.object(q, "raw_source", lambda url: raw[url]), contextlib.redirect_stdout(io.StringIO()):
         sprint.freeze(SimpleNamespace(output=case_output, cohort=output / "cohort.json", snapshots=output / "snapshots.json", count=2))
         selection = q.load(case_output / "selection.json")
         assert [a["status"] for a in selection["attempts"]] == ["non3", "input_unavailable_or_invalid", "npm3_eligible", "npm3_eligible"]
