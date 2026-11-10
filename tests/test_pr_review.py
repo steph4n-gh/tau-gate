@@ -329,6 +329,28 @@ class PullRequestReview(unittest.TestCase):
         incomplete, _ = self.run_review(head=head, expected=2, extra=("--approval-store", str(store)))
         self.assertNotIn("approval_request", incomplete)
 
+    def test_missing_integrity_names_package_and_next_action(self):
+        self.lock["packages"]["node_modules/pkg"].pop("integrity")
+        self.write("package-lock.json", json_data(self.lock))
+        report, output = self.run_review(head=self.commit("missing integrity"), expected=2)
+        error = report["errors"][0]
+        self.assertEqual(error["stage"], "head_evidence")
+        self.assertIn("node_modules/pkg", error["message"])
+        self.assertIn("canonical SHA512", error["next_action"])
+        text = (output / "summary.md").read_text()
+        self.assertIn("node_modules/pkg", text)
+        self.assertIn("Next: Restore a lock entry", text)
+
+    def test_unknown_evidence_names_each_package_in_summary(self):
+        core = {"base": {"execution_evidence": [
+            {"path": "node_modules/unknown", "state": "missing", "reason": "missing locator for locked instance"}]},
+            "head": {"execution_evidence": []}, "policy": {}}
+        report = {"outcome": "incomplete", "base": None, "head": None, "policy": None,
+                  "source_approval": None, "core": core, "errors": []}
+        report["review"] = review_view(report, self.root)
+        self.assertIn("Supply the original verified package evidence", report["review"]["unknowns"][0]["next_action"])
+        self.assertIn("base `node_modules/unknown`: missing", summary(report))
+
     def test_omitted_execution_change_cannot_receive_one_action_approval(self):
         report = {"core": {"status": "complete", "policy": {"outcome": "blocked", "issues": [],
                              "unapproved_execution_candidates": [{"path": "node_modules/pkg", "fingerprint": "a" * 64}] }},

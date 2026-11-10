@@ -319,6 +319,31 @@ def command_text(output, label, evidence):
     return {event: scripts[event] for event in sorted(observed["lifecycle"])}
 
 
+def next_action(reason):
+    message = str(reason or "").lower()
+    if "sha512 sri mismatch" in message:
+        return "Do not use these archive bytes. Resolve the lock/archive mismatch before rerunning."
+    if "sha512 sri" in message:
+        return "Restore a lock entry with canonical SHA512 integrity for the original archive, then rerun; otherwise review this package manually."
+    if "download requires https registry.npmjs.org" in message or "artifact redirects are unsupported" in message:
+        return "Have the repository owner supply the exact SHA512-bound archive through a trusted offline cache, then rerun."
+    if "artifact acquisition failed" in message:
+        return "Retry acquisition of the same lock-bound archive or provide it through a trusted offline cache."
+    if "unsupported artifact source" in message:
+        return "Review this source manually or replace it with a supported archive and canonical SHA512 lock entry."
+    if "compressed limit" in message or "decompressed limit" in message or "tar exceeds 10000 entries" in message:
+        return "Review this archive manually; it exceeds the supported inspection bounds."
+    if "nonportable tar path" in message or "pax" in message or "unsupported tar" in message:
+        return "Review the archive manually or obtain a package with a supported portable tar layout."
+    if "manifest" in message and ("does not match" in message or "differs" in message):
+        return "Resolve the lockfile/manifest disagreement from the original sources, then rerun."
+    if "missing locator" in message or "bundle parent lacks qualified" in message:
+        return "Supply the original verified package evidence and rerun; review manually until it is available."
+    if "source approval" in message or "approval file" in message:
+        return "Ask a trusted administrator to repair the base policy, then rerun this head."
+    return "Resolve this exact input or evidence gap and rerun this head; use manual review until then."
+
+
 def review_view(report, output):
     core = report.get("core") or {}
     changes = core.get("execution_evidence_changes", [])
@@ -353,7 +378,7 @@ def review_view(report, output):
         for item in core.get(label, {}).get("execution_evidence", []):
             if item.get("state") != "qualified":
                 unknowns.append({"side": label, "path": item.get("path"), "state": item.get("state"),
-                                 "reason": item.get("reason")})
+                                 "reason": item.get("reason"), "next_action": next_action(item.get("reason"))})
     return {"execution_changes": rows, "remaining_execution_changes": len(changes) - len(rows),
             "unknowns": unknowns}
 
@@ -590,15 +615,11 @@ def summary(report):
     for candidate in policy.get("unapproved_execution_candidates", []):
         lines.append(f"- Unapproved `{markdown_text(candidate['path'] or '<root>')}` fingerprint `{candidate['fingerprint']}`.")
     if unknowns:
-        counts = {}
-        for item in unknowns:
-            key = (item["side"], item["state"], json.dumps(item["reason"], sort_keys=True, ensure_ascii=False))
-            counts[key] = counts.get(key, 0) + 1
-        lines.extend(["", "## Unknown evidence", ""])
-        for (side, state, reason), count in sorted(counts.items(), key=lambda entry: (-entry[1], entry[0]))[:12]:
-            lines.append(f"- {count} {side} package sides: {markdown_text(state)}; {markdown_text(reason)}.")
-        if len(counts) > 12:
-            lines.append(f"- {len(counts) - 12} further reason groups are in `report.json`.")
+        lines.extend(["", "## Evidence gaps", ""])
+        for item in unknowns[:20]:
+            lines.append(f"- {item['side']} `{markdown_text(item['path'] or '<root>')}`: {markdown_text(item['state'])}; {markdown_text(item['reason'])}. Next: {markdown_text(item['next_action'])}")
+        if len(unknowns) > 20:
+            lines.append(f"- {len(unknowns) - 20} more package sides and their next actions are in `report.json`.")
     reasons = list(report["errors"])
     for label in ("base", "head"):
         snapshot = core.get(label, {})
@@ -616,10 +637,10 @@ def summary(report):
     if "review_input_issue" in policy:
         reasons.append({"stage": "policy", "message": policy["review_input_issue"]})
     if reasons:
-        lines.extend(["", "Incomplete input reasons:"])
+        lines.extend(["", "## Input and policy gaps", ""])
         for reason in reasons:
             text = reason["message"] if isinstance(reason["message"], str) else json.dumps(reason["message"], sort_keys=True)
-            lines.append(f"- {reason['stage']}: {markdown_text(text)}")
+            lines.append(f"- {reason['stage']}: {markdown_text(text)}. Next: {markdown_text(next_action(text))}")
     lines.extend(["", "Artifact integrity binds bytes to the lock. Source snapshots retain caller trust. This report does not prove scripts safe or predict host installation selection.", ""])
     return "\n".join(lines)
 
@@ -765,7 +786,7 @@ def review(args):
         message = str(exc)
         for original, replacement in replacements:
             message = message.replace(original, replacement)
-        report["errors"].append({"stage": stage, "message": message})
+        report["errors"].append({"stage": stage, "message": message, "next_action": next_action(message)})
     for label, snapshot in snapshots.items():
         report[label] = snapshot.report()
     if output is not None:

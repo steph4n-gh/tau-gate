@@ -700,42 +700,45 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
     archives = set()
     budget = WorkBudget()
     for path, record in sorted(lock["packages"].items()):
-        if record.get("link", False):
-            continue
-        if record.get("inBundle") is True and "resolved" not in record and "integrity" not in record:
-            continue
-        if is_registry_path(path):
-            archive_source(record.get("resolved"))
-            digest = sri_digest(record.get("integrity"))
-            cache_name = digest.hex() + ".tgz"
-            if archive_cache is not None:
-                archive = read_limited(confined_file(archive_cache, cache_name), budget=budget)
+        try:
+            if record.get("link", False):
+                continue
+            if record.get("inBundle") is True and "resolved" not in record and "integrity" not in record:
+                continue
+            if is_registry_path(path):
+                archive_source(record.get("resolved"))
+                digest = sri_digest(record.get("integrity"))
+                cache_name = digest.hex() + ".tgz"
+                if archive_cache is not None:
+                    archive = read_limited(confined_file(archive_cache, cache_name), budget=budget)
+                else:
+                    archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback, budget=budget)
+                data, manifest, _, _ = archive_facts(archive, record.get("integrity"), budget=budget)
+                check_identity(path, record, manifest)
+                relative = "artifacts/" + sha256(archive) + ".tgz"
+                if relative not in archives:
+                    destination = output / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(archive)
+                    archives.add(relative)
+                entries.append({"path": path, "artifact": relative})
             else:
-                archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback, budget=budget)
-            data, manifest, _, _ = archive_facts(archive, record.get("integrity"), budget=budget)
-            check_identity(path, record, manifest)
-            relative = "artifacts/" + sha256(archive) + ".tgz"
-            if relative not in archives:
+                relative_source = (path + "/" if path else "") + "package.json"
+                source = confined_file(project_dir, relative_source)
+                data = read_limited(source, MAX_MANIFEST, budget=budget)
+                check_identity(path, record, strict_json(data))
+                relative = "projects/" + (path + "/" if path else "") + "package.json"
                 destination = output / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes(archive)
-                archives.add(relative)
-            entries.append({"path": path, "artifact": relative})
-        else:
-            relative_source = (path + "/" if path else "") + "package.json"
-            source = confined_file(project_dir, relative_source)
-            data = read_limited(source, MAX_MANIFEST, budget=budget)
-            check_identity(path, record, strict_json(data))
-            relative = "projects/" + (path + "/" if path else "") + "package.json"
-            destination = output / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(data)
-            binding = source.parent / "binding.gyp"
-            if binding.is_symlink():
-                raise EvidenceError("symlink binding.gyp source")
-            if binding.exists():
-                (destination.parent / "binding.gyp").write_bytes(read_limited(binding, budget=budget))
-            entries.append({"path": path, "project_manifest": relative})
+                destination.write_bytes(data)
+                binding = source.parent / "binding.gyp"
+                if binding.is_symlink():
+                    raise EvidenceError("symlink binding.gyp source")
+                if binding.exists():
+                    (destination.parent / "binding.gyp").write_bytes(read_limited(binding, budget=budget))
+                entries.append({"path": path, "project_manifest": relative})
+        except (EvidenceError, OSError) as exc:
+            raise EvidenceError(f"locked instance {path or '<root>'!r}: {exc}") from exc
     index_path = output / "index.json"
     index_path.write_bytes(json_bytes({"schema_version": 1, "lock_sha256": sha256(lock_bytes), "packages": entries}))
     validate_bundle(lock_path, index_path, confined_file(project_dir, "package.json"))
