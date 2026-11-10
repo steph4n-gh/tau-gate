@@ -42,7 +42,7 @@ mod archive {
         )?;
         Ok(out)
     }
-    pub(super) fn tar(bytes: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
+    pub(super) fn tar(bytes: &[u8]) -> Result<(Vec<u8>, Option<String>), &'static str> {
         let mut tar = TarInspector::new();
         tar.write(bytes, &mut Budget::new())?;
         tar.finish()

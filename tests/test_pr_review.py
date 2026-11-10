@@ -17,7 +17,7 @@ BINARY = Path(os.environ.get("TAU_GATE", ROOT / "target/release/tau-gate")).reso
 WRAPPER = ROOT / "tools/pr_review.py"
 sys.path.insert(0, str(ROOT / "tools"))
 from npm_evidence import collect_evidence
-from pr_review import GitObjects
+from pr_review import GitObjects, approval_request
 
 
 def json_data(value):
@@ -181,6 +181,116 @@ class PullRequestReview(unittest.TestCase):
         self.assertIn(candidates[0]["fingerprint"], text)
         self.assertIn("lifecycle", text)
         self.assertIn("Introducer", text)
+        self.assertIn("Current `prepare` command", text)
+        self.assertIn("Proposed `prepare` command", text)
+        self.assertIn("echo changed-root-canary &gt; CANARY_EXECUTED", text)
+        self.assertEqual(report["review"]["execution_changes"][0]["after"]["commands"]["prepare"],
+                         "echo changed-root-canary > CANARY_EXECUTED")
+
+    def test_proposed_artifact_command_uses_verified_bytes_and_escaped_view(self):
+        command = "node -e \"console.log('<script>alert(1)</script>')\""
+        archive = self.archive({"name": "pkg", "version": "1.0.0", "scripts": {"install": command}})
+        digest = hashlib.sha512(archive).digest()
+        (self.cache / (digest.hex() + ".tgz")).write_bytes(archive)
+        self.lock["packages"]["node_modules/pkg"]["integrity"] = "sha512-" + base64.b64encode(digest).decode()
+        self.write("package-lock.json", json_data(self.lock))
+        report, output = self.run_review(head=self.commit("change exact install command"), expected=1)
+        rows = {row["path"]: row for row in report["review"]["execution_changes"]}
+        row = rows["node_modules/pkg"]
+        self.assertEqual(row["after"]["commands"], {"install": command})
+        self.assertEqual(row["after"]["route"], [{"from": "root", "to": "node_modules/pkg", "kinds": ["dependencies"]}])
+        text = (output / "summary.md").read_text()
+        self.assertIn("`root` --dependencies--> `node_modules/pkg`", text)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", text)
+        self.assertNotIn("<script>", text)
+
+    def test_one_trusted_action_approves_exact_head_and_stale_head_blocks(self):
+        store = self.root / "trusted-approval-store"
+        store.mkdir()
+        self.manifest["scripts"]["prepare"] = "echo reviewed-head > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        head = self.commit("proposed lifecycle change")
+        before = self.git("status", "--porcelain")
+        blocked, _ = self.run_review(head=head, expected=1, extra=("--approval-store", str(store)))
+        request = blocked["approval_request"]
+        self.assertEqual(request["head_commit"], head)
+        self.assertEqual([item["path"] for item in request["approvals"]], [""])
+        self.assertEqual(request["source_tree_sha256"], self.source_digest(head))
+        self.sequence += 1
+        output = self.root / f"approval-action-{self.sequence}"
+        command = [sys.executable, str(WRAPPER), "--repo", str(self.repo), "--base", self.base,
+                   "--head", head, "--project", "apps/example", "--approvals", "apps/example/.tau-gate-approvals.json",
+                   "--source-approvals", "apps/example/.tau-gate-source-approvals.json",
+                   "--tau-gate", str(BINARY), "--archive-cache", str(self.cache), "--output", str(output),
+                   "--approval-store", str(store), "--approve-subject", request["subject_sha256"]]
+        action = subprocess.run(command, capture_output=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        self.assertEqual(action.returncode, 0, action.stderr)
+        self.assertTrue(json.loads(action.stdout)["approval_recorded"])
+        self.assertEqual(json.loads((store / (request["subject_sha256"] + ".json")).read_bytes()), request)
+        allowed, allowed_output = self.run_review(head=head, expected=0, extra=("--approval-store", str(store)))
+        self.assertEqual(allowed["core"]["policy"]["outcome"], "allowed")
+        self.assertEqual(allowed["source_approval"]["status"], "allowed")
+        self.assertTrue(allowed["trusted_approval"]["matched"])
+        self.assertIn("was recorded by the trusted store", (allowed_output / "summary.md").read_text())
+        self.assertEqual(self.git("status", "--porcelain"), before)
+        self.manifest["scripts"]["prepare"] = "echo stale-head > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        stale, _ = self.run_review(head=self.commit("change after approval"), expected=1,
+                                   extra=("--approval-store", str(store)))
+        self.assertNotEqual(stale["approval_request"]["subject_sha256"], request["subject_sha256"])
+        self.assertNotIn("trusted_approval", stale)
+
+    def test_trusted_approval_requires_exact_subject_and_external_store(self):
+        store = self.root / "trusted-approval-store"
+        store.mkdir()
+        self.manifest["scripts"]["prepare"] = "echo changed > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        head = self.commit("new proposal")
+        blocked, _ = self.run_review(head=head, expected=1, extra=("--approval-store", str(store)))
+        self.assertIn("approval_request", blocked)
+        self.sequence += 1
+        output = self.root / f"bad-approval-{self.sequence}"
+        command = [sys.executable, str(WRAPPER), "--repo", str(self.repo), "--base", self.base,
+                   "--head", head, "--project", "apps/example", "--approvals", "apps/example/.tau-gate-approvals.json",
+                   "--source-approvals", "apps/example/.tau-gate-source-approvals.json", "--tau-gate", str(BINARY),
+                   "--archive-cache", str(self.cache), "--output", str(output), "--approval-store", str(store),
+                   "--approve-subject", "0" * 64]
+        result = subprocess.run(command, capture_output=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(list(store.iterdir()), [])
+        request = blocked["approval_request"]
+        forged = dict(request)
+        forged["approvals"] = []
+        (store / (request["subject_sha256"] + ".json")).write_bytes(json_data(forged))
+        mismatched, _ = self.run_review(head=head, expected=2, extra=("--approval-store", str(store)))
+        self.assertEqual(mismatched["errors"][0]["stage"], "trusted_approval")
+        self.assertIn("differs from the exact request", mismatched["errors"][0]["message"])
+        (self.repo / "approvals").mkdir()
+        report, _ = self.run_review(head=head, expected=2, extra=("--approval-store", str(self.repo / "approvals")))
+        self.assertIn("trusted approval store", report["errors"][0]["message"])
+
+    def test_trusted_store_cannot_approve_head_policy_edit_or_missing_archive(self):
+        store = self.root / "trusted-approval-store"
+        store.mkdir()
+        self.manifest["scripts"]["prepare"] = "echo changed > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        self.policy_path.write_bytes(json_data(self.approvals()))
+        head = self.commit("self approve from proposed head")
+        blocked, _ = self.run_review(head=head, expected=1, extra=("--approval-store", str(store)))
+        self.assertNotIn("approval_request", blocked)
+        self.git("reset", "--hard", self.base)
+        self.lock["packages"]["node_modules/pkg"]["integrity"] = "sha512-" + base64.b64encode(b"0" * 64).decode()
+        self.write("package-lock.json", json_data(self.lock))
+        head = self.commit("unavailable archive")
+        incomplete, _ = self.run_review(head=head, expected=2, extra=("--approval-store", str(store)))
+        self.assertNotIn("approval_request", incomplete)
+
+    def test_omitted_execution_change_cannot_receive_one_action_approval(self):
+        report = {"core": {"status": "complete", "policy": {"outcome": "blocked", "issues": [],
+                             "unapproved_execution_candidates": [{"path": "node_modules/pkg", "fingerprint": "a" * 64}] }},
+                  "source_approval": {}, "review": {"unknowns": [], "remaining_execution_changes": 1},
+                  "errors": []}
+        self.assertIsNone(approval_request(report))
 
     def test_approval_transition_stays_valid_through_policy_update_and_cleanup(self):
         old_manifest = json_data(self.manifest)

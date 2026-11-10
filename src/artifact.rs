@@ -128,10 +128,10 @@ pub(crate) fn inspect_verified(
     let mut tar = TarInspector::new();
     gunzip_stream(
         proof.bytes,
-        &mut |bytes, budget| tar.write(bytes, budget),
+        &mut |bytes, budget| tar.write(bytes, budget).map_err(str::to_owned),
         budget,
     )?;
-    let (manifest, binding_gyp_sha256) = tar.finish()?;
+    let (manifest, binding_gyp_sha256) = tar.finish().map_err(str::to_owned)?;
     Ok(Artifact {
         manifest,
         binding_gyp_sha256,
@@ -551,18 +551,18 @@ fn compressed_block(
     }
 }
 
-fn tar_text(field: &[u8]) -> Result<&str, String> {
+fn tar_text(field: &[u8]) -> Result<&str, &'static str> {
     let end = field
         .iter()
         .position(|byte| *byte == 0)
         .unwrap_or(field.len());
     if field[end..].iter().any(|byte| *byte != 0) {
-        return Err("ambiguous tar text field".into());
+        return Err("ambiguous tar text field");
     }
-    std::str::from_utf8(&field[..end]).map_err(|_| "non-UTF8 tar path".into())
+    std::str::from_utf8(&field[..end]).map_err(|_| "non-UTF8 tar path")
 }
 
-fn tar_number(field: &[u8]) -> Result<usize, String> {
+fn tar_number(field: &[u8]) -> Result<usize, &'static str> {
     let mut value = 0usize;
     let mut digits = false;
     let mut ended = false;
@@ -580,7 +580,7 @@ fn tar_number(field: &[u8]) -> Result<usize, String> {
                     ended = true;
                 }
             }
-            _ => return Err("invalid octal tar number".into()),
+            _ => return Err("invalid octal tar number"),
         }
     }
     Ok(value)
@@ -633,7 +633,7 @@ impl TarInspector {
         }
     }
 
-    fn write(&mut self, mut bytes: &[u8], budget: &mut Budget) -> Result<(), String> {
+    fn write(&mut self, mut bytes: &[u8], budget: &mut Budget) -> Result<(), &'static str> {
         while !bytes.is_empty() {
             let count = bytes.len().min(512 - self.buffered);
             self.block[self.buffered..self.buffered + count].copy_from_slice(&bytes[..count]);
@@ -648,7 +648,11 @@ impl TarInspector {
         Ok(())
     }
 
-    fn consume_block(&mut self, header: &[u8; 512], budget: &mut Budget) -> Result<(), String> {
+    fn consume_block(
+        &mut self,
+        header: &[u8; 512],
+        budget: &mut Budget,
+    ) -> Result<(), &'static str> {
         if let Some(entry) = &mut self.entry {
             let count = entry.remaining.min(512);
             entry.digest.update(&header[..count]);
@@ -657,7 +661,7 @@ impl TarInspector {
             }
             entry.remaining -= count;
             if header[count..].iter().any(|byte| *byte != 0) {
-                return Err("nonzero tar entry padding".into());
+                return Err("nonzero tar entry padding");
             }
             if entry.remaining == 0 {
                 self.complete_entry()?;
@@ -669,15 +673,19 @@ impl TarInspector {
             return Ok(());
         }
         if self.end_blocks != 0 {
-            return Err("invalid tar end markers or trailing data".into());
+            return Err("invalid tar end markers or trailing data");
         }
-        budget.entry()?;
+        budget.entry().map_err(|_| {
+            budget
+                .exhausted
+                .unwrap_or("snapshot tar processing exceeds 250000 headers")
+        })?;
         if self.entry_count == MAX_ENTRIES {
-            return Err("tar exceeds 10000 entries".into());
+            return Err("tar exceeds 10000 entries");
         }
         self.entry_count += 1;
         if &header[257..265] != b"ustar\x0000" && &header[257..265] != b"ustar  \0" {
-            return Err("artifact requires POSIX or GNU ustar headers".into());
+            return Err("artifact requires POSIX or GNU ustar headers");
         }
         let expected = tar_number(&header[148..156])?;
         let actual: usize = header
@@ -692,17 +700,17 @@ impl TarInspector {
             })
             .sum();
         if expected != actual {
-            return Err("tar header checksum mismatch".into());
+            return Err("tar header checksum mismatch");
         }
         let directory = match header[156] {
             b'0' | 0 => false,
             b'5' => true,
-            _ => return Err("tar links, extensions and special records are unsupported".into()),
+            _ => return Err("tar links, extensions and special records are unsupported"),
         };
         if header[157..257].iter().any(|byte| *byte != 0)
             || header[500..].iter().any(|byte| *byte != 0)
         {
-            return Err("unsupported tar link or reserved metadata".into());
+            return Err("unsupported tar link or reserved metadata");
         }
         for field in [
             &header[100..108],
@@ -713,11 +721,11 @@ impl TarInspector {
             tar_number(field)?;
         }
         if tar_number(&header[329..337])? != 0 || tar_number(&header[337..345])? != 0 {
-            return Err("tar regular entry has device metadata".into());
+            return Err("tar regular entry has device metadata");
         }
         let size = tar_number(&header[124..136])?;
         if size > MAX_TAR || (directory && size != 0) {
-            return Err("invalid tar entry size".into());
+            return Err("invalid tar entry size");
         }
         let name = tar_text(&header[..100])?;
         let prefix = match tar_text(&header[345..500]) {
@@ -745,7 +753,7 @@ impl TarInspector {
                 || path[offset + 3..].is_empty()
                 || path[offset + 3..].contains("/./")
             {
-                return Err("unsupported dot tar path".into());
+                return Err("unsupported dot tar path");
             }
             path.replace_range(offset + 1..offset + 3, "");
             true
@@ -771,7 +779,7 @@ impl TarInspector {
                         || base[..3].eq_ignore_ascii_case(b"LPT"))
                     && matches!(base[3], b'1'..=b'9'))
         }) {
-            return Err("unsupported nonportable tar path".into());
+            return Err("unsupported nonportable tar path");
         }
         let (member_root, relative) = path.split_once('/').unwrap_or((&path, ""));
         if self
@@ -779,30 +787,30 @@ impl TarInspector {
             .as_deref()
             .is_some_and(|expected| expected != member_root)
         {
-            return Err("tar contains inconsistent archive roots".into());
+            return Err("tar contains inconsistent archive roots");
         }
         self.root.get_or_insert_with(|| member_root.to_owned());
         if relative.is_empty() && !directory {
-            return Err("tar root is not a directory".into());
+            return Err("tar root is not a directory");
         }
         if directory && matches!(relative, "package.json" | "binding.gyp") {
-            return Err("evidence path is not a regular tar file".into());
+            return Err("evidence path is not a regular tar file");
         }
         if dot_alias && (directory || matches!(relative, "package.json" | "binding.gyp")) {
-            return Err("dot aliases of directories or lifecycle evidence are unsupported".into());
+            return Err("dot aliases of directories or lifecycle evidence are unsupported");
         }
         if (relative.eq_ignore_ascii_case("package.json")
             || relative.eq_ignore_ascii_case("binding.gyp"))
             && !matches!(relative, "package.json" | "binding.gyp")
         {
-            return Err("noncanonical lifecycle evidence tar path".into());
+            return Err("noncanonical lifecycle evidence tar path");
         }
 
         if relative == "package.json" && size > MAX_MANIFEST {
-            return Err("package manifest exceeds 1 MiB".into());
+            return Err("package manifest exceeds 1 MiB");
         }
         if relative == "binding.gyp" && size > MAX_BINDING {
-            return Err("binding.gyp exceeds 64 MiB".into());
+            return Err("binding.gyp exceeds 64 MiB");
         }
         let manifest = (relative == "package.json").then(|| Vec::with_capacity(size));
         self.entry = Some(TarEntry {
@@ -821,7 +829,7 @@ impl TarInspector {
         Ok(())
     }
 
-    fn complete_entry(&mut self) -> Result<(), String> {
+    fn complete_entry(&mut self) -> Result<(), &'static str> {
         let TarEntry {
             path,
             directory,
@@ -855,10 +863,10 @@ impl TarInspector {
                 || prior.paired
                 || prior.dot_alias == dot_alias
             {
-                return Err("duplicate case-folded tar path".into());
+                return Err("duplicate case-folded tar path");
             }
             if prior.data_sha256 != data_sha256 || prior.metadata_sha256 != metadata_sha256 {
-                return Err("conflicting dot-alias tar path".into());
+                return Err("conflicting dot-alias tar path");
             }
             prior.paired = true;
         } else {
@@ -877,22 +885,22 @@ impl TarInspector {
         Ok(())
     }
 
-    fn finish(self) -> Result<(Vec<u8>, Option<String>), String> {
+    fn finish(self) -> Result<(Vec<u8>, Option<String>), &'static str> {
         if self.buffered != 0 {
-            return Err("tar length is not block aligned".into());
+            return Err("tar length is not block aligned");
         }
         if self.entry.is_some() {
-            return Err("truncated tar entry".into());
+            return Err("truncated tar entry");
         }
         if self.end_blocks < 2 {
-            return Err("tar is missing its end markers".into());
+            return Err("tar is missing its end markers");
         }
         if self
             .paths
             .values()
             .any(|entry| entry.dot_alias && !entry.paired)
         {
-            return Err("unpaired dot-alias tar path".into());
+            return Err("unpaired dot-alias tar path");
         }
         for path in self.paths.keys() {
             for (offset, _) in path.match_indices('/') {
@@ -901,7 +909,7 @@ impl TarInspector {
                     .get(&path[..offset])
                     .is_some_and(|entry| !entry.directory)
                 {
-                    return Err("tar file conflicts with a parent directory".into());
+                    return Err("tar file conflicts with a parent directory");
                 }
             }
         }
@@ -915,8 +923,8 @@ impl TarInspector {
 #[cfg(test)]
 fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<String>), String> {
     let mut inspector = TarInspector::new();
-    inspector.write(tar, budget)?;
-    inspector.finish()
+    inspector.write(tar, budget).map_err(str::to_owned)?;
+    inspector.finish().map_err(str::to_owned)
 }
 
 #[cfg(test)]
