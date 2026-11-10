@@ -83,6 +83,46 @@ pub(crate) struct Artifact {
     pub sha512: String,
 }
 
+pub(crate) struct VerifiedArtifact<'a> {
+    bytes: &'a [u8],
+    sha512: String,
+}
+
+impl VerifiedArtifact<'_> {
+    pub(crate) fn sha512(&self) -> &str {
+        &self.sha512
+    }
+}
+
+pub(crate) fn verify<'a>(bytes: &'a [u8], integrity: &str) -> Result<VerifiedArtifact<'a>, String> {
+    if bytes.len() > MAX_COMPRESSED {
+        return Err("compressed artifact exceeds 64 MiB".into());
+    }
+    let digest = sha512(bytes);
+    if integrity != format!("sha512-{}", base64_digest(&digest)) {
+        return Err("artifact requires one matching canonical SHA512 integrity".into());
+    }
+    Ok(VerifiedArtifact {
+        bytes,
+        sha512: digest,
+    })
+}
+
+pub(crate) fn inspect_verified(
+    proof: VerifiedArtifact<'_>,
+    budget: &mut Budget,
+) -> Result<Artifact, String> {
+    budget.check()?;
+    let mut expanded = Vec::new();
+    gunzip(proof.bytes, &mut expanded, budget)?;
+    let (manifest, binding_gyp_sha256) = inspect_tar(&expanded, budget)?;
+    Ok(Artifact {
+        manifest,
+        binding_gyp_sha256,
+        sha512: proof.sha512().to_owned(),
+    })
+}
+
 pub(crate) fn inspect(
     bytes: &[u8],
     integrity: &str,
@@ -91,20 +131,7 @@ pub(crate) fn inspect(
 ) -> Result<Artifact, String> {
     expanded.clear();
     budget.check()?;
-    if bytes.len() > MAX_COMPRESSED {
-        return Err("compressed artifact exceeds 64 MiB".into());
-    }
-    let digest = sha512(bytes);
-    if integrity != format!("sha512-{}", base64_digest(&digest)) {
-        return Err("artifact requires one matching canonical SHA512 integrity".into());
-    }
-    gunzip(bytes, expanded, budget)?;
-    let (manifest, binding_gyp_sha256) = inspect_tar(expanded, budget)?;
-    Ok(Artifact {
-        manifest,
-        binding_gyp_sha256,
-        sha512: digest,
-    })
+    inspect_verified(verify(bytes, integrity)?, budget)
 }
 
 fn base64_digest(hex: &str) -> String {
