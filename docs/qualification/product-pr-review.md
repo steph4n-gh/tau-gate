@@ -2,7 +2,7 @@
 
 The local technical workflow now completes one real dependency update without a fingerprint-policy PR. A report made from trusted Git objects shows the locked change, typed route, exact qualified lifecycle command text, artifact and manifest hashes, unknown evidence, and the next action. A trusted maintainer records one exact subject in an external store, then the same head changes from blocked to allowed. No public package lifecycle script was executed.
 
-This is **not a release qualification**. The [fourth historical cohort](npm3-full-sprint.md) stays frozen at 10/30 complete. A new prospective, repository-disjoint PR cohort, hosted approval-store integration, five outside-maintainer uses, a blinded review comparison, and a signed release remain open. The [compact receipt](evidence/product-pr-review-20261110.json) binds the local results to source, binary, report, control, and fuzz hashes. Large inputs and raw logs remain under ignored `ecosystem_audit/product-pr-review-20261110`.
+This is **not a release qualification**. The [fourth historical cohort](npm3-full-sprint.md) stays frozen at 10/30 complete. The later [candidate decision](product-release-decision-20261110.md) records a five-round repository-disjoint replay at 17/30 complete, below its frozen coverage floors. Hosted positive comment approval, five outside-maintainer uses, a blinded review comparison, and a signed versioned release remain open. The [local-work receipt](evidence/product-pr-review-20261110.json) binds the earlier blocked-to-allowed replay, controls, and fuzz run to source and binary hashes. Large inputs and raw logs remain under ignored `ecosystem_audit/product-pr-review-20261110`.
 
 ## What changed
 

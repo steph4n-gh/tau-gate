@@ -1,0 +1,103 @@
+{
+  "candidate": {
+    "binary_sha256": "89fe1f265f2b31ee9416a5c3f5d838e435f889037e9ecfa0cb940f956a3e96c5",
+    "ci_run": 42879083071,
+    "codeql_run": 42879083256,
+    "draft_pr": "https://github.com/steph4n-gh/tau-gate/pull/34",
+    "signed_candidate_run": 42879151940,
+    "source_commit": "c140aed0cfc8ed30890d9a01766d2a8542bc9c21"
+  },
+  "cohort": {
+    "acquisition_accounted_input_bytes": 9602939447,
+    "acquisition_seconds": 338.2490157918073,
+    "files_sha256": {
+      "acquisition.json": "4881839397ed87c30ea10787ad556d123dbc5c05aa616781181c2a01f8aa2f35",
+      "labels.json": "1476004c2560c84af4fdaa037452fa66284a61adced4916730c11bcf865de5c3",
+      "protocol.json": "0effc48e6f11f52dc958994a381ff5833e1bb8a07871db4dae1d989b635626b4",
+      "replay/plan.json": "8214e1afe151ffee7c5b9e2528bb0b95df2779a6668ac59a47a770d5a793ab90",
+      "replay/receipts.json": "ac00b046d4982d13c0acd1ac801f604d71dc686eddd4f085ec6b9bdbd9681ccc",
+      "selection.json": "5ef21b281e9a1138eb7dd6a5bbe4ca7dac25da1c89a2e8c3d40110aad94251bf",
+      "summary.json": "1e12f18859e717eaa553cf18d752db8f1eed8fca052aeec84df2696b07317213"
+    },
+    "independent_labels_complete": 18,
+    "partial_issue_occurrences_by_side": {
+      "archive exceeds member count": 4,
+      "child is not a direct declared bundled dependency of its parent archive": 156,
+      "duplicate or case-folded archive path": 2,
+      "manifest devDependencies differs from lock": 2,
+      "manifest version differs from lock identity": 2,
+      "missing evidence locator": 97
+    },
+    "scope": "30 frozen repository-disjoint historical npm v3 update PRs, public advisory mode",
+    "selection_statuses": {
+      "no_root_lock_change": 42,
+      "other_lock_version": 3,
+      "prior_cohort": 157,
+      "selected": 30
+    },
+    "unique_repositories": 30,
+    "unknown_package_sides": {
+      "base": 156,
+      "head": 107
+    }
+  },
+  "controls": {
+    "evidence_matrix": "333/333 passed",
+    "native_npm_matrix": "17/17 passed; authored loopback packages only",
+    "receipt_sha256": {
+      "evidence-c140/receipt.json": "09dafa59fc699f05af2d45e9f471bebd60d2eb5db99d11dacd568567c0c17cbc",
+      "native-c140/receipt.json": "56f1d231eea5051c9fb333bc70c14f62a25c9db9f201702ffb40a07b06d8e760",
+      "regression-c140/receipt.json": "e868ca91fcc9b6390b0da3aab96cf05a307e6e6e0864f5728fa89f75c5d1b727",
+      "tar-c140/receipt.json": "5a31e0a9b0e54bc59e91274d98fbf3dadd1acbdf7820cf23ba613193e0369aa5",
+      "wrapper-c140.log": "03953937bc63e9af76ca00efe89c8758e7285625935fe9ec4abbd4761995f2d6"
+    },
+    "tar_asan": "5/5 uninterrupted 60-second runs below 512 MiB; 8,740,484 inputs",
+    "trusted_wrapper": "20/20 passed"
+  },
+  "decision": {
+    "five_maintainer_blinded_comparison": "not yet run",
+    "hosted_comment_approval_positive_flow": "not yet observed",
+    "public_lifecycle_scripts_executed": false,
+    "reason": "17/30 end-to-end is below frozen 80% floor; 17/18 oracle-complete is below frozen 95% floor",
+    "release_gate": "failed",
+    "versioned_publication": "not performed"
+  },
+  "replay": {
+    "all_pairs_floor": 0.8,
+    "all_pairs_floor_met": false,
+    "assessable_events": 9985,
+    "concurrent_workers": 3,
+    "conditional_complete": 17,
+    "conditional_floor": 0.95,
+    "conditional_floor_met": false,
+    "fact_mismatches": 0,
+    "incomplete_case_ids": [
+      "p02-48855752a782",
+      "p04-a7a9c63d8cc4",
+      "p08-72516a3ac035",
+      "p09-0137834c3299",
+      "p11-e1a1e1dc1c66",
+      "p13-1799c29fc456",
+      "p16-cb772e482ac8",
+      "p17-12f20304c87b",
+      "p18-ab4a14a435ac",
+      "p19-564b6afffb2d",
+      "p24-f84200f5fced",
+      "p25-948004a3f0e7",
+      "p29-7fc0d9e6ca35"
+    ],
+    "invalid_protocol_exits": 0,
+    "matched_events": 9926,
+    "max_process_rss_bytes": 1045331968,
+    "median_of_case_median_process_seconds": 26.182647167006508,
+    "missed_events": 59,
+    "output_stable_cases": 30,
+    "processes": 150,
+    "processing_complete": 17,
+    "rounds": 5,
+    "slowest_process_seconds": 83.03203462506644,
+    "timeouts": 0,
+    "unexpected_allowed_outcomes": 0
+  },
+  "schema_version": 1
+}
