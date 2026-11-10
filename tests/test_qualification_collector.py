@@ -38,7 +38,8 @@ def check_zipped(zipped, *, budget=None):
     return npm_evidence.archive_facts(zipped, sri, budget=budget)
 
 
-def large_archive(*, extra=(), expanded_size=None, payload_name="package/blob.bin"):
+def large_archive(*, extra=(), expanded_size=None, payload_name="package/blob.bin",
+                  payload_size=65 * 1024 ** 2, alias_name=None, alias_last_byte=b"\0"):
     output = io.BytesIO()
     expanded = 0
     with gzip.GzipFile(fileobj=output, mode="wb", mtime=0) as zipped:
@@ -54,9 +55,13 @@ def large_archive(*, extra=(), expanded_size=None, payload_name="package/blob.bi
 
         entry("package/package.json", len(MANIFEST))
         write(MANIFEST + bytes(-len(MANIFEST) % 512))
-        entry(payload_name, 65 * 1024 ** 2)
-        for _ in range(65 * 16):
-            write(bytes(64 * 1024))
+        for name in [payload_name] + ([alias_name] if alias_name is not None else []):
+            entry(name, payload_size)
+            for offset in range(0, payload_size, 64 * 1024):
+                size = min(64 * 1024, payload_size - offset)
+                final = alias_last_byte if name == alias_name and offset + size == payload_size else b"\0"
+                write(bytes(size - 1) + final)
+            write(bytes(-payload_size % 512))
         for name, data in extra:
             entry(name, len(data))
             write(data + bytes(-len(data) % 512))
@@ -73,6 +78,17 @@ def checksum(header):
 
 
 class CollectorCompatibility(unittest.TestCase):
+    def test_large_dot_alias_requires_complete_file_identity(self):
+        for first, second in [("package/./blob.bin", "package/blob.bin"),
+                              ("package/blob.bin", "package/./blob.bin")]:
+            zipped, _ = large_archive(payload_name=first, payload_size=33 * 1024 ** 2,
+                                      alias_name=second)
+            self.assertEqual(check_zipped(zipped)[0], MANIFEST)
+        zipped, _ = large_archive(payload_name="package/./blob.bin", payload_size=33 * 1024 ** 2,
+                                  alias_name="package/blob.bin", alias_last_byte=b"x")
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "conflicting dot-alias"):
+            check_zipped(zipped)
+
     def test_large_archive_and_exact_expanded_limit_qualify(self):
         zipped, expanded = large_archive(extra=[("package/binding.gyp", b"native")])
         budget = npm_evidence.WorkBudget(expanded=expanded, headers=3)
@@ -85,6 +101,8 @@ class CollectorCompatibility(unittest.TestCase):
         self.assertEqual(budget.headers_remaining, 0)
         zipped, _ = large_archive(expanded_size=128 * 1024 ** 2)
         self.assertEqual(check_zipped(zipped)[0], MANIFEST)
+        zipped, _ = large_archive(payload_name="package/binding.gyp", payload_size=64 * 1024 ** 2)
+        self.assertEqual(check_zipped(zipped)[2:], (True, hashlib.sha256(bytes(64 * 1024 ** 2)).hexdigest()))
 
     def test_large_archive_tail_and_work_limits_remain_fail_closed(self):
         zipped, expanded = large_archive()

@@ -597,7 +597,31 @@ def resource_cases():
     assert len(tar) == 64 * MIB and len(compressed) > 64 * MIB
     result.append(Case('limit_compressed', 'Expanded tar is exactly 64MiB. Stored block overhead makes compressed bytes exceed 64MiB.', 'incomplete', artifact=compressed, expected_reason='input exceeds 67108864 bytes'))
     tar += bytes(512)
-    result.append(Case('limit_expanded', 'Expanded tar exceeds 64MiB while compressed bytes remain below the compressed limit.', 'incomplete', artifact=zipped(tar), expected_reason='expanded artifact exceeds 64 MiB'))
+    result.append(Case('valid_large_expanded_64', 'Expanded tar exceeds the former 64MiB limit and remains within the bounded archive profile.', artifact=zipped(tar)))
+    tar += bytes(128 * MIB - len(tar))
+    result.append(Case('valid_expanded_128', 'Expanded tar is exactly the declared 128MiB limit.', artifact=zipped(tar)))
+    result.append(Case('limit_expanded', 'Expanded tar exceeds 128MiB while compressed bytes remain below the compressed limit.', 'incomplete', artifact=zipped(tar + bytes(512)), expected_reason='expanded artifact exceeds 128 MiB'))
+    large = tar_for(payload=bytes(65 * MIB))
+    valid = zipped(large)
+    result.append(Case('valid_large_payload', 'A 65MiB regular file is streamed before the archive qualifies.', artifact=valid))
+    result.append(Case('large_tail_crc', 'A large archive with a valid early manifest has a corrupt gzip CRC.', 'incomplete', artifact=changed(valid, len(valid) - 8, bytes([valid[-8] ^ 1])), expected_reason='gzip checksum mismatch'))
+    result.append(Case('large_tail_isize', 'A large archive with a valid early manifest has a corrupt gzip ISIZE.', 'incomplete', artifact=changed(valid, len(valid) - 4, bytes([valid[-4] ^ 1])), expected_reason='gzip expanded size mismatch'))
+    result.append(Case('large_tail_truncated', 'A large archive is missing the last byte of its gzip footer.', 'incomplete', artifact=valid[:-1]))
+    result.append(Case('large_tail_member', 'A second gzip member follows a large archive.', 'incomplete', artifact=valid + zipped(b''), expected_reason='gzip contains trailing data or multiple members'))
+    result.append(Case('large_tail_trailing', 'A trailing byte follows a large archive.', 'incomplete', artifact=valid + b'x', expected_reason='gzip contains trailing data or multiple members'))
+    duplicate = tar_for(payload=bytes(65 * MIB), extra=[regular('package/package.json', encoded(MANIFEST))])
+    result.append(Case('large_late_duplicate', 'A duplicate package.json follows a 65MiB regular file.', 'incomplete', artifact=zipped(duplicate), expected_reason='duplicate case-folded tar path'))
+    padded = tar_for(payload=bytes(65 * MIB), extra=[regular('package/late.txt', b'x')])
+    padding_offset = 1024 + 512 + 65 * MIB + 512 + 1
+    result.append(Case('large_late_padding', 'Nonzero tar padding follows a late file after a 65MiB payload.', 'incomplete', artifact=zipped(changed(padded, padding_offset, b'x')), expected_reason='nonzero tar entry padding'))
+    overflow = bytearray(large)
+    overflow[1024 + 124:1024 + 136] = f'{128 * MIB:011o}\0'.encode()
+    overflow = tar_checksum(overflow, 1024)
+    result.append(Case('large_declared_size_overflow', 'A declared file size exceeds the remaining per-archive expansion allowance.', 'incomplete', artifact=zipped(overflow)))
+    native = zipped(tar_for(extra=[regular('package/binding.gyp', bytes(64 * MIB))]))
+    result.append(Case('valid_binding_gyp_64', 'binding.gyp is exactly its retained 64MiB lifecycle input limit.', artifact=native))
+    native = zipped(tar_for(extra=[regular('package/binding.gyp', bytes(64 * MIB + 1))]))
+    result.append(Case('limit_binding_gyp', 'binding.gyp retains its 64MiB lifecycle input limit under the expanded archive profile.', 'incomplete', artifact=native, expected_reason='binding.gyp exceeds 64 MiB'))
     return result
 
 

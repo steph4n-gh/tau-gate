@@ -17,6 +17,7 @@ import zlib
 
 
 MAX_FILE = 64 * 1024 * 1024
+MAX_EXPANDED = 128 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
 MAX_NPM_RECORDS = 10_000
 MAX_NPM_REFERENCES = 50_000
@@ -157,6 +158,51 @@ def tar_text(field):
         raise EvidenceError("non-UTF8 tar path") from exc
 
 
+class _GzipReader:
+    CHUNK = 64 * 1024
+
+    def __init__(self, archive, budget):
+        self.archive = archive
+        self.budget = budget
+        self.decoder = zlib.decompressobj(31)
+        self.offset = 0
+        self.pending = b""
+        self.expanded = 0
+
+    def read(self, size):
+        result = bytearray()
+        while len(result) < size and not self.decoder.eof:
+            if self.budget is not None and self.budget.exhausted is not None:
+                raise EvidenceError(self.budget.exhausted)
+            if not self.pending and self.offset < len(self.archive):
+                self.pending = self.archive[self.offset:self.offset + self.CHUNK]
+                self.offset += len(self.pending)
+            bound = min(size - len(result), self.CHUNK, MAX_EXPANDED - self.expanded + 1)
+            if self.budget is not None:
+                bound = min(bound, self.budget.expanded_remaining + 1)
+            try:
+                data = self.decoder.decompress(self.pending, bound)
+            except zlib.error as exc:
+                if self.budget is not None:
+                    # zlib can reject a chunk without reporting its expanded bytes.
+                    self.budget.charge("expanded_remaining", MAX_EXPANDED + 1 - self.expanded,
+                                       "snapshot expanded evidence exceeds 4 GiB")
+                raise EvidenceError(f"invalid gzip: {exc}") from exc
+            self.pending = self.decoder.unconsumed_tail
+            self.expanded += len(data)
+            if self.budget is not None:
+                self.budget.charge("expanded_remaining", len(data), "snapshot expanded evidence exceeds 4 GiB")
+            if self.expanded > MAX_EXPANDED:
+                raise EvidenceError("archive exceeds decompressed limit")
+            if self.decoder.eof:
+                if self.decoder.unused_data or self.offset < len(self.archive):
+                    raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
+            elif not data and not self.pending and self.offset == len(self.archive):
+                raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
+            result.extend(data)
+        return bytes(result)
+
+
 def archive_facts(archive, integrity, *, budget=None):
     if budget is not None and budget.exhausted is not None:
         raise EvidenceError(budget.exhausted)
@@ -164,32 +210,24 @@ def archive_facts(archive, integrity, *, budget=None):
         raise EvidenceError("archive exceeds compressed limit")
     if hashlib.sha512(archive).digest() != sri_digest(integrity):
         raise EvidenceError("archive SHA512 SRI mismatch")
-    try:
-        decoder = zlib.decompressobj(31)
-        tar_data = decoder.decompress(archive, MAX_FILE + 1)
-        if budget is not None:
-            budget.charge("expanded_remaining", len(tar_data), "snapshot expanded evidence exceeds 4 GiB")
-        if len(tar_data) > MAX_FILE or decoder.unconsumed_tail:
-            raise EvidenceError("archive exceeds decompressed limit")
-        if not decoder.eof or decoder.unused_data:
-            raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
-    except zlib.error as exc:
-        if budget is not None:
-            budget.charge("expanded_remaining", MAX_FILE + 1, "snapshot expanded evidence exceeds 4 GiB")
-        raise EvidenceError(f"invalid gzip: {exc}") from exc
-    except (OSError, EOFError) as exc:
-        raise EvidenceError(f"invalid gzip: {exc}") from exc
+    stream = _GzipReader(archive, budget)
     offset = 0
     seen = {}
     entry_count = 0
     root_name = None
     manifest_bytes = None
     binding_hash = None
-    while offset + 512 <= len(tar_data):
-        header = tar_data[offset:offset + 512]
+    while True:
+        header = stream.read(512)
+        if len(header) != 512:
+            raise EvidenceError("missing tar terminator")
         if not any(header):
-            if len(tar_data) - offset < 1024 or any(tar_data[offset:]):
+            second = stream.read(512)
+            if len(second) != 512 or any(second):
                 raise EvidenceError("invalid tar terminator")
+            while tail := stream.read(stream.CHUNK):
+                if any(tail):
+                    raise EvidenceError("invalid tar terminator")
             break
         if entry_count == 10_000:
             raise EvidenceError("tar exceeds 10000 entries")
@@ -252,35 +290,46 @@ def archive_facts(archive, integrity, *, budget=None):
             raise EvidenceError("dot aliases of directories or lifecycle evidence are unsupported")
         if any(seen.get("/".join(parts[:n]).lower(), {}).get("kind") == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
             raise EvidenceError("tar file and parent path conflict")
-        if info.size < 0 or info.size > MAX_FILE or (info.isdir() and info.size) or offset + 512 + info.size > len(tar_data):
+        if info.size < 0 or info.size > MAX_EXPANDED or (info.isdir() and info.size) or offset + 512 + info.size > MAX_EXPANDED:
             raise EvidenceError("invalid tar size")
-        start = offset + 512
-        end = start + info.size
-        padded_end = start + ((info.size + 511) // 512) * 512
-        if padded_end > len(tar_data) or any(tar_data[end:padded_end]):
+        if relative == "package.json" and info.size > MAX_MANIFEST:
+            raise EvidenceError("invalid archived package.json")
+        if relative == "binding.gyp" and info.size > MAX_FILE:
+            raise EvidenceError("binding.gyp exceeds 64 MiB")
+        digest = hashlib.sha256()
+        manifest_data = bytearray() if relative == "package.json" else None
+        remaining = info.size
+        while remaining:
+            data = stream.read(min(remaining, stream.CHUNK))
+            if not data:
+                raise EvidenceError("invalid tar size")
+            digest.update(data)
+            if manifest_data is not None:
+                manifest_data.extend(data)
+            remaining -= len(data)
+        padding_size = -info.size % 512
+        padding = stream.read(padding_size)
+        if len(padding) != padding_size or any(padding):
             raise EvidenceError("invalid tar padding")
+        file_hash = digest.hexdigest()
         previous = seen.get(canonical)
         if previous is not None:
             if (previous["name"] != name or previous["kind"] != "file" or info.isdir()
                     or previous["paired"] or previous["dot_alias"] == dot_alias):
                 raise EvidenceError("duplicate tar path or excessive entry count")
             if (previous["before"] != header[100:148] or previous["after"] != header[156:512]
-                    or tar_data[previous["start"]:previous["end"]] != tar_data[start:end]):
+                    or previous["size"] != info.size or previous["sha256"] != file_hash):
                 raise EvidenceError("conflicting dot-alias tar path")
             previous["paired"] = True
         else:
             seen[canonical] = {"name": name, "kind": "directory" if info.isdir() else "file",
-                               "start": start, "end": end, "before": header[100:148], "after": header[156:512],
+                               "size": info.size, "sha256": file_hash, "before": header[100:148], "after": header[156:512],
                                "dot_alias": dot_alias, "paired": False}
         if relative == "package.json":
-            if info.size > MAX_MANIFEST:
-                raise EvidenceError("invalid archived package.json")
-            manifest_bytes = tar_data[start:end]
+            manifest_bytes = bytes(manifest_data)
         elif relative == "binding.gyp":
-            binding_hash = sha256(tar_data[start:end])
-        offset = padded_end
-    else:
-        raise EvidenceError("missing tar terminator")
+            binding_hash = file_hash
+        offset += 512 + info.size + padding_size
     if any(item["dot_alias"] and not item["paired"] for item in seen.values()):
         raise EvidenceError("unpaired dot-alias tar path")
     if manifest_bytes is None:
