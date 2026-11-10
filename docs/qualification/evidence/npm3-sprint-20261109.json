@@ -1,0 +1,4439 @@
+{
+  "artifact_hashes": {
+    "evidence-controls/receipt.json": "73996ccafb6b478d8a96980c20aa54103fdb2b59aaa1b0c22fa6c8f9b88f82cf",
+    "example-review.receipt.json": "9ae2ee76be1dbb6f646a7a0c81a27e85126ae97614aed53b628df24cebd73add",
+    "fresh/cohort.json": "2050ff4bb31360571f55d1e13988e24507ab0dd9e60166e35649e474baa35751",
+    "fresh/inventory.json": "7f4deef03360366eab9193167e5775acf7552a650ab710e92731590a12e479ec",
+    "fresh/snapshots.json": "619191b7474bb9eba41baba40238e58b4cfa2df9fe8d003a8f5ee9400f4d4202",
+    "frozen.json": "18c1b5e8c463f610a011340e819e7ebde4af8a91235a4adfa5d344bc232e8b83",
+    "fuzz/receipt.json": "7219b5d51aa23517b83c6ecc86c68219070e0242d449ac1ebc8e590ff470db81",
+    "graph-comparison/protocol.json": "1d472536be954bb55ae3fac9b6eb1572a5483befeefd948c93983669b380f7bc",
+    "graph-comparison/results.json": "2ef4d1d14ce5007681689e56d31d5b998edf1e05667f0f8ebfa26dbe53bfb6c3",
+    "native-comparison/delivery.json": "b6dd483be8099b71e794221efcd643b518810fd8686f51b9d3499932aa24d3c0",
+    "native-comparison/observer-corrected-run/receipt.json": "a5c7bd2968c17595856d3b34308857d0368dcccc21499c30abbd3f9a53700b9e",
+    "native-comparison/pnpm-adjunct/receipt.json": "e2373314049dcb6184cb63754f4495920e8392da47a1a0de3f26c68addfdfeb1",
+    "native-comparison/pnpm-strict-diagnostic/receipt.json": "a85aae13d030cee3f3463eef0772a7ea923e5ea7517b802fff12943d9ee4918b",
+    "native-latest/npm-runtime-comparison/receipt.json": "003540f257acff084cf2c11eb5c288ea0f9b9b07d7c59caed1564a47a63c8a1c",
+    "native-latest/pnpm-runtime-comparison/receipt.json": "dc2c51225f55994440b89962b6409de0ce6c420127cffc8c4a45bfd7c3dcd16a",
+    "npm-reference/receipt.json": "ea4883fd104eb211b88e6d78cc714dd3534b50d1ecd8defdea795ec62b102656",
+    "pair-qualification/labels.json": "8bc44be36679b1d909a161bd8716ed351893930287cdd9111367a2d615c78874",
+    "pair-qualification/protocol.json": "83cd367edc41f388351956fe03eaae7d15ef9bc7610175394f495c0dbfb0c5bc",
+    "pair-qualification/replay/receipts.json": "a0c759bd8418aef50ee555aa7b8fd193e42a6582ef5e589742f887ca9b53a2d3",
+    "pair-qualification/resource-accounting.json": "49f47941619f91d5299a96ac027a65520ca1c43eaa7b9b8d5a057e1840f26d1d",
+    "pair-qualification/selection.json": "470087043d41384a4f649e9a2a8840ee0e2b88a8290e8f01316fe80a5730593d",
+    "pair-qualification/summary.json": "00f1e0ea718bdf9b26f82f8b2e7b6ead8d28a16c8f228625accb305ee3af036e",
+    "rebuilds/receipt.json": "21d821ec301361621a4521245df32db0d06613a7241c74019be5f20aa266d74f",
+    "scorecard.json": "2562d3297afd5f6bb3cc62d417c76d809053b7f4d289458f765fc21c0d7ecdb1",
+    "wrapper-controls/receipt.json": "0886d90423095d25e0230c6cfa67fd4a951786fcedc16f9b7c447cbb17413e11"
+  },
+  "candidate_freeze": {
+    "candidate_files": {
+      "libtau_gate.dylib": "3846b16c1d69080756eb0c77be352bc6bbf4d4cffbfcedb066d43301967c7fc0",
+      "tau-gate": "096cf0a6a96bc66f5c4f5589dcd9ac1770ca3613cb01bd86fe4c9daaaa48ba86"
+    },
+    "frozen_at_utc": "2026-11-10T00:00:21.981493+00:00",
+    "protocol": {
+      "acquisition_limit_bytes": 4294967296,
+      "completion_scope": "full npm3 evidence advisoryreview; complete blocked decisions valid underfixtureenforcement, never fabricatepublicapprovals",
+      "historical_pairs": "first30independentlyformat-eligible npm3pairs,cohortrank+newestlockchange order,max3attemptedcommits perrepo; independent labels beforecandidate replay; excludedattemptsretained",
+      "human_advantage": "not assessable by automation or ownerreplay",
+      "no_public_lifecycle_execution": true,
+      "ordinary_completion_floor": 0.8,
+      "original_corpus": "ecosystem_audit/top200-repositories-20261109",
+      "per_file_limit_bytes": 67108864,
+      "previous_fresh_corpus": "ecosystem_audit/math-fresh-validation-20261109/fresh",
+      "product_scope": "npm3executionevidence andtrustedapprovals; pnpmadjacentnativecontrolonly",
+      "repository_count": 100,
+      "selection": "next100distinctcanonicalGitHub IDs by pinnedcriticalnpmrank afterexcludingall400prioridentities; do not replace no-lock/unavailable/non3 projects"
+    },
+    "source_commit": "f1ceb5065e9cff509260de2709add024cc5c32e6",
+    "source_files": {
+      "Cargo.lock": "51aa8f28acd64ef75e3295d49ce856e29440853987d297e9126faae7c41a5a83",
+      "Cargo.toml": "e7a8a5598dc226c656a731576b8233909b617045e41e65634d60409110acdf6e",
+      "build.rs": "0a8fffed12efe1ce6026ad0961888ba16bc826053ae2b6926097ce5a9fbdad30",
+      "include/tau_gate.h": "62c94397c7580a2d3771d48de6b8f4203436e5420ba860a6b43ab876bafaa6ac",
+      "src/artifact.rs": "6619dd05bf5a893ab3423a8f89de7bc3bbdb76c345031170fea48dfe109f9c0f",
+      "src/config.rs": "53f969888c0257609fe66a1f1229f35d718f9eadcaabfb6bd7ed84c8b0c04597",
+      "src/digest.rs": "36312267475e4614eff64cb0d20265c32e02f00934450ee75ee3149882c2698d",
+      "src/error.rs": "207dfcf750c802629159c1f42c6ddee459fc4bf62bd071cca4cad14228dd3051",
+      "src/evidence.rs": "2dcde0f13ee7a80d84353ab2ed77e8ed6c963dbfa66e845c0613d7a5089ef0ba",
+      "src/graph.rs": "6ca9127e20440ac1acb7217e38b6fa1c6ba129382cb96c395471fbf8a0a52583",
+      "src/graph_impl.rs": "008639c876bff08b7bec6f3124ecf819448730c62d5b14588bf50030d726fd99",
+      "src/lib.rs": "ba5eb56dd3e07c45fefeb73c0aa032adb0e6644284fa56666da7d7a048b419ef",
+      "src/main.rs": "b1254a689aebc85d5d3681d62d45d9420c198f77accd9be53e9edb5bc6a0a040",
+      "src/math.rs": "7016924fc7e77d1c6abfc5b56c76c5e7919dfdee0af594dbe70332fcba28444d",
+      "src/npm_legacy.rs": "edca54daad80bc92c4bed354093e36df17f07aa8b77dedc1eca3ca578a32ae8a",
+      "src/parser.rs": "7bde4e6340d09fc389f78a0a2fdb9f837beb9112e51a6b893bea091b372466f9",
+      "src/pnpm.rs": "956005c4d03afbec8ccd75e253c5516f51d5ede5fc2042326661516431852c2c",
+      "src/policy.rs": "7f50f0d6e799e901a960efa1bb88f858331d6fe307d2f660d5f394de4f604b4f",
+      "src/project_inputs.rs": "fdedcbb5c2acb278f5a03b53663564928e8cec5bdb21d928ce3dad1f954f557f",
+      "src/review.rs": "99a1bc200405bdbd7a67e81b82a3c6466f10c50a932439789e4bdc7e56f3ec12",
+      "src/semver.rs": "c0017950e396142f67a968053a1956cb609b4a2290d04cd41ce7030132b616b1",
+      "src/telemetry.rs": "75f6c9b049312a33db1dbbdfd6d6463b7cbcc5e205b39621fb4c53ec4e1bb279",
+      "src/yarn.rs": "7b876663a0444a12a15ffa28ad0b57af8647acc0337f881cbb70e3e6e1dcf7aa",
+      "src/yarn_berry.rs": "4a1666748bf291da925789a1b0992c58452a4cbfc7927bc4bb590ce973f38337",
+      "tools/npm3_sprint.py": "315a22a130d7c8de119553adde60fddf89831aaecb1a03d4efaf35a012f041b2",
+      "tools/npm_evidence.py": "d4f832c50baecd5fb37784a93a184c96aa61b0047e527da295571d904a2b2929",
+      "tools/npm_repo_experiment.py": "379342899a29b3071f1679e9fec781b6930bff1a4e17cb82c4861b2e35a3f370",
+      "tools/qualification.py": "8ffc2c53795551de8aa2140231a076ebed7ce50765e61ebf9abcc8175ad4548d",
+      "tools/qualification_oracle.py": "d729e11633fa26623a4429ab345bdd9692399e455627dbdc811ca92bb11c572c"
+    }
+  },
+  "cohort": {
+    "excluded_identities": [
+      "101arrowz/fflate",
+      "acornjs/acorn",
+      "acornjs/acorn-jsx",
+      "airbnb/javascript",
+      "ajv-validator/ajv",
+      "alangpierce/sucrase",
+      "alexei/sprintf.js",
+      "alexreardon/memoize-one",
+      "angular/angular-cli",
+      "antfu-collective/vite-node",
+      "apollographql/graphql-tag",
+      "archiverjs/node-archiver",
+      "ardatan/graphql-tools",
+      "ariaminaei/pretty-error",
+      "auth0/jwt-decode",
+      "auth0/node-jsonwebtoken",
+      "auth0/node-jws",
+      "avoidwork/filesize.js",
+      "aws/aws-sdk-js-v3",
+      "axios/axios",
+      "azure/azure-sdk-for-js",
+      "babel/babel",
+      "babel/babel-loader",
+      "beatgammit/base64-js",
+      "benjamn/ast-types",
+      "benjamn/recast",
+      "bholloway/resolve-url-loader",
+      "blakeembrey/change-case",
+      "bowser-js/bowser",
+      "brianc/node-postgres",
+      "brix/crypto-js",
+      "broofa/mime",
+      "browserify/crypto-browserify",
+      "browserify/events",
+      "browserify/resolve",
+      "browserslist/browserslist",
+      "browserslist/caniuse-lite",
+      "cacjs/cac",
+      "calvinmetcalf/lie",
+      "caolan/async",
+      "chaijs/chai",
+      "chalk/chalk",
+      "cheeriojs/cheerio",
+      "chimurai/http-proxy-middleware",
+      "chrisdickinson/raf",
+      "chromedevtools/devtools-protocol",
+      "clean-css/clean-css",
+      "component/escape-html",
+      "conventional-changelog/conventional-changelog",
+      "coolaj86/atob.js",
+      "cosmiconfig/cosmiconfig",
+      "css/csso",
+      "cssnano/cssnano",
+      "csstools/postcss-plugins",
+      "csstree/csstree",
+      "cure53/dompurify",
+      "cypress-io/cypress",
+      "d3/d3-array",
+      "d3/d3-format",
+      "d3/d3-scale",
+      "d3/d3-shape",
+      "dankogai/js-base64",
+      "date-fns/date-fns",
+      "dchest/tweetnacl-js",
+      "dcodeio/long.js",
+      "debug-js/debug",
+      "definitelytyped/definitelytyped",
+      "defunctzombie/node-url",
+      "dequelabs/axe-core",
+      "developit/mitt",
+      "digitalbazaar/forge",
+      "dominictarr/jsonstream",
+      "dominictarr/rc",
+      "dominictarr/through",
+      "dotansimha/graphql-code-generator",
+      "dotenvx/dotenv-expand",
+      "eemeli/yaml",
+      "emotion-js/emotion",
+      "enquirer/enquirer",
+      "eslint/doctrine",
+      "eslint/eslint",
+      "eslint/js",
+      "estools/esquery",
+      "estools/estraverse",
+      "evanw/esbuild",
+      "evanw/node-source-map-support",
+      "eventemitter2/eventemitter2",
+      "expressjs/body-parser",
+      "expressjs/compression",
+      "expressjs/cors",
+      "expressjs/express",
+      "expressjs/serve-index",
+      "expressjs/serve-static",
+      "faisalman/ua-parser-js",
+      "faye/faye-websocket-node",
+      "felixge/node-dateformat",
+      "feross/buffer",
+      "floating-ui/floating-ui",
+      "follow-redirects/follow-redirects",
+      "form-data/form-data",
+      "formidablelabs/react-fast-compare",
+      "forwardemail/superagent",
+      "fsevents/fsevents",
+      "gajus/table",
+      "getsentry/sentry-javascript",
+      "googleapis/google-cloud-node-core",
+      "graphql/graphql-js",
+      "gregberge/svgr",
+      "grpc/grpc-node",
+      "handlebars-lang/handlebars.js",
+      "hapijs/hoek",
+      "hapijs/joi",
+      "highlightjs/highlight.js",
+      "http-party/node-http-proxy",
+      "http-party/node-portfinder",
+      "hughsk/flat",
+      "i18next/i18next",
+      "image-size/image-size",
+      "immerjs/immer",
+      "immutable-js/immutable-js",
+      "import-js/eslint-plugin-import",
+      "indutny/bn.js",
+      "indutny/elliptic",
+      "indutny/node-ip",
+      "inikulin/parse5",
+      "inspect-js/node-deep-equal",
+      "isaacs/minimatch",
+      "isaacs/minipass-pipeline",
+      "isaacs/node-glob",
+      "isaacs/node-graceful-fs",
+      "isaacs/node-lru-cache",
+      "isaacs/node-tar",
+      "isaacs/rimraf",
+      "isaacs/sax-js",
+      "istanbuljs/babel-plugin-istanbul",
+      "istanbuljs/istanbuljs",
+      "jakearchibald/idb",
+      "jakechampion/fetch",
+      "jakejs/jake",
+      "jantimon/html-webpack-plugin",
+      "jaredwray/keyv",
+      "jashkenas/underscore",
+      "jedwatson/classnames",
+      "jest-community/eslint-plugin-jest",
+      "jestjs/jest",
+      "jhurliman/node-rate-limiter",
+      "jmespath/jmespath.js",
+      "jonaskello/tsconfig-paths",
+      "jorgebucaran/colorette",
+      "josdejong/workerpool",
+      "jprichardson/node-fs-extra",
+      "jprichardson/node-jsonfile",
+      "jquense/yup",
+      "jquery/esprima",
+      "jquery/jquery",
+      "js-cookie/js-cookie",
+      "jsdom/jsdom",
+      "jshttp/basic-auth",
+      "jshttp/cookie",
+      "jshttp/http-errors",
+      "jshttp/mime-db",
+      "jshttp/mime-types",
+      "json5/json5",
+      "jsx-eslint/eslint-plugin-jsx-a11y",
+      "jsx-eslint/eslint-plugin-react",
+      "kentcdodds/babel-plugin-macros",
+      "kentcdodds/cross-env",
+      "kpdecker/jsdiff",
+      "kriszyp/json-schema",
+      "kulshekhar/ts-jest",
+      "leonidas-from-xiv/node-xml2js",
+      "less/less.js",
+      "ljharb/qs",
+      "lodash/lodash",
+      "lovell/sharp",
+      "lquixada/cross-fetch",
+      "lukeed/clsx",
+      "lukeed/kleur",
+      "lukeed/polka",
+      "lukeed/sirv",
+      "mafintosh/pump",
+      "mafintosh/tar-stream",
+      "mapbox/node-pre-gyp",
+      "marak/colors.js",
+      "markdown-it/linkify-it",
+      "markdown-it/markdown-it",
+      "markedjs/marked",
+      "mathiasbynens/he",
+      "mathiasbynens/punycode.js",
+      "max-mapper/concat-stream",
+      "max-mapper/extract-zip",
+      "mde/ejs",
+      "mdevils/html-entities",
+      "mdn/data",
+      "mdx-js/mdx",
+      "meta/flow",
+      "meta/jscodeshift",
+      "meta/prop-types",
+      "meta/regenerator",
+      "meta/watchman",
+      "mhart/aws4",
+      "micromark/micromark",
+      "micromatch/micromatch",
+      "micromatch/picomatch",
+      "microsoft/playwright",
+      "microsoft/reflect-metadata",
+      "microsoft/tslib",
+      "microsoft/typescript",
+      "mikaelbr/node-notifier",
+      "mikemcl/big.js",
+      "mikemcl/decimal.js",
+      "mishoo/uglifyjs",
+      "mochajs/mocha",
+      "moment/luxon",
+      "moment/moment",
+      "moment/moment-timezone",
+      "mongodb/js-bson",
+      "motdotla/dotenv",
+      "moxystudio/node-cross-spawn",
+      "mozilla/source-map",
+      "mridgway/hoist-non-react-statics",
+      "mrmlnc/fast-glob",
+      "mui/material-ui",
+      "naturalintelligence/fast-xml-parser",
+      "node-formidable/formidable",
+      "nodeca/argparse",
+      "nodeca/js-yaml",
+      "nodejs/nan",
+      "nodejs/node-addon-api",
+      "nodejs/readable-stream",
+      "nodejs/undici",
+      "normalize/mz",
+      "npm/cli",
+      "npm/ini",
+      "npm/node-semver",
+      "nrwl/nx",
+      "nv/cssom",
+      "octokit/core.js",
+      "omgovich/colord",
+      "oozcitak/xmlbuilder-js",
+      "open-telemetry/opentelemetry-js",
+      "paulmillr/chokidar",
+      "peterolson/biginteger.js",
+      "petkaantonov/bluebird",
+      "pillarjs/iconv-lite",
+      "pillarjs/path-to-regexp",
+      "pillarjs/send",
+      "pimterry/loglevel",
+      "pinojs/pino",
+      "plurals/pluralize",
+      "pngjs/pngjs",
+      "pnpm/pnpm",
+      "postcss/autoprefixer",
+      "postcss/postcss",
+      "postcss/postcss-load-config",
+      "postcss/postcss-nested",
+      "prettier/eslint-config-prettier",
+      "prettier/eslint-plugin-prettier",
+      "prettier/prettier",
+      "primus/eventemitter3",
+      "prismjs/prism",
+      "protobufjs/protobuf.js",
+      "puleos/object-hash",
+      "puppeteer/puppeteer",
+      "pvorb/clone",
+      "pvorb/node-md5",
+      "qix-/color-convert",
+      "quantizor/markdown-to-jsx",
+      "que-etc/resize-observer-polyfill",
+      "radix-ui/primitives",
+      "react-hook-form/react-hook-form",
+      "react/create-react-app",
+      "react/react",
+      "reactivex/rxjs",
+      "reactjs/react-transition-group",
+      "redis/ioredis",
+      "reduxjs/react-redux",
+      "reduxjs/redux-thunk",
+      "remarkjs/remark",
+      "remix-run/history",
+      "remix-run/react-router",
+      "rollup/plugins",
+      "rollup/rollup",
+      "salesforce/tough-cookie",
+      "sass/dart-sass",
+      "sboudrias/inquirer.js",
+      "senchalabs/connect",
+      "shelljs/shelljs",
+      "sidorares/json-bigint",
+      "sinclairzx81/sinclair-typebox",
+      "sindresorhus/camelcase-keys",
+      "sindresorhus/cli-spinners",
+      "sindresorhus/component-emitter",
+      "sindresorhus/configstore",
+      "sindresorhus/debounce",
+      "sindresorhus/del",
+      "sindresorhus/dot-prop",
+      "sindresorhus/execa",
+      "sindresorhus/file-type",
+      "sindresorhus/get-port",
+      "sindresorhus/globals",
+      "sindresorhus/globby",
+      "sindresorhus/got",
+      "sindresorhus/log-update",
+      "sindresorhus/memoize",
+      "sindresorhus/meow",
+      "sindresorhus/normalize-url",
+      "sindresorhus/object-assign",
+      "sindresorhus/open",
+      "sindresorhus/ora",
+      "sindresorhus/p-limit",
+      "sindresorhus/pify",
+      "sindresorhus/pretty-bytes",
+      "sindresorhus/pretty-ms",
+      "sindresorhus/query-string",
+      "sindresorhus/type-fest",
+      "sindresorhus/update-notifier",
+      "sinonjs/fake-timers",
+      "sinonjs/sinon",
+      "socketio/socket.io",
+      "sockjs/sockjs-node",
+      "stefanpenner/es6-promise",
+      "storybookjs/storybook",
+      "streamich/memfs",
+      "stuk/jszip",
+      "styled-components/css-to-react-native",
+      "substack/semver-compare",
+      "substack/text-table",
+      "sudodoki/copy-to-clipboard",
+      "survivejs/webpack-merge",
+      "svg/svgo",
+      "swc-project/swc",
+      "tailwindlabs/tailwindcss",
+      "taylorhakes/fecha",
+      "tehshrike/deepmerge",
+      "terser/terser",
+      "testing-library/dom-testing-library",
+      "testing-library/eslint-plugin-testing-library",
+      "testing-library/jest-dom",
+      "testing-library/react-testing-library",
+      "testing-library/user-event",
+      "thejoshwolfe/yauzl",
+      "thysultan/stylis",
+      "tildeio/rsvp.js",
+      "tim-kos/node-retry",
+      "tj/commander.js",
+      "tomas/needle",
+      "tootallnate/node-bindings",
+      "tootallnate/proxy-agents",
+      "tritondatacenter/node-http-signature",
+      "tritondatacenter/node-verror",
+      "tsconfig/bases",
+      "typescript-eslint/typescript-eslint",
+      "typestrong/fork-ts-checker-webpack-plugin",
+      "typestrong/ts-loader",
+      "typestrong/ts-node",
+      "typicode/husky",
+      "unifiedjs/unified",
+      "unjs/consola",
+      "unjs/unplugin",
+      "unshiftio/url-parse",
+      "uuidjs/uuid",
+      "validatorjs/validator.js",
+      "vercel/arg",
+      "vercel/ms",
+      "vercel/next.js",
+      "visionmedia/node-progress",
+      "vitejs/vite",
+      "vitest-dev/vitest",
+      "vuejs/core",
+      "webpack-contrib/file-loader",
+      "webpack-contrib/url-loader",
+      "webpack/copy-webpack-plugin",
+      "webpack/css-loader",
+      "webpack/enhanced-resolve",
+      "webpack/loader-utils",
+      "webpack/memory-fs",
+      "webpack/minimizer-webpack-plugin",
+      "webpack/node-libs-browser",
+      "webpack/postcss-loader",
+      "webpack/sass-loader",
+      "webpack/style-loader",
+      "webpack/tapable",
+      "webpack/watchpack",
+      "webpack/webpack-bundle-analyzer",
+      "webpack/webpack-cli",
+      "webpack/webpack-dev-middleware",
+      "webpack/webpack-dev-server",
+      "webreflection/flatted",
+      "websockets/ws",
+      "whitequark/ipaddr.js",
+      "winstonjs/winston",
+      "xtuc/webassemblyjs",
+      "yahoo/serialize-javascript",
+      "yargs/yargs",
+      "yarnpkg/yarn",
+      "yuzujs/setimmediate",
+      "zertosh/invariant",
+      "zloirock/core-js",
+      "zspecza/common-tags"
+    ],
+    "repositories": [
+      {
+        "identity": "airbnb/babel-plugin-dynamic-import-node",
+        "package": "babel-plugin-dynamic-import-node",
+        "package_rank": 873,
+        "rank": 1
+      },
+      {
+        "identity": "tabrindle/envinfo",
+        "package": "envinfo",
+        "package_rank": 874,
+        "rank": 2
+      },
+      {
+        "identity": "sindresorhus/p-retry",
+        "package": "p-retry",
+        "package_rank": 876,
+        "rank": 3
+      },
+      {
+        "identity": "lukeed/klona",
+        "package": "klona",
+        "package_rank": 877,
+        "rank": 4
+      },
+      {
+        "identity": "d3/d3-interpolate",
+        "package": "d3-interpolate",
+        "package_rank": 879,
+        "rank": 5
+      },
+      {
+        "identity": "fb55/css-select",
+        "package": "css-select",
+        "package_rank": 880,
+        "rank": 6
+      },
+      {
+        "identity": "koichik/node-tunnel",
+        "package": "tunnel",
+        "package_rank": 884,
+        "rank": 7
+      },
+      {
+        "identity": "jsdom/whatwg-url",
+        "package": "whatwg-url",
+        "package_rank": 885,
+        "rank": 8
+      },
+      {
+        "identity": "isaacs/inherits",
+        "package": "inherits",
+        "package_rank": 886,
+        "rank": 9
+      },
+      {
+        "identity": "d3/d3-color",
+        "package": "d3-color",
+        "package_rank": 887,
+        "rank": 10
+      },
+      {
+        "identity": "chalk/supports-color",
+        "package": "supports-color",
+        "package_rank": 888,
+        "rank": 11
+      },
+      {
+        "identity": "orling/grapheme-splitter",
+        "package": "grapheme-splitter",
+        "package_rank": 890,
+        "rank": 12
+      },
+      {
+        "identity": "alexreardon/tiny-invariant",
+        "package": "tiny-invariant",
+        "package_rank": 892,
+        "rank": 13
+      },
+      {
+        "identity": "mathiasbynens/jsesc",
+        "package": "jsesc",
+        "package_rank": 893,
+        "rank": 14
+      },
+      {
+        "identity": "sindresorhus/quick-lru",
+        "package": "quick-lru",
+        "package_rank": 895,
+        "rank": 15
+      },
+      {
+        "identity": "d3/d3-time-format",
+        "package": "d3-time-format",
+        "package_rank": 897,
+        "rank": 16
+      },
+      {
+        "identity": "dougwilson/nodejs-depd",
+        "package": "depd",
+        "package_rank": 898,
+        "rank": 17
+      },
+      {
+        "identity": "mcollina/fastq",
+        "package": "fastq",
+        "package_rank": 899,
+        "rank": 18
+      },
+      {
+        "identity": "octokit/graphql.js",
+        "package": "@octokit/graphql",
+        "package_rank": 900,
+        "rank": 19
+      },
+      {
+        "identity": "guybedford/es-module-lexer",
+        "package": "es-module-lexer",
+        "package_rank": 902,
+        "rank": 20
+      },
+      {
+        "identity": "alexeyraspopov/picocolors",
+        "package": "picocolors",
+        "package_rank": 903,
+        "rank": 21
+      },
+      {
+        "identity": "webpack-contrib/source-map-loader",
+        "package": "source-map-loader",
+        "package_rank": 909,
+        "rank": 22
+      },
+      {
+        "identity": "hiddentao/fast-levenshtein",
+        "package": "fast-levenshtein",
+        "package_rank": 911,
+        "rank": 23
+      },
+      {
+        "identity": "import-js/eslint-import-resolver-typescript",
+        "package": "eslint-import-resolver-typescript",
+        "package_rank": 916,
+        "rank": 24
+      },
+      {
+        "identity": "sindresorhus/strip-json-comments",
+        "package": "strip-json-comments",
+        "package_rank": 917,
+        "rank": 25
+      },
+      {
+        "identity": "developit/dlv",
+        "package": "dlv",
+        "package_rank": 918,
+        "rank": 26
+      },
+      {
+        "identity": "mafintosh/tar-fs",
+        "package": "tar-fs",
+        "package_rank": 919,
+        "rank": 27
+      },
+      {
+        "identity": "sindresorhus/serialize-error",
+        "package": "serialize-error",
+        "package_rank": 920,
+        "rank": 28
+      },
+      {
+        "identity": "jergason/recursive-readdir",
+        "package": "recursive-readdir",
+        "package_rank": 921,
+        "rank": 29
+      },
+      {
+        "identity": "sindresorhus/escape-string-regexp",
+        "package": "escape-string-regexp",
+        "package_rank": 922,
+        "rank": 30
+      },
+      {
+        "identity": "octokit/rest.js",
+        "package": "@octokit/rest",
+        "package_rank": 923,
+        "rank": 31
+      },
+      {
+        "identity": "zertosh/v8-compile-cache",
+        "package": "v8-compile-cache",
+        "package_rank": 924,
+        "rank": 32
+      },
+      {
+        "identity": "rawify/fraction.js",
+        "package": "fraction.js",
+        "package_rank": 926,
+        "rank": 33
+      },
+      {
+        "identity": "node-modules/agentkeepalive",
+        "package": "agentkeepalive",
+        "package_rank": 927,
+        "rank": 34
+      },
+      {
+        "identity": "dmnd/dedent",
+        "package": "dedent",
+        "package_rank": 928,
+        "rank": 35
+      },
+      {
+        "identity": "stream-utils/raw-body",
+        "package": "raw-body",
+        "package_rank": 930,
+        "rank": 36
+      },
+      {
+        "identity": "kriskowal/asap",
+        "package": "asap",
+        "package_rank": 932,
+        "rank": 37
+      },
+      {
+        "identity": "visionmedia/bytes.js",
+        "package": "bytes",
+        "package_rank": 933,
+        "rank": 38
+      },
+      {
+        "identity": "gkz/prelude-ls",
+        "package": "prelude-ls",
+        "package_rank": 934,
+        "rank": 39
+      },
+      {
+        "identity": "microsoft/node-jsonc-parser",
+        "package": "jsonc-parser",
+        "package_rank": 935,
+        "rank": 40
+      },
+      {
+        "identity": "suguru03/neo-async",
+        "package": "neo-async",
+        "package_rank": 937,
+        "rank": 41
+      },
+      {
+        "identity": "sindresorhus/find-up",
+        "package": "find-up",
+        "package_rank": 938,
+        "rank": 42
+      },
+      {
+        "identity": "bruce/node-temp",
+        "package": "temp",
+        "package_rank": 940,
+        "rank": 43
+      },
+      {
+        "identity": "npm/hosted-git-info",
+        "package": "hosted-git-info",
+        "package_rank": 941,
+        "rank": 44
+      },
+      {
+        "identity": "xmldom/xmldom",
+        "package": "@xmldom/xmldom",
+        "package_rank": 942,
+        "rank": 45
+      },
+      {
+        "identity": "npm/nopt",
+        "package": "nopt",
+        "package_rank": 943,
+        "rank": 46
+      },
+      {
+        "identity": "mafintosh/why-is-node-running",
+        "package": "why-is-node-running",
+        "package_rank": 944,
+        "rank": 47
+      },
+      {
+        "identity": "sindresorhus/ansi-escapes",
+        "package": "ansi-escapes",
+        "package_rank": 945,
+        "rank": 48
+      },
+      {
+        "identity": "jhchen/fast-diff",
+        "package": "fast-diff",
+        "package_rank": 946,
+        "rank": 49
+      },
+      {
+        "identity": "garycourt/uri-js",
+        "package": "uri-js",
+        "package_rank": 947,
+        "rank": 50
+      },
+      {
+        "identity": "fb55/domhandler",
+        "package": "domhandler",
+        "package_rank": 948,
+        "rank": 51
+      },
+      {
+        "identity": "paulmillr/readdirp",
+        "package": "readdirp",
+        "package_rank": 950,
+        "rank": 52
+      },
+      {
+        "identity": "sindresorhus/log-symbols",
+        "package": "log-symbols",
+        "package_rank": 951,
+        "rank": 53
+      },
+      {
+        "identity": "jhiesey/stream-http",
+        "package": "stream-http",
+        "package_rank": 952,
+        "rank": 54
+      },
+      {
+        "identity": "browserify/node-util",
+        "package": "util",
+        "package_rank": 954,
+        "rank": 55
+      },
+      {
+        "identity": "creationix/jsonparse",
+        "package": "jsonparse",
+        "package_rank": 955,
+        "rank": 56
+      },
+      {
+        "identity": "luisrudge/postcss-flexbugs-fixes",
+        "package": "postcss-flexbugs-fixes",
+        "package_rank": 956,
+        "rank": 57
+      },
+      {
+        "identity": "justmoon/node-extend",
+        "package": "extend",
+        "package_rank": 957,
+        "rank": 58
+      },
+      {
+        "identity": "sindresorhus/slash",
+        "package": "slash",
+        "package_rank": 958,
+        "rank": 59
+      },
+      {
+        "identity": "sindresorhus/crypto-random-string",
+        "package": "crypto-random-string",
+        "package_rank": 959,
+        "rank": 60
+      },
+      {
+        "identity": "browserify/sha.js",
+        "package": "sha.js",
+        "package_rank": 960,
+        "rank": 61
+      },
+      {
+        "identity": "sindresorhus/leven",
+        "package": "leven",
+        "package_rank": 961,
+        "rank": 62
+      },
+      {
+        "identity": "webpack/loader-runner",
+        "package": "loader-runner",
+        "package_rank": 962,
+        "rank": 63
+      },
+      {
+        "identity": "beaugunderson/ip-address",
+        "package": "ip-address",
+        "package_rank": 963,
+        "rank": 64
+      },
+      {
+        "identity": "winstonjs/logform",
+        "package": "logform",
+        "package_rank": 964,
+        "rank": 65
+      },
+      {
+        "identity": "babel/babel-polyfills",
+        "package": "babel-plugin-polyfill-corejs3",
+        "package_rank": 965,
+        "rank": 66
+      },
+      {
+        "identity": "webpack/webpack-sources",
+        "package": "webpack-sources",
+        "package_rank": 966,
+        "rank": 67
+      },
+      {
+        "identity": "moll/json-stringify-safe",
+        "package": "json-stringify-safe",
+        "package_rank": 967,
+        "rank": 68
+      },
+      {
+        "identity": "jonaskello/tsconfig-paths-webpack-plugin",
+        "package": "tsconfig-paths-webpack-plugin",
+        "package_rank": 968,
+        "rank": 69
+      },
+      {
+        "identity": "cli-table/cli-table3",
+        "package": "cli-table3",
+        "package_rank": 969,
+        "rank": 70
+      },
+      {
+        "identity": "feross/simple-get",
+        "package": "simple-get",
+        "package_rank": 970,
+        "rank": 71
+      },
+      {
+        "identity": "runk/node-chardet",
+        "package": "chardet",
+        "package_rank": 971,
+        "rank": 72
+      },
+      {
+        "identity": "stacktracejs/error-stack-parser",
+        "package": "error-stack-parser",
+        "package_rank": 972,
+        "rank": 73
+      },
+      {
+        "identity": "urthen/case-sensitive-paths-webpack-plugin",
+        "package": "case-sensitive-paths-webpack-plugin",
+        "package_rank": 973,
+        "rank": 74
+      },
+      {
+        "identity": "d3/d3-ease",
+        "package": "d3-ease",
+        "package_rank": 974,
+        "rank": 75
+      },
+      {
+        "identity": "kaelzhang/node-ignore",
+        "package": "ignore",
+        "package_rank": 975,
+        "rank": 76
+      },
+      {
+        "identity": "tvcutsem/harmony-reflect",
+        "package": "harmony-reflect",
+        "package_rank": 976,
+        "rank": 77
+      },
+      {
+        "identity": "fb55/entities",
+        "package": "entities",
+        "package_rank": 977,
+        "rank": 78
+      },
+      {
+        "identity": "componentdriven/csf",
+        "package": "@storybook/csf",
+        "package_rank": 978,
+        "rank": 79
+      },
+      {
+        "identity": "unjs/ufo",
+        "package": "ufo",
+        "package_rank": 979,
+        "rank": 80
+      },
+      {
+        "identity": "browserify/commonjs-assert",
+        "package": "assert",
+        "package_rank": 980,
+        "rank": 81
+      },
+      {
+        "identity": "micromatch/anymatch",
+        "package": "anymatch",
+        "package_rank": 982,
+        "rank": 82
+      },
+      {
+        "identity": "visionmedia/batch",
+        "package": "batch",
+        "package_rank": 985,
+        "rank": 83
+      },
+      {
+        "identity": "sindresorhus/make-dir",
+        "package": "make-dir",
+        "package_rank": 990,
+        "rank": 84
+      },
+      {
+        "identity": "forbeslindesay/throat",
+        "package": "throat",
+        "package_rank": 991,
+        "rank": 85
+      },
+      {
+        "identity": "lukeed/dequal",
+        "package": "dequal",
+        "package_rank": 994,
+        "rank": 86
+      },
+      {
+        "identity": "jonschlinkert/clone-deep",
+        "package": "clone-deep",
+        "package_rank": 995,
+        "rank": 87
+      },
+      {
+        "identity": "sysgears/webpack-virtual-modules",
+        "package": "webpack-virtual-modules",
+        "package_rank": 996,
+        "rank": 88
+      },
+      {
+        "identity": "mathiasbynens/regenerate",
+        "package": "regenerate",
+        "package_rank": 999,
+        "rank": 89
+      },
+      {
+        "identity": "patrickjuchli/basic-ftp",
+        "package": "basic-ftp",
+        "package_rank": 1000,
+        "rank": 90
+      },
+      {
+        "identity": "indutny/hash.js",
+        "package": "hash.js",
+        "package_rank": 1002,
+        "rank": 91
+      },
+      {
+        "identity": "yargs/cliui",
+        "package": "cliui",
+        "package_rank": 1003,
+        "rank": 92
+      },
+      {
+        "identity": "lydell/js-tokens",
+        "package": "js-tokens",
+        "package_rank": 1004,
+        "rank": 93
+      },
+      {
+        "identity": "watson/ci-info",
+        "package": "ci-info",
+        "package_rank": 1005,
+        "rank": 94
+      },
+      {
+        "identity": "jfromaniello/url-join",
+        "package": "url-join",
+        "package_rank": 1006,
+        "rank": 95
+      },
+      {
+        "identity": "chalk/strip-ansi",
+        "package": "strip-ansi",
+        "package_rank": 1007,
+        "rank": 96
+      },
+      {
+        "identity": "npm/validate-npm-package-name",
+        "package": "validate-npm-package-name",
+        "package_rank": 1008,
+        "rank": 97
+      },
+      {
+        "identity": "feross/safe-buffer",
+        "package": "safe-buffer",
+        "package_rank": 1009,
+        "rank": 98
+      },
+      {
+        "identity": "qix-/color-string",
+        "package": "color-string",
+        "package_rank": 1010,
+        "rank": 99
+      },
+      {
+        "identity": "mikolalysenko/functional-red-black-tree",
+        "package": "functional-red-black-tree",
+        "package_rank": 1011,
+        "rank": 100
+      }
+    ],
+    "source_sha256": "d92bfe1296ad39f3c148dd735c5a69df23c9d119f44906acd7607bbab0813e55",
+    "source_url": "https://raw.githubusercontent.com/alpha-omega-security/heatmap/4ed37981a6e5049c81d7436d90abe036d2810773/data/critical.json"
+  },
+  "current_native_versions": {
+    "npm": "12.2.2",
+    "pnpm": "12.18.0"
+  },
+  "graph_reference_summary": {
+    "arborist_edges": {
+      "True": 20
+    },
+    "arborist_paths": {
+      "True": 20
+    },
+    "cases": 20,
+    "ecosystems_coordinates": {
+      "True": 20
+    },
+    "name_version_mismatch_cases": 0,
+    "topology_status": {
+      "complete": 20
+    }
+  },
+  "historical_case_summary": {
+    "assessable_events": 4301,
+    "attempt_statuses": {
+      "input_unavailable_or_invalid": 4,
+      "no_captured_npm_json_lock": 45,
+      "non3": 17,
+      "npm3_eligible": 30
+    },
+    "cases": [
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 116,
+        "complete": false,
+        "event_matches": 116,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r006-80f0a8cdbd45",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 426311680,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "fb55/css-select",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 14.965662667062134,
+        "wall_seconds_range": [
+          14.603473750175908,
+          15.245864792028442
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 6,
+        "complete": false,
+        "event_matches": 6,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r006-49579df230cb",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 430276608,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "fb55/css-select",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 14.801310542039573,
+        "wall_seconds_range": [
+          14.459070000099018,
+          14.840424874797463
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 11,
+        "complete": false,
+        "event_matches": 11,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r006-9a76fe0edcb0",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 432078848,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "fb55/css-select",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 14.859203082975,
+        "wall_seconds_range": [
+          14.492714291904122,
+          15.16836137487553
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 17,
+        "complete": true,
+        "event_matches": 17,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r008-8ad33b85f55f",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 213106688,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "jsdom/whatwg-url",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 10.708598291967064,
+        "wall_seconds_range": [
+          10.43656445806846,
+          10.901317999931052
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 151,
+        "complete": true,
+        "event_matches": 151,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r008-97aaa94d7a56",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 195592192,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "jsdom/whatwg-url",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 9.138546042144299,
+        "wall_seconds_range": [
+          8.957519166870043,
+          9.322710833977908
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 2,
+        "complete": true,
+        "event_matches": 2,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r008-6a0e2ad72245",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 174948352,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "jsdom/whatwg-url",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 7.759092542110011,
+        "wall_seconds_range": [
+          7.566885166801512,
+          7.946148541988805
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 42,
+        "complete": true,
+        "event_matches": 42,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r019-50222c3021cc",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 365887488,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "octokit/graphql.js",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 19.151914374902844,
+        "wall_seconds_range": [
+          18.881949125090614,
+          19.64565183315426
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 6,
+        "complete": true,
+        "event_matches": 6,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r019-af94a01b676a",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 365264896,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "octokit/graphql.js",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 19.029809084022418,
+        "wall_seconds_range": [
+          18.858222708804533,
+          19.578056999947876
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 149,
+        "complete": true,
+        "event_matches": 149,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r019-2b245254e40e",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 367869952,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "octokit/graphql.js",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 19.372388666961342,
+        "wall_seconds_range": [
+          18.600184542126954,
+          19.581335166003555
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 952,
+        "complete": true,
+        "event_matches": 952,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r022-87b0b4d463f1",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 128417792,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "webpack-contrib/source-map-loader",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 3.324958291137591,
+        "wall_seconds_range": [
+          3.2076859169173986,
+          3.5036531251389533
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 246,
+        "complete": true,
+        "event_matches": 246,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r022-58835b661af3",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 128204800,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "webpack-contrib/source-map-loader",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 3.208270583068952,
+        "wall_seconds_range": [
+          3.06540595786646,
+          3.308503083186224
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 1394,
+        "complete": true,
+        "event_matches": 1394,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r022-4797cc123d09",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 129794048,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "webpack-contrib/source-map-loader",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 2.5475543329957873,
+        "wall_seconds_range": [
+          2.4156937091611326,
+          2.7795667918398976
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 118,
+        "complete": false,
+        "event_matches": 118,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r031-351ee1dc7d6f",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 417955840,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "octokit/rest.js",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 11.897476499900222,
+        "wall_seconds_range": [
+          11.617281540995464,
+          12.146818875102326
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 5,
+        "complete": false,
+        "event_matches": 5,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r031-cd6ace029871",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 417808384,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "octokit/rest.js",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 11.877624083077535,
+        "wall_seconds_range": [
+          11.359812415903434,
+          12.215421458007768
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 5,
+        "complete": false,
+        "event_matches": 5,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r031-fefa2ba23656",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 417300480,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "octokit/rest.js",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 11.919208166887984,
+        "wall_seconds_range": [
+          11.434882916975766,
+          13.657378042116761
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 176,
+        "complete": true,
+        "event_matches": 176,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r036-001c5f794d60",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 283869184,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "stream-utils/raw-body",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 12.208891791990027,
+        "wall_seconds_range": [
+          11.888092375127599,
+          12.60117533383891
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 11,
+        "complete": false,
+        "event_matches": 11,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r036-8875d6688241",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 278593536,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "stream-utils/raw-body",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 11.971443375106901,
+        "wall_seconds_range": [
+          11.551295291865245,
+          12.435509582981467
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 36,
+        "complete": true,
+        "event_matches": 36,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r036-88a64d529e9f",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 241287168,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "stream-utils/raw-body",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 9.697740457952023,
+        "wall_seconds_range": [
+          9.236246790969744,
+          16.757809709059075
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 25,
+        "complete": false,
+        "event_matches": 25,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r040-f1e2a421266e",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 72663040,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "microsoft/node-jsonc-parser",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 0.597376958001405,
+        "wall_seconds_range": [
+          0.5739440419711173,
+          0.714111709035933
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 12,
+        "complete": false,
+        "event_matches": 12,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r040-7d0e3ca4fcf8",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 73334784,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "microsoft/node-jsonc-parser",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 0.584527499973774,
+        "wall_seconds_range": [
+          0.5571371668484062,
+          0.6581107911188155
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 5,
+        "complete": false,
+        "event_matches": 5,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r040-53551aabacb0",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 73203712,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "microsoft/node-jsonc-parser",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 0.5888997500296682,
+        "wall_seconds_range": [
+          0.5546920830383897,
+          0.8932594158686697
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 9,
+        "complete": false,
+        "event_matches": 9,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r049-90d7fff46aa7",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 17039360,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "jhchen/fast-diff",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 0.2676920408848673,
+        "wall_seconds_range": [
+          0.247811459004879,
+          0.4221448330208659
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 46,
+        "complete": false,
+        "event_matches": 36,
+        "event_misses": 10,
+        "fact_mismatches": 0,
+        "id": "r051-cf32167f6bca",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 566411264,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "fb55/domhandler",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 16.578532041981816,
+        "wall_seconds_range": [
+          15.861255833879113,
+          17.359182249987498
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 11,
+        "complete": false,
+        "event_matches": 11,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r051-63de21f0448d",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 584515584,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "fb55/domhandler",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 16.28454408305697,
+        "wall_seconds_range": [
+          15.781993458978832,
+          16.406586666125804
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 116,
+        "complete": false,
+        "event_matches": 116,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r051-68069e7676d2",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 583188480,
+        "policy_outcomes": [
+          "incomplete"
+        ],
+        "repository": "fb55/domhandler",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 16.502571958117187,
+        "wall_seconds_range": [
+          15.68169516697526,
+          17.354742540977895
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 2,
+        "complete": true,
+        "event_matches": 2,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r052-5dba3694a1de",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 77824000,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "paulmillr/readdirp",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 0.5540890840347856,
+        "wall_seconds_range": [
+          0.5210594581440091,
+          0.5820196671411395
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 2,
+        "complete": true,
+        "event_matches": 2,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r052-5f1b74ebe001",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 78299136,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "paulmillr/readdirp",
+        "statuses": [
+          "complete"
+        ],
+        "wall_seconds_median": 0.5380707499571145,
+        "wall_seconds_range": [
+          0.5002688330132514,
+          0.5401657498441637
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 53,
+        "complete": false,
+        "event_matches": 53,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r052-a7694e87ca77",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 77037568,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "paulmillr/readdirp",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 0.5223832088522613,
+        "wall_seconds_range": [
+          0.49209983297623694,
+          0.6377894589677453
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 1,
+        "complete": false,
+        "event_matches": 1,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r063-857a7bf9566b",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 96878592,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "webpack/loader-runner",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 1.5123382499441504,
+        "wall_seconds_range": [
+          1.4184103328734636,
+          1.696452541043982
+        ]
+      },
+      {
+        "approval_relevant_misses": 0,
+        "assessable_events": 576,
+        "complete": false,
+        "event_matches": 576,
+        "event_misses": 0,
+        "fact_mismatches": 0,
+        "id": "r063-9711d5c84b26",
+        "output_sha256_stable": true,
+        "peak_rss_bytes_max": 96600064,
+        "policy_outcomes": [
+          "advisory"
+        ],
+        "repository": "webpack/loader-runner",
+        "statuses": [
+          "incomplete"
+        ],
+        "wall_seconds_median": 1.2999947918578982,
+        "wall_seconds_range": [
+          1.270759291946888,
+          1.3929777080193162
+        ]
+      }
+    ],
+    "completion_floor": 0.8,
+    "completion_floor_met": false,
+    "completion_fraction": 0.43333333333333335,
+    "event_recall": 0.997674959311788,
+    "human_review_minutes": null,
+    "incorrect_allowed_fixture_gate": "not assessed here; separate mandatory controlled gate",
+    "independent_labels_complete": 13,
+    "labels_sha256": "8bc44be36679b1d909a161bd8716ed351893930287cdd9111367a2d615c78874",
+    "matched_events": 4291,
+    "pairs": 30,
+    "processing_complete": 13,
+    "protocol_sha256": "83cd367edc41f388351956fe03eaae7d15ef9bc7610175394f495c0dbfb0c5bc",
+    "safety_claim": "none; historical public reports are advisory",
+    "selection_sha256": "470087043d41384a4f649e9a2a8840ee0e2b88a8290e8f01316fe80a5730593d",
+    "unexpected_allowed_outcomes": 0,
+    "unknown_packages_by_side": {
+      "base": 47,
+      "head": 42
+    }
+  },
+  "independent_label_summary": {
+    "acquisition_sha256": "4fd6d0d64e2ff6da896fb3eedf3191f58eb5ee81ccf9e15afd3ff5f90b4e00c0",
+    "cases": [
+      {
+        "assessable_events": 116,
+        "event_sha256": "77d3635d956354806f1cecd002aaea77f37b7ca617fff8401faca7b2baf28a29",
+        "id": "r006-80f0a8cdbd45",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "7fbe978c9a59e9ad643702adc8509b509967e0d6bea2bff270baf10ffd42b652",
+            "facts_sha256": "3987d7905eed884cf5a4de0117a78973d593813962a7bfad0b9c4d2143f54507",
+            "input_inventory_entry_count": 251
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "f3cee97225274d4a7d7bcea59fa41a6868187895dde364028cca56341d485472",
+            "facts_sha256": "3bdab17a78b676a1ab9b7fdb81204cb1457a35971dd15fd54df42479ce547500",
+            "input_inventory_entry_count": 251
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 2,
+          "head": 2
+        }
+      },
+      {
+        "assessable_events": 6,
+        "event_sha256": "3fea74ac45778375ed831949c8da514bcd769d0e58a720a1988a6283bc4a439e",
+        "id": "r006-49579df230cb",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "920a11c0594880ce173404dbf7702fac5e530cf8dfa0541bed90d80390e54f2e",
+            "facts_sha256": "3b316e68f38d259b286c2d3551dc3908eaf5f3d69d611a2c66db9f1ef83cb847",
+            "input_inventory_entry_count": 251
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "2df39793e37c15deb396f8b417abc081d7a4c9fbaf175d70387f36f696f0ae61",
+            "facts_sha256": "3987d7905eed884cf5a4de0117a78973d593813962a7bfad0b9c4d2143f54507",
+            "input_inventory_entry_count": 251
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 2,
+          "head": 2
+        }
+      },
+      {
+        "assessable_events": 11,
+        "event_sha256": "4ff2605554a0d7da91e01675643b96a211a637a6b3d2611db154bcb2742d9c6b",
+        "id": "r006-9a76fe0edcb0",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "4e6aaebfa719eb596a771605eda66a5d80782d2c00928e13073e666f87e641b0",
+            "facts_sha256": "ac905efe4677312d5b11901ca9f6d5a065b7442895a245c92e5e96ed3c123340",
+            "input_inventory_entry_count": 251
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "920a11c0594880ce173404dbf7702fac5e530cf8dfa0541bed90d80390e54f2e",
+            "facts_sha256": "3b316e68f38d259b286c2d3551dc3908eaf5f3d69d611a2c66db9f1ef83cb847",
+            "input_inventory_entry_count": 251
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 2,
+          "head": 2
+        }
+      },
+      {
+        "assessable_events": 17,
+        "event_sha256": "f8b607ec8dfc458666168d798ecd3afcebe11166fb410b485f90e87d432a6258",
+        "id": "r008-8ad33b85f55f",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "af2fb004a25fb56dd9493a8d95c52c5e97b24b96ef612e69d3823c389cf3e211",
+            "facts_sha256": "55664610c6b2a7a34539c2d708bd8d32a0c021972ee735f30f2795aa79e29f97",
+            "input_inventory_entry_count": 203
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "2435cdc488924c19c34c266df17540d8fe09263ec2876c7b2b4c77f2e394b28b",
+            "facts_sha256": "e2933a006c26b946c3dde35041b633f7b687cde27459bfaea2bf6587e4ab942c",
+            "input_inventory_entry_count": 203
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 151,
+        "event_sha256": "d74ea17a1e9d6e5ae268ba44ca9a6ed66aa5715c6c20db6d81fbd2ca57638089",
+        "id": "r008-97aaa94d7a56",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "4af05b3bcd83ad98eb2a5b0e8cf1fa0d90b3bda9c76e2a70de9cc4d977b93839",
+            "facts_sha256": "e09ef1160457a674d6ded3dd07065462677c72e230becbca1df4df9bf4a18f5e",
+            "input_inventory_entry_count": 178
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "f6e2e4c47a300cef37de9ef995b8018d5fae65305a904f724dc5e7acd3711c29",
+            "facts_sha256": "55664610c6b2a7a34539c2d708bd8d32a0c021972ee735f30f2795aa79e29f97",
+            "input_inventory_entry_count": 203
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 2,
+        "event_sha256": "547b74641c13db18d1d5fb013e4830a6245207f62cbc9316f39094c136455b69",
+        "id": "r008-6a0e2ad72245",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "7db5c197279c65e07cd85d04dedf88a91a7ad3b4ef27e7d2f1aa7696d2c03149",
+            "facts_sha256": "868e336c3fb86f20263d53ed60e535b3339bf54eff6843d8fbad48e929b270a7",
+            "input_inventory_entry_count": 178
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "4af05b3bcd83ad98eb2a5b0e8cf1fa0d90b3bda9c76e2a70de9cc4d977b93839",
+            "facts_sha256": "e09ef1160457a674d6ded3dd07065462677c72e230becbca1df4df9bf4a18f5e",
+            "input_inventory_entry_count": 178
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 42,
+        "event_sha256": "f05b8470521aafb930289a14812a5a9d1f41f0d036fe42633afe1468eda96daf",
+        "id": "r019-50222c3021cc",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "b16d21b3404dcd036c538c2d5f8e7de2acc8e91bcfee93326044100e7f60613b",
+            "facts_sha256": "d51bcb040334e203f624ea0ab682c2db7978ef0fe7b6755bab1e000f501963e1",
+            "input_inventory_entry_count": 177
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "540e313736c06c752d4b9b8a6f5a6bbb97fd208e01a20dfaf0ccadfe0ba94508",
+            "facts_sha256": "a918fbaf596c004737d6d43dacf7ecfc58c3ba475d495065b323a54951a27c8e",
+            "input_inventory_entry_count": 175
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 6,
+        "event_sha256": "1ea66f879c49d4f55a22035053cfc9e6b248463338ba0ab75f5d4d1073fcbe74",
+        "id": "r019-af94a01b676a",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "03d14dbdb074212da49e30d723df36a912e633589fa2a97a8528071eefce9ff3",
+            "facts_sha256": "2494d98b414d103d91b08013261328c8b95afa4f5cf7782912460454fabcd7cf",
+            "input_inventory_entry_count": 177
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "b16d21b3404dcd036c538c2d5f8e7de2acc8e91bcfee93326044100e7f60613b",
+            "facts_sha256": "d51bcb040334e203f624ea0ab682c2db7978ef0fe7b6755bab1e000f501963e1",
+            "input_inventory_entry_count": 177
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 149,
+        "event_sha256": "458663018749c8684712db095363b44e36850b805ab1805ae0c4a5e8ded43853",
+        "id": "r019-2b245254e40e",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "e600558d7aea7c7c34dffd89ca347b8bd0533f916da808478534d0372de87679",
+            "facts_sha256": "d8b3c3c3080202948eb4be17b4edc57d200e5d052884799f23f44bfa0e9bad4d",
+            "input_inventory_entry_count": 177
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "03d14dbdb074212da49e30d723df36a912e633589fa2a97a8528071eefce9ff3",
+            "facts_sha256": "2494d98b414d103d91b08013261328c8b95afa4f5cf7782912460454fabcd7cf",
+            "input_inventory_entry_count": 177
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 952,
+        "event_sha256": "70a17ec49bdb29f12d5f6c3ed0b3275c04629b0b6868e1d112d3885606204db6",
+        "id": "r022-87b0b4d463f1",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "6d5b2da0dadc2e91a575bb3eda1c9eedeac2e397c75737c6174153f380ccbc28",
+            "facts_sha256": "8f8ce8b6c9de2f51708a6c503f6a26c3e279e198fd39c4ec9b3331359188e43c",
+            "input_inventory_entry_count": 1099
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "f9b0cf4895073748875d3d78ba7238659b40ab97af880dd938b448f69cf8e4c0",
+            "facts_sha256": "a99b1cd569f9ac1ed46adedb9afba9202782252fc0794666e72b48ac049c8c2c",
+            "input_inventory_entry_count": 1100
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 246,
+        "event_sha256": "ae3c542f514bd44a2780c15abf88570373252c335561bc88677f783ae909e104",
+        "id": "r022-58835b661af3",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "ae2196047b5c30d0cfb7a86b1ab69239b542a2e23f376865d894d13b287e243c",
+            "facts_sha256": "b24e6fd6ee632446c86e970b88c2138de8a3726863b063e3281be610e7408497",
+            "input_inventory_entry_count": 982
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "6d5b2da0dadc2e91a575bb3eda1c9eedeac2e397c75737c6174153f380ccbc28",
+            "facts_sha256": "8f8ce8b6c9de2f51708a6c503f6a26c3e279e198fd39c4ec9b3331359188e43c",
+            "input_inventory_entry_count": 1099
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 1394,
+        "event_sha256": "fbdc3faff262c71277e35a04e5bb770f2d45c6882bf5d47227ac8c9dd1f66df0",
+        "id": "r022-4797cc123d09",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "b4a93caded057db23331199a30576f57693b806be8e21079e2c4acdcf9a92461",
+            "facts_sha256": "edd2fb165498c23fbfc79ba072b3926e0bf453d2dc682de1a94dee919d57f7ba",
+            "input_inventory_entry_count": 946
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "ae2196047b5c30d0cfb7a86b1ab69239b542a2e23f376865d894d13b287e243c",
+            "facts_sha256": "b24e6fd6ee632446c86e970b88c2138de8a3726863b063e3281be610e7408497",
+            "input_inventory_entry_count": 982
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 118,
+        "event_sha256": "bd6b30765c0eefceb6aa19114836edfb616a6c2ad76542e3916d1ef12f54a67b",
+        "id": "r031-351ee1dc7d6f",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "67aaebd192d88acc5948fbc042e6fd26ed75b632c8b5fc14a06579dafaa98121",
+            "facts_sha256": "d78beb71504337b3199d0b4d5150f1128999d6d57bd68a65359419f6a2d419e5",
+            "input_inventory_entry_count": 308
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "872246639464629f37c90369129efba18a34c21245be409224009525b15dd544",
+            "facts_sha256": "78caae58691fd61ed8cca9f14c3b7fa153bbb4ecec17b161860870d7e6e115ce",
+            "input_inventory_entry_count": 310
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 1
+        }
+      },
+      {
+        "assessable_events": 5,
+        "event_sha256": "71fe641c85432b88a5f2e5ba717236f8f3da7458860861a3bd3bd963869f1ea3",
+        "id": "r031-cd6ace029871",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "a79f0428d64edc3a9566a5173c5218779ec995989bede89cfbdc781207d2afb5",
+            "facts_sha256": "35871b56f542c7b09af3319c2e5effa5f1d8450eb84886fa84cbe080e65cd637",
+            "input_inventory_entry_count": 308
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "77be63daaa0d977340a6e4e70cd0387589abe5c114634c84317ddd1c97b6262c",
+            "facts_sha256": "d78beb71504337b3199d0b4d5150f1128999d6d57bd68a65359419f6a2d419e5",
+            "input_inventory_entry_count": 308
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 1
+        }
+      },
+      {
+        "assessable_events": 5,
+        "event_sha256": "34c97bd507bb3197ff01ec452bcf72b8d918353f4aa51e0e95505cc3d5ad5dd5",
+        "id": "r031-fefa2ba23656",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "9ab006c07c5f1717a3c1554457fb726c08f1ba124f68205716fe3e3eed391c70",
+            "facts_sha256": "1f6c321836177b1f24b00992e523abfcea36b916220c6637927ca7dd0e68e8ce",
+            "input_inventory_entry_count": 308
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "5ce0d286ce0a3917458b5c28d057f3dca80c764772338d1d939c8ecf7d0589bb",
+            "facts_sha256": "35871b56f542c7b09af3319c2e5effa5f1d8450eb84886fa84cbe080e65cd637",
+            "input_inventory_entry_count": 308
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 1
+        }
+      },
+      {
+        "assessable_events": 176,
+        "event_sha256": "c0e7f9f34d7bcbce6dd5b05bd13c22e23194ae7c0f0906f2f4cb3db013a191ae",
+        "id": "r036-001c5f794d60",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "119f1572e936038fdbd0c080ba10e170b17c9266bb2f2c4194ebd4c68c0eb4e5",
+            "facts_sha256": "da2dc9d0b23611b7860d095dbf4dcf0011ceeb059b37390ccdd20181962c3018",
+            "input_inventory_entry_count": 393
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "4ba45041c7f51f0d9d935f853a905f5d25b1b1e2899cba305ecfa90bc4ec590c",
+            "facts_sha256": "ec59c9846f20f81e969eca99d15017abc542d64287f9a01110e52597b8303179",
+            "input_inventory_entry_count": 384
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 11,
+        "event_sha256": "97239aa7734fa7f2749ce2ec624fd77987cd1c895e74180bb0e7b40e9097a54b",
+        "id": "r036-8875d6688241",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "c8716acd20b76c5d4c07ab85883a96a8d4ebba66bfe6091da1444ba60ea009b4",
+            "facts_sha256": "f823954e362bebc6f7351ba64ce94fbb567bcc179ff87e140f1f950866682b02",
+            "input_inventory_entry_count": 393
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "119f1572e936038fdbd0c080ba10e170b17c9266bb2f2c4194ebd4c68c0eb4e5",
+            "facts_sha256": "da2dc9d0b23611b7860d095dbf4dcf0011ceeb059b37390ccdd20181962c3018",
+            "input_inventory_entry_count": 393
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 36,
+        "event_sha256": "2576b807fc8ec3a0aa90ae131df93f96526d8f57595bf6d868670258c1aaed87",
+        "id": "r036-88a64d529e9f",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "e98f50fb30e06d55eb841c294d25ec08c339901df32495fad8aeeda12864b8a7",
+            "facts_sha256": "67bf1853c41ef8705793ca987dcab65be4701b309c48950c3dc6f82da452abd5",
+            "input_inventory_entry_count": 358
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "197b05ef1047c0b65507a8cd8f296f0835ad132f672f8a9796915d1a0d2ea50c",
+            "facts_sha256": "bb9ab6a3421ce319f48d3244d255afdfff9a547507965cbe1a9ead90cccc309e",
+            "input_inventory_entry_count": 393
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 25,
+        "event_sha256": "f6f441e67b029ba95b571058a3631d9f4f1a5334bfb0954d8333db0db86f83c2",
+        "id": "r040-f1e2a421266e",
+        "inputs": {
+          "base": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "b354475c1de9a85b54baaba233eff018d36cda0685b24570e5c2c936e8b9a22e",
+            "facts_sha256": "e2e05cf129e9f84af9618aa2a51ee95119185385ec9b69e4fef8cb48355046c4",
+            "input_inventory_entry_count": 153
+          },
+          "head": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "0b7a6c4c99298d0c51ab06eb7d2129b0927922c71b6a388c64950516c5dde893",
+            "facts_sha256": "d67092cf3140d5ae62e5fa7b3e2562b37f6985c7e3e8ad019409f6495a93edc6",
+            "input_inventory_entry_count": 153
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 1
+        }
+      },
+      {
+        "assessable_events": 12,
+        "event_sha256": "3f5a0536efd42828875a3d5f3d6c90c0c7fce8ec27538aab5d5b475da62e99ca",
+        "id": "r040-7d0e3ca4fcf8",
+        "inputs": {
+          "base": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "95c8310545a875b6a200799c41b08c900badf0207d99f041790025bdfdf5a945",
+            "facts_sha256": "e923f1184c80001d559c87f3fee7eb48a44d9e1c8345d5ba12dc047ff030684e",
+            "input_inventory_entry_count": 153
+          },
+          "head": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "8eefd2a32b82d0ed896cb45a021a9f868027e8ae5687d2f2003993fdb417570b",
+            "facts_sha256": "e2e05cf129e9f84af9618aa2a51ee95119185385ec9b69e4fef8cb48355046c4",
+            "input_inventory_entry_count": 153
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 1
+        }
+      },
+      {
+        "assessable_events": 5,
+        "event_sha256": "958d31b4c8ebe91c7d135384c4abcd6112b5c973ef49b6d421dc862d5ab6908f",
+        "id": "r040-53551aabacb0",
+        "inputs": {
+          "base": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "dfca90d553f7e2405bbfa193520385d2ab51fe2d16a47adb2031014868ab2810",
+            "facts_sha256": "170bff606f16bceef2f57f3bad141b30483c1bf2538032742f4d3ebd0d6ac6c5",
+            "input_inventory_entry_count": 153
+          },
+          "head": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "95c8310545a875b6a200799c41b08c900badf0207d99f041790025bdfdf5a945",
+            "facts_sha256": "e923f1184c80001d559c87f3fee7eb48a44d9e1c8345d5ba12dc047ff030684e",
+            "input_inventory_entry_count": 153
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 1
+        }
+      },
+      {
+        "assessable_events": 9,
+        "event_sha256": "042f6fd08b53aef5df9f7c7401c222de9489fbd2cfd343ff6987130ffa631229",
+        "id": "r049-90d7fff46aa7",
+        "inputs": {
+          "base": {
+            "acquisition_status": "partial",
+            "canonical_input_inventory_sha256": "eceab00eeabf63601e8051106a832c072843365b50ac06ea3a46505db096efb3",
+            "facts_sha256": "14eb7ca79637177501fe8792e38db486f3e446bf7a3e9def822aa59de511c5a3",
+            "input_inventory_entry_count": 159
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "32cd584545dc680ea38469de22d0e91436d538e90f15c0209db6f2492a7687b8",
+            "facts_sha256": "b6c4dd695fc95df7d0a1c7c1002618def05f8762d0bc9b70214545bff6fd309b",
+            "input_inventory_entry_count": 160
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 46,
+        "event_sha256": "d3424b3deb9d45b6b1a4c527760396845336b8b333e889b765ea5f25d1ec498a",
+        "id": "r051-cf32167f6bca",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "6a70278980722eb74d59d66e7d74e661d943efd757c1ddf930d452fbc01aa6ca",
+            "facts_sha256": "43987c866fcd7d04a9f6a4a05d3ee0126de5d0a7e27a86234d245857c704b4c2",
+            "input_inventory_entry_count": 268
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "ec8c4137707be8976072afe8d37f362ff4595d31d47541aa0efce2d30a018bf1",
+            "facts_sha256": "f70da87bc8f4129c6cb1157f1b29eeb700725401719a9f4f21b1a08007758b40",
+            "input_inventory_entry_count": 268
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 10,
+          "head": 10
+        }
+      },
+      {
+        "assessable_events": 11,
+        "event_sha256": "3c83108c856b0dd327c2247cc1ff807c91ac3c29e4a4e023a447c140466e3f7c",
+        "id": "r051-63de21f0448d",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "a1e28d598d1cc38e26c389f80664f7ce99c69aba9fe7bc4f5411fde17ee85341",
+            "facts_sha256": "b20aa0a1f490618890d658359e3cb30c1889dbb5fb657c5c8f296a87425a78ea",
+            "input_inventory_entry_count": 268
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "cc70ee620327c38fc3c0b32e804c9c6cbe5a868505c24cf79734473ba3e7a752",
+            "facts_sha256": "43987c866fcd7d04a9f6a4a05d3ee0126de5d0a7e27a86234d245857c704b4c2",
+            "input_inventory_entry_count": 268
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 10,
+          "head": 10
+        }
+      },
+      {
+        "assessable_events": 116,
+        "event_sha256": "0ef218dd0bb911a5e698120d9606a4374977c1b1975ab537d4ef89f43ad5e15e",
+        "id": "r051-68069e7676d2",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "7272ddc567222570ff6fe5ab58dd7e9e250040c9f94beaeb6718df7b1c0001af",
+            "facts_sha256": "9d3600bcd6343d895a3fc7b0927ace935aaff77b7876bc5b6a7aebe78ac6ddc1",
+            "input_inventory_entry_count": 268
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "a1e28d598d1cc38e26c389f80664f7ce99c69aba9fe7bc4f5411fde17ee85341",
+            "facts_sha256": "b20aa0a1f490618890d658359e3cb30c1889dbb5fb657c5c8f296a87425a78ea",
+            "input_inventory_entry_count": 268
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 10,
+          "head": 10
+        }
+      },
+      {
+        "assessable_events": 2,
+        "event_sha256": "3ab4e1da3b1f2103522bfe24159926ad247ca3471419389e32a0f488903b5892",
+        "id": "r052-5dba3694a1de",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "b0d28233f627525c7b40ff95b5e2e412475b24f3241dbb6b5a1919f8a8b2c62b",
+            "facts_sha256": "16008bb9babda05d522f3e53c2d44961ad3f5ebbf595620d95716fd0d355f9de",
+            "input_inventory_entry_count": 88
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "517c9c263d57a78db23b26884ec8492cbf2e525f8f3bc95057b9763dd92cbe43",
+            "facts_sha256": "6d464c02d309c790495d38b4fbc8fe5e0ecc39bbea1596d7d88b0c16e8a31587",
+            "input_inventory_entry_count": 88
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 2,
+        "event_sha256": "330a6f6a6636c39ab86aa67ba871a5a90bc3cc55c06317f94418da0b89e2c165",
+        "id": "r052-5f1b74ebe001",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "a4e8421783ad4363187a5de64f407841dbbc261a6430725f69e2be44aadc2ce3",
+            "facts_sha256": "0933880e2dd5baa0305a5f764e39bfc00427b37184b1f20c88076070fa914630",
+            "input_inventory_entry_count": 88
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "b0d28233f627525c7b40ff95b5e2e412475b24f3241dbb6b5a1919f8a8b2c62b",
+            "facts_sha256": "16008bb9babda05d522f3e53c2d44961ad3f5ebbf595620d95716fd0d355f9de",
+            "input_inventory_entry_count": 88
+          }
+        },
+        "status": "complete",
+        "unknown_packages": {
+          "base": 0,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 53,
+        "event_sha256": "09b78902c0c2c78acaec284d23bc17b2ac34946619962e38040593a81f2eb0f5",
+        "id": "r052-a7694e87ca77",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "943fa3c2c1b474a5ff60aced34204f9bb133775e0a1b578a74f68260fe14e57c",
+            "facts_sha256": "9fbab1058ee7a68e69ff72c3a78d157db233b5206aaa578cff8a31622cf00848",
+            "input_inventory_entry_count": 85
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "a4e8421783ad4363187a5de64f407841dbbc261a6430725f69e2be44aadc2ce3",
+            "facts_sha256": "0933880e2dd5baa0305a5f764e39bfc00427b37184b1f20c88076070fa914630",
+            "input_inventory_entry_count": 88
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 1,
+        "event_sha256": "6fd027ef0301c2a258b9b53b88b1286eacbb380802484b6d992278682d8f9f86",
+        "id": "r063-857a7bf9566b",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "c10bbe76d87c32260d67cde9b46e0d7da977acf1197eff8b3c564ca129f5e7e8",
+            "facts_sha256": "15fea38e717b2bee0e028fec0cb8bca3c24dd43318b9bc18fbcb5f2b0823ece4",
+            "input_inventory_entry_count": 538
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "40125e3426254f70d8e2c97b528e836617370117a674cb41e3f81e334de5cdff",
+            "facts_sha256": "8821fad63f4a52d473da1302e7f18c332154f13fcab94eb27868f816611a372c",
+            "input_inventory_entry_count": 538
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 0
+        }
+      },
+      {
+        "assessable_events": 576,
+        "event_sha256": "f6a28f4cdec05f183da52f3f3318f8987698fa57ab2f62bddc70ced6e80c5a3b",
+        "id": "r063-9711d5c84b26",
+        "inputs": {
+          "base": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "c82d43f103a2360e08b3182cb627f7526fa63ecbf79d065abc8cf029ef41ff4b",
+            "facts_sha256": "95b12e77c21cda922903fab0a25ddb4777fe5e004120c3998126180760247279",
+            "input_inventory_entry_count": 499
+          },
+          "head": {
+            "acquisition_status": "complete",
+            "canonical_input_inventory_sha256": "230058e5b6954adbb898cd9e6515cb39c25552e3b1c4fbee6d59b91fae28d708",
+            "facts_sha256": "b45ff1d788f4ec7890115f6d11925436557e6fce6279f11383be5c32470d9b3a",
+            "input_inventory_entry_count": 538
+          }
+        },
+        "status": "partial",
+        "unknown_packages": {
+          "base": 1,
+          "head": 0
+        }
+      }
+    ],
+    "human_review_minutes": null,
+    "oracle_sha256": "d729e11633fa26623a4429ab345bdd9692399e455627dbdc811ca92bb11c572c",
+    "scope": "all locked records; root lifecycle ROOT_EVENTS, workspace install lifecycle plus prepare, archive install lifecycle; independent tarfile reader, without executing code; runtime behavior and npm host selection are not labels",
+    "scoring_helper_sha256": "8ffc2c53795551de8aa2140231a076ebed7ce50765e61ebf9abcc8175ad4548d",
+    "selection_sha256": "470087043d41384a4f649e9a2a8840ee0e2b88a8290e8f01316fe80a5730593d"
+  },
+  "reproduction_limit": "Raw original archives, source snapshots, expanded facts and per-run logs remain local; source commits, file hashes and receipt hashes are preserved here. Do not treat an unavailable artifact as a pass.",
+  "schema_version": 1,
+  "scope": "npm v3 local qualification sprint; no human benefit or new release qualification",
+  "scorecard": {
+    "candidate_sha256": "096cf0a6a96bc66f5c4f5589dcd9ac1770ca3613cb01bd86fe4c9daaaa48ba86",
+    "comparison": {
+      "assessable_events": 4301,
+      "event_recall": 0.997674959311788,
+      "matched_events": 4291
+    },
+    "completion": {
+      "completion_floor": 0.8,
+      "completion_floor_met": false,
+      "completion_fraction": 0.43333333333333335,
+      "pairs": 30,
+      "processing_complete": 13
+    },
+    "costs": {
+      "all_runs_wall_range": [
+        0.247811459004879,
+        19.64565183315426
+      ],
+      "case_median_wall_range": [
+        0.2676920408848673,
+        19.372388666961342
+      ],
+      "case_median_wall_seconds": 10.203169374959543,
+      "complete": {
+        "cases": 13,
+        "max_core_peak_rss_bytes": 367869952,
+        "median_case_wall_seconds": 9.138546042144299
+      },
+      "incomplete": {
+        "cases": 17,
+        "max_core_peak_rss_bytes": 584515584,
+        "median_case_wall_seconds": 11.897476499900222
+      },
+      "max_core_peak_rss_bytes": 584515584
+    },
+    "fuzz_outcomes": [
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 25601,
+          "new_units_added": 6131,
+          "number_of_executed_units": 1561688,
+          "peak_rss_mb": 331,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "json"
+      },
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 8501,
+          "new_units_added": 1540,
+          "number_of_executed_units": 518594,
+          "peak_rss_mb": 410,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "gzip"
+      },
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 5592,
+          "new_units_added": 1579,
+          "number_of_executed_units": 341126,
+          "peak_rss_mb": 492,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "deflate"
+      },
+      {
+        "exit_code": 1,
+        "stats": {
+          "average_exec_per_sec": 29521,
+          "new_units_added": 211,
+          "number_of_executed_units": 383777,
+          "peak_rss_mb": 546,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "tar"
+      },
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 3027,
+          "new_units_added": 1926,
+          "number_of_executed_units": 184702,
+          "peak_rss_mb": 466,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "artifact"
+      },
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 27528,
+          "new_units_added": 10093,
+          "number_of_executed_units": 1679242,
+          "peak_rss_mb": 370,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "lockfiles"
+      },
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 4821,
+          "new_units_added": 932,
+          "number_of_executed_units": 294090,
+          "peak_rss_mb": 493,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "ffi"
+      },
+      {
+        "exit_code": 0,
+        "stats": {
+          "average_exec_per_sec": 1481,
+          "new_units_added": 712,
+          "number_of_executed_units": 90364,
+          "peak_rss_mb": 317,
+          "slowest_unit_time_sec": 0
+        },
+        "target": "review"
+      }
+    ],
+    "graph_reference": {
+      "arborist_edges": {
+        "True": 20
+      },
+      "arborist_paths": {
+        "True": 20
+      },
+      "cases": 20,
+      "ecosystems_coordinates": {
+        "True": 20
+      },
+      "name_version_mismatch_cases": 0,
+      "topology_status": {
+        "complete": 20
+      }
+    },
+    "human_benefit_measured": false,
+    "incorrect_allowed_historical_claim": "not assessed: public reviews are advisory, with no supplied approvals",
+    "independent_labels": {
+      "known_fact_events": {
+        "added": 392,
+        "artifact_changed": 757,
+        "integrity_changed": 758,
+        "lifecycle_changed": 2,
+        "manifest_changed": 765,
+        "removed": 105,
+        "source_changed": 758,
+        "version_changed": 764
+      },
+      "known_lifecycle_body_events": 2,
+      "unknown_package_side_records": 89,
+      "unknown_reasons": {
+        "archive exceeds expanded limit": 78,
+        "manifest devDependencies differs from lock": 1,
+        "manifest version differs from lock identity": 3,
+        "missing evidence locator": 7
+      }
+    },
+    "legacy_native_versions": {
+      "node-version": {
+        "exit_code": 0,
+        "value": "v26.9.0"
+      },
+      "npm-version": {
+        "exit_code": 0,
+        "value": "11.19.1"
+      },
+      "strict-capability": {
+        "exit_code": 0,
+        "value": "false"
+      }
+    },
+    "limits": [
+      "Thirty correlated update pairs from eleven npm3 repositories, not ecosystem prevalence",
+      "Ten reporting misses have unknown execution relevance; a false approval_relevant flag does not prove irrelevance",
+      "Strong native policies already reject new versions, new sources, unapproved hooks and SRI tamper in the declared controlled scope",
+      "Archive byte binding also creates legitimate reapproval cost",
+      "No new signed release or independent-operator rebuild is established"
+    ],
+    "native_cases": [
+      {
+        "case": "unchanged",
+        "change": "Unchanged approved dependency.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "allowed"
+        }
+      },
+      {
+        "case": "command_changed",
+        "change": "Same version and URL, changed install body and updated lock integrity.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "version_changed",
+        "change": "New version with unchanged install body.",
+        "observed": {
+          "exact_source_url": "blocked",
+          "exact_version": "blocked",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "archive_payload_changed",
+        "change": "Same manifest and lifecycle, changed non-lifecycle archive payload and updated integrity.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "hook_metadata_changed",
+        "change": "Hook-bearing package description changes without changing the lifecycle body. Conservative reapproval cost.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "source_changed",
+        "change": "Identical artifact at another resolved URL.",
+        "observed": {
+          "exact_source_url": "blocked",
+          "exact_version": "executed",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "integrity_tamper",
+        "change": "Changed archive served against unchanged lock integrity. Shared integrity control.",
+        "observed": {
+          "exact_source_url": "blocked",
+          "exact_version": "blocked",
+          "tau_gate": "incomplete"
+        }
+      },
+      {
+        "case": "missing_evidence",
+        "change": "Original archive remains available to npm, but Tau-Gate bundle omits its locator.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "incomplete"
+        }
+      },
+      {
+        "case": "no_hook_metadata_changed",
+        "change": "Non-executing package metadata and archive change.",
+        "observed": {
+          "exact_source_url": "no_execution",
+          "exact_version": "no_execution",
+          "tau_gate": "allowed"
+        }
+      },
+      {
+        "case": "no_hook_version_changed",
+        "change": "Non-executing package version change.",
+        "observed": {
+          "exact_source_url": "no_execution",
+          "exact_version": "no_execution",
+          "tau_gate": "allowed"
+        }
+      },
+      {
+        "case": "new_unapproved_hook",
+        "change": "A formerly script-free package gains an install hook with no native or Tau-Gate approval.",
+        "observed": {
+          "exact_source_url": "blocked",
+          "exact_version": "blocked",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "legitimate_command_approved",
+        "change": "Changed command explicitly receives a fresh approval.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "allowed"
+        }
+      },
+      {
+        "case": "legitimate_version_approved",
+        "change": "New version explicitly receives a fresh native policy and Tau-Gate approval.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "allowed"
+        }
+      },
+      {
+        "case": "policy_self_edit",
+        "change": "Head adds its own new-version approvals; trusted-base wrapper restores both native policy and Tau-Gate approvals.",
+        "observed": {
+          "exact_source_url": "blocked",
+          "exact_version": "blocked",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "root_unchanged",
+        "change": "Unchanged approved root-source install body.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "allowed"
+        }
+      },
+      {
+        "case": "root_command_changed",
+        "change": "Root-source install body changes with old source approval.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "blocked"
+        }
+      },
+      {
+        "case": "legitimate_root_approved",
+        "change": "Root-source command change receives fresh source approval.",
+        "observed": {
+          "exact_source_url": "executed",
+          "exact_version": "executed",
+          "tau_gate": "allowed"
+        }
+      }
+    ],
+    "native_version": "12.2.2",
+    "qualification_verdict": "completion_floor_failed",
+    "source_commit": "f1ceb5065e9cff509260de2709add024cc5c32e6"
+  },
+  "selected_pairs": [
+    {
+      "base": "f445e69bd985a0692bb0a75d57469bdfcc253a1e",
+      "commit_url": "https://github.com/fb55/css-select/commit/80f0a8cdbd451162aa88b49e589d929be189c9b8",
+      "committed_at": "2026-11-06T13:53:53Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 154950,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "c1d104197ae5f01657696382213dfa8bdfe6c043d4d987ecb06a7323446c1ed1",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/f445e69bd985a0692bb0a75d57469bdfcc253a1e/package-lock.json"
+          },
+          {
+            "bytes": 1975,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "424441d188330efefdb15aca60b4b45d7845ef125c6f97d3c23be7f7523d5c02",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/f445e69bd985a0692bb0a75d57469bdfcc253a1e/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 154960,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "ec6a52ab300d821f82e47367ff6f14ece3776b20b6a91b2b703f527fee0e1f1e",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/80f0a8cdbd451162aa88b49e589d929be189c9b8/package-lock.json"
+          },
+          {
+            "bytes": 1975,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "405d8be14b3d9603494984d173d72a8cc36247081db75724a41c8d8b758935b3",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/80f0a8cdbd451162aa88b49e589d929be189c9b8/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "17d5d8749fa2d793506e9536b313218fc3c29b66",
+      "head": "80f0a8cdbd451162aa88b49e589d929be189c9b8",
+      "id": "r006-80f0a8cdbd45",
+      "lockfile": "package-lock.json",
+      "repository": "fb55/css-select",
+      "repository_rank": 6,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90",
+      "commit_url": "https://github.com/fb55/css-select/commit/49579df230cb1cce5ca819f752f5231fa92332a3",
+      "committed_at": "2026-11-04T13:54:07Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 154950,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "be79f3cc5a57c62920222b2e9309bb4160d9831e4d7dccb523a6e3a0d6bb1c0c",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90/package-lock.json"
+          },
+          {
+            "bytes": 1975,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "c722fe5292d166b37a4b8fce5f930e3391586f90f02e5d94420ebcec12b1a0b7",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 154950,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "c1d104197ae5f01657696382213dfa8bdfe6c043d4d987ecb06a7323446c1ed1",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/49579df230cb1cce5ca819f752f5231fa92332a3/package-lock.json"
+          },
+          {
+            "bytes": 1975,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "424441d188330efefdb15aca60b4b45d7845ef125c6f97d3c23be7f7523d5c02",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/49579df230cb1cce5ca819f752f5231fa92332a3/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "17d5d8749fa2d793506e9536b313218fc3c29b66",
+      "head": "49579df230cb1cce5ca819f752f5231fa92332a3",
+      "id": "r006-49579df230cb",
+      "lockfile": "package-lock.json",
+      "repository": "fb55/css-select",
+      "repository_rank": 6,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "aa740181a2113e3ce6fafe7827e7f80b04aa8e44",
+      "commit_url": "https://github.com/fb55/css-select/commit/9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90",
+      "committed_at": "2026-11-03T13:54:28Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 154950,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "0ad732ee9c5f439a1d35f09538d363e666618132eabc6a870633e13ddf8eb02a",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/aa740181a2113e3ce6fafe7827e7f80b04aa8e44/package-lock.json"
+          },
+          {
+            "bytes": 1975,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "878a1a7c645489ef1dda77187097ed7bffa759f0a818a22580440e10ff092501",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/aa740181a2113e3ce6fafe7827e7f80b04aa8e44/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 154950,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "be79f3cc5a57c62920222b2e9309bb4160d9831e4d7dccb523a6e3a0d6bb1c0c",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90/package-lock.json"
+          },
+          {
+            "bytes": 1975,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "c722fe5292d166b37a4b8fce5f930e3391586f90f02e5d94420ebcec12b1a0b7",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/css-select/9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "17d5d8749fa2d793506e9536b313218fc3c29b66",
+      "head": "9a76fe0edcb0e5b286f82b11cf80f1ff593c2a90",
+      "id": "r006-9a76fe0edcb0",
+      "lockfile": "package-lock.json",
+      "repository": "fb55/css-select",
+      "repository_rank": 6,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "fa005633a62a8855a44aab63b539c697e8eabab3",
+      "commit_url": "https://github.com/jsdom/whatwg-url/commit/8ad33b85f55f5061e4bf1a5ed105f6811f407df6",
+      "committed_at": "2026-10-29T00:35:57Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 99572,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "1069b0a454d2d0d2c075bfd7c442aad49e9610ab3325c0d953d1f2d1030d218f",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/fa005633a62a8855a44aab63b539c697e8eabab3/package-lock.json"
+          },
+          {
+            "bytes": 1671,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "088e3ffc9cab51d4625a1e75e118fdd8c9287230ccb2badbca6e484551814619",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/fa005633a62a8855a44aab63b539c697e8eabab3/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 98922,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "b475b7a79922f7027f4b0e5547f97d69ac3a90315d441dc6c7d472dabb8bed0c",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/8ad33b85f55f5061e4bf1a5ed105f6811f407df6/package-lock.json"
+          },
+          {
+            "bytes": 1759,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "9e1d82ca43cbb406243342d967441af903c663251877e8ca40be3926877e55e4",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/8ad33b85f55f5061e4bf1a5ed105f6811f407df6/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8ad33b85f55f5061e4bf1a5ed105f6811f407df6",
+      "head": "8ad33b85f55f5061e4bf1a5ed105f6811f407df6",
+      "id": "r008-8ad33b85f55f",
+      "lockfile": "package-lock.json",
+      "repository": "jsdom/whatwg-url",
+      "repository_rank": 8,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "6a0e2ad72245ec3b7dfb122709c9f5762313b928",
+      "commit_url": "https://github.com/jsdom/whatwg-url/commit/97aaa94d7a56f7f857a2f3d583623b1af478373f",
+      "committed_at": "2026-10-28T03:05:28Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 83737,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "5124d2c41ff23f1d84c966119c3acf55296c2e540786a26dcf9f279284edece5",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/6a0e2ad72245ec3b7dfb122709c9f5762313b928/package-lock.json"
+          },
+          {
+            "bytes": 1469,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "22427fa396ab9f3542008df937424ddbcacc0bbc8b0fc002d7928e243c23a728",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/6a0e2ad72245ec3b7dfb122709c9f5762313b928/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 99572,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "1069b0a454d2d0d2c075bfd7c442aad49e9610ab3325c0d953d1f2d1030d218f",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/97aaa94d7a56f7f857a2f3d583623b1af478373f/package-lock.json"
+          },
+          {
+            "bytes": 1671,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "088e3ffc9cab51d4625a1e75e118fdd8c9287230ccb2badbca6e484551814619",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/97aaa94d7a56f7f857a2f3d583623b1af478373f/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8ad33b85f55f5061e4bf1a5ed105f6811f407df6",
+      "head": "97aaa94d7a56f7f857a2f3d583623b1af478373f",
+      "id": "r008-97aaa94d7a56",
+      "lockfile": "package-lock.json",
+      "repository": "jsdom/whatwg-url",
+      "repository_rank": 8,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "f0069361de7bb4b5fe2ea39cdcd92ec49e12fe31",
+      "commit_url": "https://github.com/jsdom/whatwg-url/commit/6a0e2ad72245ec3b7dfb122709c9f5762313b928",
+      "committed_at": "2026-10-14T03:14:51Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 83737,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "8bc115c9d36cb019efffcc2c45b9ae604beaa209a521f54d23d79d7160b15a6e",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/f0069361de7bb4b5fe2ea39cdcd92ec49e12fe31/package-lock.json"
+          },
+          {
+            "bytes": 1469,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "9158b5f14567ce85b100876a9d2b716e0945fc87da243ced4c0fd6ef30ac5a5b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/f0069361de7bb4b5fe2ea39cdcd92ec49e12fe31/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 83737,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "5124d2c41ff23f1d84c966119c3acf55296c2e540786a26dcf9f279284edece5",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/6a0e2ad72245ec3b7dfb122709c9f5762313b928/package-lock.json"
+          },
+          {
+            "bytes": 1469,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "22427fa396ab9f3542008df937424ddbcacc0bbc8b0fc002d7928e243c23a728",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jsdom/whatwg-url/6a0e2ad72245ec3b7dfb122709c9f5762313b928/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8ad33b85f55f5061e4bf1a5ed105f6811f407df6",
+      "head": "6a0e2ad72245ec3b7dfb122709c9f5762313b928",
+      "id": "r008-6a0e2ad72245",
+      "lockfile": "package-lock.json",
+      "repository": "jsdom/whatwg-url",
+      "repository_rank": 8,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "af94a01b676ae066185b1e36507e3039bc118f34",
+      "commit_url": "https://github.com/octokit/graphql.js/commit/50222c3021cc415f057d62fa16fba6aa808d5ab8",
+      "committed_at": "2026-08-30T20:54:51Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 91051,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "2f7f2894751f6d60045e8a42ca562ba81c5ffaecab162f53ea216fb5746422e1",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/af94a01b676ae066185b1e36507e3039bc118f34/package-lock.json"
+          },
+          {
+            "bytes": 1873,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "e6b6bfaf5b107fb6686a7b5ffe59aba48e8f0959485ca2f3fab2e564fcd351cb",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/af94a01b676ae066185b1e36507e3039bc118f34/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 88822,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "ba992c1001a2a707508b654cbf0892b842087236f8a92e31aa732f6c94b13848",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/50222c3021cc415f057d62fa16fba6aa808d5ab8/package-lock.json"
+          },
+          {
+            "bytes": 1873,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "3bed1d247ef2f60378098accb16d70297f2c390b62a71b8ae47f338da2b90689",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/50222c3021cc415f057d62fa16fba6aa808d5ab8/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "50222c3021cc415f057d62fa16fba6aa808d5ab8",
+      "head": "50222c3021cc415f057d62fa16fba6aa808d5ab8",
+      "id": "r019-50222c3021cc",
+      "lockfile": "package-lock.json",
+      "repository": "octokit/graphql.js",
+      "repository_rank": 19,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "2b245254e40e891e573e0c5db2dc5e2bfe6da642",
+      "commit_url": "https://github.com/octokit/graphql.js/commit/af94a01b676ae066185b1e36507e3039bc118f34",
+      "committed_at": "2026-08-01T15:14:53Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 91051,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "a186d69b4b464c346c4719d939beaec9388be9c8d4f4936f54b26de0aa5874ae",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/2b245254e40e891e573e0c5db2dc5e2bfe6da642/package-lock.json"
+          },
+          {
+            "bytes": 1873,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "a90d2af64a29af6a5d197cc6b5431046bb8d801db1aaab51a571e41d2dce300b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/2b245254e40e891e573e0c5db2dc5e2bfe6da642/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 91051,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "2f7f2894751f6d60045e8a42ca562ba81c5ffaecab162f53ea216fb5746422e1",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/af94a01b676ae066185b1e36507e3039bc118f34/package-lock.json"
+          },
+          {
+            "bytes": 1873,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "e6b6bfaf5b107fb6686a7b5ffe59aba48e8f0959485ca2f3fab2e564fcd351cb",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/af94a01b676ae066185b1e36507e3039bc118f34/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "50222c3021cc415f057d62fa16fba6aa808d5ab8",
+      "head": "af94a01b676ae066185b1e36507e3039bc118f34",
+      "id": "r019-af94a01b676a",
+      "lockfile": "package-lock.json",
+      "repository": "octokit/graphql.js",
+      "repository_rank": 19,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "245ee6e85b5ac4fa5e0be8f2e0ba7f3b6dafb3fb",
+      "commit_url": "https://github.com/octokit/graphql.js/commit/2b245254e40e891e573e0c5db2dc5e2bfe6da642",
+      "committed_at": "2026-08-01T15:14:24Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 89420,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "56e0d524b96d8bb7d8e66661cb0e3449ecc6675a993e72f553d4b18b8fc1c37a",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/245ee6e85b5ac4fa5e0be8f2e0ba7f3b6dafb3fb/package-lock.json"
+          },
+          {
+            "bytes": 1873,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "a90d2af64a29af6a5d197cc6b5431046bb8d801db1aaab51a571e41d2dce300b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/245ee6e85b5ac4fa5e0be8f2e0ba7f3b6dafb3fb/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 91051,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "a186d69b4b464c346c4719d939beaec9388be9c8d4f4936f54b26de0aa5874ae",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/2b245254e40e891e573e0c5db2dc5e2bfe6da642/package-lock.json"
+          },
+          {
+            "bytes": 1873,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "a90d2af64a29af6a5d197cc6b5431046bb8d801db1aaab51a571e41d2dce300b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/graphql.js/2b245254e40e891e573e0c5db2dc5e2bfe6da642/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "50222c3021cc415f057d62fa16fba6aa808d5ab8",
+      "head": "2b245254e40e891e573e0c5db2dc5e2bfe6da642",
+      "id": "r019-2b245254e40e",
+      "lockfile": "package-lock.json",
+      "repository": "octokit/graphql.js",
+      "repository_rank": 19,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "58835b661af3f16fbad3964a5ac187078a4fd08b",
+      "commit_url": "https://github.com/webpack-contrib/source-map-loader/commit/87b0b4d463f1d1e2d826939be0573b106c58b787",
+      "committed_at": "2025-07-31T10:18:11Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 699582,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "1bd21a1e3a7b8a4a45616fee2af8b10a673e6c8ad3a84f80542902e4c567041a",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/58835b661af3f16fbad3964a5ac187078a4fd08b/package-lock.json"
+          },
+          {
+            "bytes": 2658,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "23c6b09a88ab0acc10a2b6aa333cdb87433613dca65da4df039550cd2bf66d84",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/58835b661af3f16fbad3964a5ac187078a4fd08b/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 700709,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "dea610eb99f4f0345cc5a0385531e819557f46cc1a52741e3fcf20242abe6e69",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/87b0b4d463f1d1e2d826939be0573b106c58b787/package-lock.json"
+          },
+          {
+            "bytes": 2658,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "a3a13cd1422b6590f096ccb5d86059b204029d89ec16aec4145aa61503250507",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/87b0b4d463f1d1e2d826939be0573b106c58b787/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "1765214ff74f0ca89a8325cb9bdb26ef011ebef1",
+      "head": "87b0b4d463f1d1e2d826939be0573b106c58b787",
+      "id": "r022-87b0b4d463f1",
+      "lockfile": "package-lock.json",
+      "repository": "webpack-contrib/source-map-loader",
+      "repository_rank": 22,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "4797cc123d095a25185db2897524a8913bb4c130",
+      "commit_url": "https://github.com/webpack-contrib/source-map-loader/commit/58835b661af3f16fbad3964a5ac187078a4fd08b",
+      "committed_at": "2025-07-31T10:05:36Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 618155,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "eb09d8d9e5835d79d2d049a8f0f4a76c08380a398fe6817e65f7a6a441ef464a",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/4797cc123d095a25185db2897524a8913bb4c130/package-lock.json"
+          },
+          {
+            "bytes": 2364,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "d270d8a572dfeb596ec441cabca32bd0d249acc3d2ac315b35ab0edbb8943c05",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/4797cc123d095a25185db2897524a8913bb4c130/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 699582,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "1bd21a1e3a7b8a4a45616fee2af8b10a673e6c8ad3a84f80542902e4c567041a",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/58835b661af3f16fbad3964a5ac187078a4fd08b/package-lock.json"
+          },
+          {
+            "bytes": 2658,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "23c6b09a88ab0acc10a2b6aa333cdb87433613dca65da4df039550cd2bf66d84",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/58835b661af3f16fbad3964a5ac187078a4fd08b/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "1765214ff74f0ca89a8325cb9bdb26ef011ebef1",
+      "head": "58835b661af3f16fbad3964a5ac187078a4fd08b",
+      "id": "r022-58835b661af3",
+      "lockfile": "package-lock.json",
+      "repository": "webpack-contrib/source-map-loader",
+      "repository_rank": 22,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "2f67eead9f9eb9a0755e89f05f2683240d3be3d7",
+      "commit_url": "https://github.com/webpack-contrib/source-map-loader/commit/4797cc123d095a25185db2897524a8913bb4c130",
+      "committed_at": "2025-06-20T13:59:49Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 587273,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "e4cc3f64091f7688e98847911cd4bbaeeafc1f08a7c41ac9d0486f0d5fad8a60",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/2f67eead9f9eb9a0755e89f05f2683240d3be3d7/package-lock.json"
+          },
+          {
+            "bytes": 2364,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "32265908702bee2451f7beb2712963ce63c34147ab96ee0ed659ad3fec7aab16",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/2f67eead9f9eb9a0755e89f05f2683240d3be3d7/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 618155,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "eb09d8d9e5835d79d2d049a8f0f4a76c08380a398fe6817e65f7a6a441ef464a",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/4797cc123d095a25185db2897524a8913bb4c130/package-lock.json"
+          },
+          {
+            "bytes": 2364,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "d270d8a572dfeb596ec441cabca32bd0d249acc3d2ac315b35ab0edbb8943c05",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack-contrib/source-map-loader/4797cc123d095a25185db2897524a8913bb4c130/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "1765214ff74f0ca89a8325cb9bdb26ef011ebef1",
+      "head": "4797cc123d095a25185db2897524a8913bb4c130",
+      "id": "r022-4797cc123d09",
+      "lockfile": "package-lock.json",
+      "repository": "webpack-contrib/source-map-loader",
+      "repository_rank": 22,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "8d559526654863c5e220c2bb0bdb67c26bc7ea24",
+      "commit_url": "https://github.com/octokit/rest.js/commit/351ee1dc7d6fe1f65ddf2c1f82b79fb9df9cd7c5",
+      "committed_at": "2026-10-04T18:35:51Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 149504,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "27776ee13af8436ce9812b4c5cf3297ae63fd8799eec6ebfcfcb653aea2fdc64",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/8d559526654863c5e220c2bb0bdb67c26bc7ea24/package-lock.json"
+          },
+          {
+            "bytes": 2894,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "65fc3ceb4d957105d3ec6aa101191b8bc3b00f7a4fbb719350114d21f6b92ea0",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/8d559526654863c5e220c2bb0bdb67c26bc7ea24/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 149815,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "8e6d9c6176b0fca50ee5e0a7a3b92d0f1e92181f861e5d1061970e527f3aaec6",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/351ee1dc7d6fe1f65ddf2c1f82b79fb9df9cd7c5/package-lock.json"
+          },
+          {
+            "bytes": 2894,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "65fc3ceb4d957105d3ec6aa101191b8bc3b00f7a4fbb719350114d21f6b92ea0",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/351ee1dc7d6fe1f65ddf2c1f82b79fb9df9cd7c5/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8537cf478f5591a630d11140b99f91da987c264b",
+      "head": "351ee1dc7d6fe1f65ddf2c1f82b79fb9df9cd7c5",
+      "id": "r031-351ee1dc7d6f",
+      "lockfile": "package-lock.json",
+      "repository": "octokit/rest.js",
+      "repository_rank": 31,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "8369f61e305d91bda11588200b22c995ce10a71d",
+      "commit_url": "https://github.com/octokit/rest.js/commit/cd6ace029871be60b361db7799cf0f81df098f8e",
+      "committed_at": "2026-10-04T18:29:21Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 149508,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "0255ab390d88ba30687743939d0cb5d2a59ababdc025f97486286c5ae76900aa",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/8369f61e305d91bda11588200b22c995ce10a71d/package-lock.json"
+          },
+          {
+            "bytes": 2894,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "65fc3ceb4d957105d3ec6aa101191b8bc3b00f7a4fbb719350114d21f6b92ea0",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/8369f61e305d91bda11588200b22c995ce10a71d/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 149504,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "27776ee13af8436ce9812b4c5cf3297ae63fd8799eec6ebfcfcb653aea2fdc64",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/cd6ace029871be60b361db7799cf0f81df098f8e/package-lock.json"
+          },
+          {
+            "bytes": 2894,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "65fc3ceb4d957105d3ec6aa101191b8bc3b00f7a4fbb719350114d21f6b92ea0",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/cd6ace029871be60b361db7799cf0f81df098f8e/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8537cf478f5591a630d11140b99f91da987c264b",
+      "head": "cd6ace029871be60b361db7799cf0f81df098f8e",
+      "id": "r031-cd6ace029871",
+      "lockfile": "package-lock.json",
+      "repository": "octokit/rest.js",
+      "repository_rank": 31,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "9103914ac7977508b477112f9afdd0fdf97c1448",
+      "commit_url": "https://github.com/octokit/rest.js/commit/fefa2ba23656cc1a032d5eb6db391302b3252aea",
+      "committed_at": "2026-10-04T18:27:44Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 149508,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "399406a270cd2f14fd0f6aabdb1c36097fe852e1103b799e0f60493b5060ab69",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/9103914ac7977508b477112f9afdd0fdf97c1448/package-lock.json"
+          },
+          {
+            "bytes": 2894,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "65fc3ceb4d957105d3ec6aa101191b8bc3b00f7a4fbb719350114d21f6b92ea0",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/9103914ac7977508b477112f9afdd0fdf97c1448/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 149508,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "0255ab390d88ba30687743939d0cb5d2a59ababdc025f97486286c5ae76900aa",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/fefa2ba23656cc1a032d5eb6db391302b3252aea/package-lock.json"
+          },
+          {
+            "bytes": 2894,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "65fc3ceb4d957105d3ec6aa101191b8bc3b00f7a4fbb719350114d21f6b92ea0",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/octokit/rest.js/fefa2ba23656cc1a032d5eb6db391302b3252aea/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8537cf478f5591a630d11140b99f91da987c264b",
+      "head": "fefa2ba23656cc1a032d5eb6db391302b3252aea",
+      "id": "r031-fefa2ba23656",
+      "lockfile": "package-lock.json",
+      "repository": "octokit/rest.js",
+      "repository_rank": 31,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "8875d66882413fb406bf27a3b732749cd4172e60",
+      "commit_url": "https://github.com/stream-utils/raw-body/commit/001c5f794d609a0920e6ec7548c65e4571e7d1f8",
+      "committed_at": "2026-11-08T00:36:05Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 207467,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "7fd1ad9481853f5c953be507fcf473cb1c22dcf962e9fc755f1cb5f6faad7841",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/8875d66882413fb406bf27a3b732749cd4172e60/package-lock.json"
+          },
+          {
+            "bytes": 1669,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "4d66d7417f97e8810a8b110ab57c0b107dfaa13ceca8b0c693779ddc4e9e5e62",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/8875d66882413fb406bf27a3b732749cd4172e60/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 203395,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "f7f52a7f08b5fb45e9ac86e6a10b58e8fd81ba76adf6bc59ca47d14c67deaa24",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/001c5f794d609a0920e6ec7548c65e4571e7d1f8/package-lock.json"
+          },
+          {
+            "bytes": 1669,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "4d66d7417f97e8810a8b110ab57c0b107dfaa13ceca8b0c693779ddc4e9e5e62",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/001c5f794d609a0920e6ec7548c65e4571e7d1f8/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "001c5f794d609a0920e6ec7548c65e4571e7d1f8",
+      "head": "001c5f794d609a0920e6ec7548c65e4571e7d1f8",
+      "id": "r036-001c5f794d60",
+      "lockfile": "package-lock.json",
+      "repository": "stream-utils/raw-body",
+      "repository_rank": 36,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "c3949f885af40733c680eb410b7d1f5aeddc2877",
+      "commit_url": "https://github.com/stream-utils/raw-body/commit/8875d66882413fb406bf27a3b732749cd4172e60",
+      "committed_at": "2026-11-08T00:33:07Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 207471,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "7d2f1fe0b5d691b55a0d8c442fb8273ab39c9bd2c32de401b378399af5c7ae31",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/c3949f885af40733c680eb410b7d1f5aeddc2877/package-lock.json"
+          },
+          {
+            "bytes": 1669,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "4d66d7417f97e8810a8b110ab57c0b107dfaa13ceca8b0c693779ddc4e9e5e62",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/c3949f885af40733c680eb410b7d1f5aeddc2877/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 207467,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "7fd1ad9481853f5c953be507fcf473cb1c22dcf962e9fc755f1cb5f6faad7841",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/8875d66882413fb406bf27a3b732749cd4172e60/package-lock.json"
+          },
+          {
+            "bytes": 1669,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "4d66d7417f97e8810a8b110ab57c0b107dfaa13ceca8b0c693779ddc4e9e5e62",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/8875d66882413fb406bf27a3b732749cd4172e60/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "001c5f794d609a0920e6ec7548c65e4571e7d1f8",
+      "head": "8875d66882413fb406bf27a3b732749cd4172e60",
+      "id": "r036-8875d6688241",
+      "lockfile": "package-lock.json",
+      "repository": "stream-utils/raw-body",
+      "repository_rank": 36,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "816f2d7a5a857dd8a2570b0e4b75e8f2fbd650fb",
+      "commit_url": "https://github.com/stream-utils/raw-body/commit/88a64d529e9f39fb4a097dda37fcb27e5fd199ef",
+      "committed_at": "2026-07-08T20:27:28Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 189049,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "6d7d3501ab224fdf21e770fc14ae8ed4af0a8d21841e2de043cd4d046272c21b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/816f2d7a5a857dd8a2570b0e4b75e8f2fbd650fb/package-lock.json"
+          },
+          {
+            "bytes": 1399,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7eea544001d6f510d411195b6f27ed5ecbcc56cfbf05c5dd4ca2afd659ddeded",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/816f2d7a5a857dd8a2570b0e4b75e8f2fbd650fb/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 207471,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "7d2f1fe0b5d691b55a0d8c442fb8273ab39c9bd2c32de401b378399af5c7ae31",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/88a64d529e9f39fb4a097dda37fcb27e5fd199ef/package-lock.json"
+          },
+          {
+            "bytes": 1668,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "9e776c8a2ec4e7050f144ca4d7f6989bd4daac1fe0c20687cf3fd95a51316b43",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/stream-utils/raw-body/88a64d529e9f39fb4a097dda37fcb27e5fd199ef/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "001c5f794d609a0920e6ec7548c65e4571e7d1f8",
+      "head": "88a64d529e9f39fb4a097dda37fcb27e5fd199ef",
+      "id": "r036-88a64d529e9f",
+      "lockfile": "package-lock.json",
+      "repository": "stream-utils/raw-body",
+      "repository_rank": 36,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "164a8e9eb137449adfe95ef906de7cb1fa757265",
+      "commit_url": "https://github.com/microsoft/node-jsonc-parser/commit/f1e2a421266e7eeb0deb420d57b486819b6e6f03",
+      "committed_at": "2026-10-03T04:37:40Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 76312,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "d115455ec40fa3cbbe8fbf56390d94600c05efb79db2149e6916451c358cb620",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/164a8e9eb137449adfe95ef906de7cb1fa757265/package-lock.json"
+          },
+          {
+            "bytes": 1177,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7422c4ba6fd0e9857baf73513a9877fe30fde6aca6397efe2ea386949d271754",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/164a8e9eb137449adfe95ef906de7cb1fa757265/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 76314,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "c3f00bdb52e1298919b7d11dd9f017f30587fe4c11ce45252d40557e4646bdab",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/f1e2a421266e7eeb0deb420d57b486819b6e6f03/package-lock.json"
+          },
+          {
+            "bytes": 1177,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7422c4ba6fd0e9857baf73513a9877fe30fde6aca6397efe2ea386949d271754",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/f1e2a421266e7eeb0deb420d57b486819b6e6f03/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "de0d2fd798a2341924c7abcc7d8a4afd745a8c9b",
+      "head": "f1e2a421266e7eeb0deb420d57b486819b6e6f03",
+      "id": "r040-f1e2a421266e",
+      "lockfile": "package-lock.json",
+      "repository": "microsoft/node-jsonc-parser",
+      "repository_rank": 40,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "53551aabacb03e92a98bf8db013bbf079b0bbb26",
+      "commit_url": "https://github.com/microsoft/node-jsonc-parser/commit/7d0e3ca4fcf847d230fee86bb6c937ebd00aaffa",
+      "committed_at": "2026-09-18T16:45:16Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 76347,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "4ec863135730b4fc2871b30157c16d6e10ebc587487b9cb7d0b0a5c9f0d47fb5",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/53551aabacb03e92a98bf8db013bbf079b0bbb26/package-lock.json"
+          },
+          {
+            "bytes": 1177,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7422c4ba6fd0e9857baf73513a9877fe30fde6aca6397efe2ea386949d271754",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/53551aabacb03e92a98bf8db013bbf079b0bbb26/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 76312,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "d115455ec40fa3cbbe8fbf56390d94600c05efb79db2149e6916451c358cb620",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/7d0e3ca4fcf847d230fee86bb6c937ebd00aaffa/package-lock.json"
+          },
+          {
+            "bytes": 1177,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7422c4ba6fd0e9857baf73513a9877fe30fde6aca6397efe2ea386949d271754",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/7d0e3ca4fcf847d230fee86bb6c937ebd00aaffa/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "de0d2fd798a2341924c7abcc7d8a4afd745a8c9b",
+      "head": "7d0e3ca4fcf847d230fee86bb6c937ebd00aaffa",
+      "id": "r040-7d0e3ca4fcf8",
+      "lockfile": "package-lock.json",
+      "repository": "microsoft/node-jsonc-parser",
+      "repository_rank": 40,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "ca66b23b9126c0806b7f3aa6e32f708635f5b7a1",
+      "commit_url": "https://github.com/microsoft/node-jsonc-parser/commit/53551aabacb03e92a98bf8db013bbf079b0bbb26",
+      "committed_at": "2026-09-18T16:44:59Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 76347,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "236639ce1f53c69568d5d585dfcbfd33a5a45591a692521ffb9e0020cbbb647e",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/ca66b23b9126c0806b7f3aa6e32f708635f5b7a1/package-lock.json"
+          },
+          {
+            "bytes": 1177,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7422c4ba6fd0e9857baf73513a9877fe30fde6aca6397efe2ea386949d271754",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/ca66b23b9126c0806b7f3aa6e32f708635f5b7a1/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 76347,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "4ec863135730b4fc2871b30157c16d6e10ebc587487b9cb7d0b0a5c9f0d47fb5",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/53551aabacb03e92a98bf8db013bbf079b0bbb26/package-lock.json"
+          },
+          {
+            "bytes": 1177,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "7422c4ba6fd0e9857baf73513a9877fe30fde6aca6397efe2ea386949d271754",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/microsoft/node-jsonc-parser/53551aabacb03e92a98bf8db013bbf079b0bbb26/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "de0d2fd798a2341924c7abcc7d8a4afd745a8c9b",
+      "head": "53551aabacb03e92a98bf8db013bbf079b0bbb26",
+      "id": "r040-53551aabacb0",
+      "lockfile": "package-lock.json",
+      "repository": "microsoft/node-jsonc-parser",
+      "repository_rank": 40,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "da83236f9981e40eb61425d0e45d0d78b7832f77",
+      "commit_url": "https://github.com/jhchen/fast-diff/commit/90d7fff46aa7e48f810b1c92e8362cf371bf0b9f",
+      "committed_at": "2023-04-25T00:55:53Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 64644,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "d1ff70316937117ba51b5eb5cb27c876c99ea38f019c8bf2333d4989a581f224",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jhchen/fast-diff/da83236f9981e40eb61425d0e45d0d78b7832f77/package-lock.json"
+          },
+          {
+            "bytes": 560,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "83f83d2a93004f9212502cb1784b6ea9e342f02dde94d529a566e06b581abd79",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jhchen/fast-diff/da83236f9981e40eb61425d0e45d0d78b7832f77/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 64713,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "3a7330aa8d15f17e4578bae7b3da5fae136042d697751584624621ac91695465",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jhchen/fast-diff/90d7fff46aa7e48f810b1c92e8362cf371bf0b9f/package-lock.json"
+          },
+          {
+            "bytes": 561,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "b7eaf80ac9de9fcb6bd7d0dd7940e51fd4a8a3c9f462c16cf05864344db0891b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/jhchen/fast-diff/90d7fff46aa7e48f810b1c92e8362cf371bf0b9f/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "0e27223f8792083f5a49a193eb1ddbf26125fdb2",
+      "head": "90d7fff46aa7e48f810b1c92e8362cf371bf0b9f",
+      "id": "r049-90d7fff46aa7",
+      "lockfile": "package-lock.json",
+      "repository": "jhchen/fast-diff",
+      "repository_rank": 49,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "b4a75072c0d0ad28b272b898a866331554461ea8",
+      "commit_url": "https://github.com/fb55/domhandler/commit/cf32167f6bca83c9d6b7ef4154db70387371731f",
+      "committed_at": "2026-11-09T13:23:54Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 164163,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "a81e656d2ea7fa9debed9fd3efd104d789bddbe4822bbbe11a846fbe27b2b405",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/b4a75072c0d0ad28b272b898a866331554461ea8/package-lock.json"
+          },
+          {
+            "bytes": 2025,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "a2b834ae7e3aab9258dbc1ef9768ca3258218a315a27222a643dced26e109cea",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/b4a75072c0d0ad28b272b898a866331554461ea8/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 164163,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "91bb8099ee0a50781e8cc425987e55e9bd090ad4c75bf795025e99161792e51d",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/cf32167f6bca83c9d6b7ef4154db70387371731f/package-lock.json"
+          },
+          {
+            "bytes": 2025,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "fbf7abd46c5103f351996e93a021e8c29c53ecf30b981f85622e8a4c9b52a4d9",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/cf32167f6bca83c9d6b7ef4154db70387371731f/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "cf32167f6bca83c9d6b7ef4154db70387371731f",
+      "head": "cf32167f6bca83c9d6b7ef4154db70387371731f",
+      "id": "r051-cf32167f6bca",
+      "lockfile": "package-lock.json",
+      "repository": "fb55/domhandler",
+      "repository_rank": 51,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "68069e7676d21f347038bf3fa4bafbb8869d2615",
+      "commit_url": "https://github.com/fb55/domhandler/commit/63de21f0448d8b8e38757088ab87bc6de2443312",
+      "committed_at": "2026-11-06T13:28:04Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 164163,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "683c90992450f11ea468f0ae11c8a85c981a197baa78f28ceda8bfd9076ae4a7",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/68069e7676d21f347038bf3fa4bafbb8869d2615/package-lock.json"
+          },
+          {
+            "bytes": 2025,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "5349fb6fe9c9194c4a3cf20356f1c77878ef1cbe3440d1dbe399d4c59cc6d28b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/68069e7676d21f347038bf3fa4bafbb8869d2615/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 164163,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "a81e656d2ea7fa9debed9fd3efd104d789bddbe4822bbbe11a846fbe27b2b405",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/63de21f0448d8b8e38757088ab87bc6de2443312/package-lock.json"
+          },
+          {
+            "bytes": 2025,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "a2b834ae7e3aab9258dbc1ef9768ca3258218a315a27222a643dced26e109cea",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/63de21f0448d8b8e38757088ab87bc6de2443312/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "cf32167f6bca83c9d6b7ef4154db70387371731f",
+      "head": "63de21f0448d8b8e38757088ab87bc6de2443312",
+      "id": "r051-63de21f0448d",
+      "lockfile": "package-lock.json",
+      "repository": "fb55/domhandler",
+      "repository_rank": 51,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "ae2b8e05f78733b2ad8a2f9adade6b90f350b03e",
+      "commit_url": "https://github.com/fb55/domhandler/commit/68069e7676d21f347038bf3fa4bafbb8869d2615",
+      "committed_at": "2026-11-06T13:24:17Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 164153,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "e1148bf1dc4f7da9ee444acbf84e36f6a25fb3178fa5515d751a41caf6c9c5a6",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/ae2b8e05f78733b2ad8a2f9adade6b90f350b03e/package-lock.json"
+          },
+          {
+            "bytes": 2025,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "bea887eaaf4a16e6a8cf0ba781affc72b561af509a66ff1cad1e20dc3058a1d5",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/ae2b8e05f78733b2ad8a2f9adade6b90f350b03e/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 164163,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "683c90992450f11ea468f0ae11c8a85c981a197baa78f28ceda8bfd9076ae4a7",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/68069e7676d21f347038bf3fa4bafbb8869d2615/package-lock.json"
+          },
+          {
+            "bytes": 2025,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "5349fb6fe9c9194c4a3cf20356f1c77878ef1cbe3440d1dbe399d4c59cc6d28b",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/fb55/domhandler/68069e7676d21f347038bf3fa4bafbb8869d2615/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "cf32167f6bca83c9d6b7ef4154db70387371731f",
+      "head": "68069e7676d21f347038bf3fa4bafbb8869d2615",
+      "id": "r051-68069e7676d2",
+      "lockfile": "package-lock.json",
+      "repository": "fb55/domhandler",
+      "repository_rank": 51,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "5f1b74ebe00177f714bfb42209f836916a72c219",
+      "commit_url": "https://github.com/paulmillr/readdirp/commit/5dba3694a1de891ea6edb0301240326f8f8c81f1",
+      "committed_at": "2026-08-06T06:10:56Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 44327,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "459c221ca9658402ee3093906ec8b9da85c63f68bcf6e20a00bae86641900a92",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/5f1b74ebe00177f714bfb42209f836916a72c219/package-lock.json"
+          },
+          {
+            "bytes": 1398,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "9445231936459ce1822216642408434ed2cb21f6708f40f71dd39e7cabe7666f",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/5f1b74ebe00177f714bfb42209f836916a72c219/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 44327,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "1c30f399021cc6602c0cd651cea30c14fba2f52622016d5b10da139cbc90ad35",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/5dba3694a1de891ea6edb0301240326f8f8c81f1/package-lock.json"
+          },
+          {
+            "bytes": 1398,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "e4243493fb09c5a7b68b2128892b6e2fa3bbc1422030a2a777975fba3a1784f6",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/5dba3694a1de891ea6edb0301240326f8f8c81f1/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8971d06673dd386bb630013477c1e60bd61496f4",
+      "head": "5dba3694a1de891ea6edb0301240326f8f8c81f1",
+      "id": "r052-5dba3694a1de",
+      "lockfile": "package-lock.json",
+      "repository": "paulmillr/readdirp",
+      "repository_rank": 52,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "a7694e87ca77ed0710bab31bb510b89687cd8f21",
+      "commit_url": "https://github.com/paulmillr/readdirp/commit/5f1b74ebe00177f714bfb42209f836916a72c219",
+      "committed_at": "2026-08-06T06:05:04Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 44327,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "91242736d778987f4ff98c86f453dc63d9066c625bb04d328633d094b675aad3",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/a7694e87ca77ed0710bab31bb510b89687cd8f21/package-lock.json"
+          },
+          {
+            "bytes": 1398,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "51d1cc5fc724d6a70b07bfe007261319ee8d74b9060df823346470bdbc86ba12",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/a7694e87ca77ed0710bab31bb510b89687cd8f21/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 44327,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "459c221ca9658402ee3093906ec8b9da85c63f68bcf6e20a00bae86641900a92",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/5f1b74ebe00177f714bfb42209f836916a72c219/package-lock.json"
+          },
+          {
+            "bytes": 1398,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "9445231936459ce1822216642408434ed2cb21f6708f40f71dd39e7cabe7666f",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/5f1b74ebe00177f714bfb42209f836916a72c219/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8971d06673dd386bb630013477c1e60bd61496f4",
+      "head": "5f1b74ebe00177f714bfb42209f836916a72c219",
+      "id": "r052-5f1b74ebe001",
+      "lockfile": "package-lock.json",
+      "repository": "paulmillr/readdirp",
+      "repository_rank": 52,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "0f51927350a5b3cd387e11da0c74ef0bfe9860b5",
+      "commit_url": "https://github.com/paulmillr/readdirp/commit/a7694e87ca77ed0710bab31bb510b89687cd8f21",
+      "committed_at": "2026-08-06T06:00:01Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 42631,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "37d5d002c6c9209cb38331283b0a9a70fa95fb0789454e41e4854b15b1d6fff2",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/0f51927350a5b3cd387e11da0c74ef0bfe9860b5/package-lock.json"
+          },
+          {
+            "bytes": 1551,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "2b11fbb5247ac2e6f6472db5194cacb5e109b482fce505e32ac81e6700df5e6f",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/0f51927350a5b3cd387e11da0c74ef0bfe9860b5/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 44327,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "91242736d778987f4ff98c86f453dc63d9066c625bb04d328633d094b675aad3",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/a7694e87ca77ed0710bab31bb510b89687cd8f21/package-lock.json"
+          },
+          {
+            "bytes": 1398,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "51d1cc5fc724d6a70b07bfe007261319ee8d74b9060df823346470bdbc86ba12",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/paulmillr/readdirp/a7694e87ca77ed0710bab31bb510b89687cd8f21/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "8971d06673dd386bb630013477c1e60bd61496f4",
+      "head": "a7694e87ca77ed0710bab31bb510b89687cd8f21",
+      "id": "r052-a7694e87ca77",
+      "lockfile": "package-lock.json",
+      "repository": "paulmillr/readdirp",
+      "repository_rank": 52,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "a1a38886eeb46d0ce66bd96839bdb18c34f78301",
+      "commit_url": "https://github.com/webpack/loader-runner/commit/857a7bf9566b099db3126dbb8a5c03f3b6caa080",
+      "committed_at": "2026-05-15T13:00:46Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 292652,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "4884bb788970f90d20c6f1c6f1a0f93bb8f6b60c373ec7b2369dac4ea90e64a2",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/a1a38886eeb46d0ce66bd96839bdb18c34f78301/package-lock.json"
+          },
+          {
+            "bytes": 1795,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "83e1084a64bd881cbc76e346caca6c5a6ec8daee46d5552b0562595cfdfb43cb",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/a1a38886eeb46d0ce66bd96839bdb18c34f78301/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 292652,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "caed8c7365628a232c2bbc6b91b11441e2945c5f83f8af4c512069b2019dd3a6",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/857a7bf9566b099db3126dbb8a5c03f3b6caa080/package-lock.json"
+          },
+          {
+            "bytes": 1795,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "83e1084a64bd881cbc76e346caca6c5a6ec8daee46d5552b0562595cfdfb43cb",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/857a7bf9566b099db3126dbb8a5c03f3b6caa080/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "857a7bf9566b099db3126dbb8a5c03f3b6caa080",
+      "head": "857a7bf9566b099db3126dbb8a5c03f3b6caa080",
+      "id": "r063-857a7bf9566b",
+      "lockfile": "package-lock.json",
+      "repository": "webpack/loader-runner",
+      "repository_rank": 63,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    },
+    {
+      "base": "61272a80e03aeb35c855902774467a9a9b3f2c1d",
+      "commit_url": "https://github.com/webpack/loader-runner/commit/9711d5c84b2636237da9d0cce142ab3b629b62e7",
+      "committed_at": "2026-04-24T14:15:25Z",
+      "files": {
+        "base": [
+          {
+            "bytes": 265926,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "c29956e28dcf65e075844baab39acd638eb8609d151524661411519668489be5",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/61272a80e03aeb35c855902774467a9a9b3f2c1d/package-lock.json"
+          },
+          {
+            "bytes": 1795,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "4978b0a1e33140cf29a71ff00bfe9c3dc5776eaf2469e04a84e03ad7613da367",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/61272a80e03aeb35c855902774467a9a9b3f2c1d/package.json"
+          }
+        ],
+        "head": [
+          {
+            "bytes": 292652,
+            "path": "package-lock.json",
+            "repository_path": "package-lock.json",
+            "sha256": "4884bb788970f90d20c6f1c6f1a0f93bb8f6b60c373ec7b2369dac4ea90e64a2",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/9711d5c84b2636237da9d0cce142ab3b629b62e7/package-lock.json"
+          },
+          {
+            "bytes": 1795,
+            "path": "package.json",
+            "repository_path": "package.json",
+            "sha256": "0c7829dd49bb582fa0a92c23ea3c59a930b6f2fc63ce0702426573897d934672",
+            "status": "captured",
+            "url": "https://raw.githubusercontent.com/webpack/loader-runner/9711d5c84b2636237da9d0cce142ab3b629b62e7/package.json"
+          }
+        ]
+      },
+      "frozen_cohort_head": "857a7bf9566b099db3126dbb8a5c03f3b6caa080",
+      "head": "9711d5c84b2636237da9d0cce142ab3b629b62e7",
+      "id": "r063-9711d5c84b26",
+      "lockfile": "package-lock.json",
+      "repository": "webpack/loader-runner",
+      "repository_rank": 63,
+      "split": "holdout",
+      "status": "npm3_eligible"
+    }
+  ]
+}

@@ -110,6 +110,8 @@ The C ABI is documented in [include/tau_gate.h](include/tau_gate.h). NULL names 
 
 ## Validation and scope
 
+The [npm v3 comparison scorecard](docs/qualification/npm3-sprint-scorecard.md) records the exact-evidence approval addition against strict current native controls, alongside the failed 80% completed-review gate: 13 of 30 real update pairs completed.
+
 ```sh
 cargo test --release --offline --all-targets
 cargo fmt -- --check
