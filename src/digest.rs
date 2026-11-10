@@ -1,35 +1,74 @@
 //! Content identities; not signatures or authenticity claims.
 pub fn sha256(input: &[u8]) -> String {
-    const K: [u32; 64] = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
-        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
-        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
-        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
-        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
-        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
-        0xc67178f2,
-    ];
-    let mut h = [
-        0x6a09e667u32,
-        0xbb67ae85,
-        0x3c6ef372,
-        0xa54ff53a,
-        0x510e527f,
-        0x9b05688c,
-        0x1f83d9ab,
-        0x5be0cd19,
-    ];
-    let mut data = input.to_vec();
-    let bits = (data.len() as u64) * 8;
-    data.push(0x80);
-    while data.len() % 64 != 56 {
-        data.push(0)
+    let mut digest = Sha256::new();
+    digest.update(input);
+    digest.finish()
+}
+
+pub(crate) struct Sha256 {
+    h: [u32; 8],
+    buffer: [u8; 64],
+    buffered: usize,
+    length: u64,
+}
+
+impl Sha256 {
+    pub(crate) fn new() -> Self {
+        let h = [
+            0x6a09e667u32,
+            0xbb67ae85,
+            0x3c6ef372,
+            0xa54ff53a,
+            0x510e527f,
+            0x9b05688c,
+            0x1f83d9ab,
+            0x5be0cd19,
+        ];
+        Self {
+            h,
+            buffer: [0; 64],
+            buffered: 0,
+            length: 0,
+        }
     }
-    data.extend_from_slice(&bits.to_be_bytes());
-    for block in data.chunks_exact(64) {
+
+    pub(crate) fn update(&mut self, mut bytes: &[u8]) {
+        self.length += bytes.len() as u64;
+        if self.buffered != 0 {
+            let count = bytes.len().min(64 - self.buffered);
+            self.buffer[self.buffered..self.buffered + count].copy_from_slice(&bytes[..count]);
+            self.buffered += count;
+            bytes = &bytes[count..];
+            if self.buffered == 64 {
+                let block = self.buffer;
+                self.compress(&block);
+                self.buffered = 0;
+            } else {
+                return;
+            }
+        }
+        let mut blocks = bytes.chunks_exact(64);
+        for block in &mut blocks {
+            self.compress(block);
+        }
+        let rest = blocks.remainder();
+        self.buffer[..rest.len()].copy_from_slice(rest);
+        self.buffered = rest.len();
+    }
+
+    fn compress(&mut self, block: &[u8]) {
+        const K: [u32; 64] = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+            0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+            0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+            0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+            0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+            0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+            0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+            0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+            0xc67178f2,
+        ];
         let mut w = [0u32; 64];
         for (i, b) in block.chunks_exact(4).enumerate() {
             w[i] = u32::from_be_bytes(b.try_into().unwrap());
@@ -42,7 +81,7 @@ pub fn sha256(input: &[u8]) -> String {
                 .wrapping_add(w[i - 7])
                 .wrapping_add(b.rotate_right(17) ^ b.rotate_right(19) ^ (b >> 10));
         }
-        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = h;
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = self.h;
         for i in 0..64 {
             let t1 = hh
                 .wrapping_add(e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25))
@@ -60,19 +99,31 @@ pub fn sha256(input: &[u8]) -> String {
             b = a;
             a = t1.wrapping_add(t2);
         }
-        for (v, x) in h.iter_mut().zip([a, b, c, d, e, f, g, hh]) {
+        for (v, x) in self.h.iter_mut().zip([a, b, c, d, e, f, g, hh]) {
             *v = v.wrapping_add(x);
         }
     }
-    let mut digest = String::with_capacity(64);
-    let hex = b"0123456789abcdef";
-    for word in h {
-        for byte in word.to_be_bytes() {
-            digest.push(hex[(byte >> 4) as usize] as char);
-            digest.push(hex[(byte & 15) as usize] as char);
+
+    pub(crate) fn finish(mut self) -> String {
+        let bits = self.length * 8;
+        let mut tail = [0u8; 128];
+        tail[..self.buffered].copy_from_slice(&self.buffer[..self.buffered]);
+        tail[self.buffered] = 0x80;
+        let length = if self.buffered < 56 { 64 } else { 128 };
+        tail[length - 8..length].copy_from_slice(&bits.to_be_bytes());
+        for block in tail[..length].chunks_exact(64) {
+            self.compress(block);
         }
+        let mut digest = String::with_capacity(64);
+        let hex = b"0123456789abcdef";
+        for word in self.h {
+            for byte in word.to_be_bytes() {
+                digest.push(hex[(byte >> 4) as usize] as char);
+                digest.push(hex[(byte & 15) as usize] as char);
+            }
+        }
+        digest
     }
-    digest
 }
 
 pub fn sha512(input: &[u8]) -> String {
@@ -224,6 +275,37 @@ pub fn sha512(input: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn incremental_sha256_matches_known_vectors_across_chunk_boundaries() {
+        for (bytes, expected) in [
+            (
+                b"".to_vec(),
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
+            (
+                b"abc".to_vec(),
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ),
+            (
+                b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".to_vec(),
+                "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+            ),
+            (
+                vec![b'a'; 1000],
+                "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3",
+            ),
+        ] {
+            for size in [1, 2, 3, 7, 55, 56, 63, 64, 65, 127, 128, 129, 1000] {
+                let mut hash = Sha256::new();
+                for chunk in bytes.chunks(size) {
+                    hash.update(chunk);
+                    hash.update(b"");
+                }
+                assert_eq!(hash.finish(), expected, "chunk size {size}");
+            }
+        }
+    }
+
     #[test]
     fn sha512_known_answers() {
         assert_eq!(sha512(b""), "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");

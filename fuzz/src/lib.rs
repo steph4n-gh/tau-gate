@@ -10,7 +10,8 @@ use tau_gate::{
     review::Snapshot,
 };
 
-pub use tau_gate::digest;
+#[path = "../../src/digest.rs"]
+pub mod digest;
 
 #[allow(dead_code)]
 mod archive {
@@ -18,24 +19,40 @@ mod archive {
 
     pub(super) fn gzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
         let mut out = Vec::new();
-        gunzip(bytes, &mut out, &mut Budget::new())?;
+        gunzip_stream(
+            bytes,
+            &mut |chunk, _| {
+                out.extend_from_slice(chunk);
+                Ok(())
+            },
+            &mut Budget::new(),
+        )?;
         Ok(out)
     }
     pub(super) fn deflate(bytes: &[u8]) -> Result<Vec<u8>, String> {
         let mut out = Vec::new();
-        inflate(bytes, &mut out, &mut Budget::new())?;
+        inflate_stream(
+            bytes,
+            &mut |chunk, _| {
+                out.extend_from_slice(chunk);
+                Ok(())
+            },
+            &mut Budget::new(),
+        )?;
         Ok(out)
     }
     pub(super) fn tar(bytes: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
-        inspect_tar(bytes, &mut Budget::new())
+        let mut tar = TarInspector::new();
+        tar.write(bytes, &mut Budget::new())?;
+        tar.finish()
     }
     pub(super) fn artifact(bytes: &[u8], sri: &str) -> Result<Artifact, String> {
-        inspect(bytes, sri, &mut Vec::new(), &mut Budget::new())
+        inspect_verified(verify(bytes, sri)?, &mut Budget::new())
     }
 }
 
 const INPUT: usize = 64 * 1024;
-const OUTPUT: usize = 64 * 1024 * 1024;
+const OUTPUT: usize = 128 * 1024 * 1024;
 
 fn hex_digest(bytes: impl IntoIterator<Item = u8>) -> String {
     let mut hex = String::new();

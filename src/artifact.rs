@@ -1,8 +1,11 @@
-use crate::digest::{sha256, sha512};
+#[cfg(test)]
+use crate::digest::sha256;
+use crate::digest::{sha512, Sha256};
 use std::collections::BTreeMap;
 
 const MAX_COMPRESSED: usize = 64 * 1024 * 1024;
-const MAX_TAR: usize = 64 * 1024 * 1024;
+const MAX_TAR: usize = 128 * 1024 * 1024;
+const MAX_BINDING: usize = 64 * 1024 * 1024;
 const MAX_MANIFEST: usize = 1024 * 1024;
 const MAX_ENTRIES: usize = 10_000;
 
@@ -113,9 +116,13 @@ pub(crate) fn inspect_verified(
     budget: &mut Budget,
 ) -> Result<Artifact, String> {
     budget.check()?;
-    let mut expanded = Vec::new();
-    gunzip(proof.bytes, &mut expanded, budget)?;
-    let (manifest, binding_gyp_sha256) = inspect_tar(&expanded, budget)?;
+    let mut tar = TarInspector::new();
+    gunzip_stream(
+        proof.bytes,
+        &mut |bytes, budget| tar.write(bytes, budget),
+        budget,
+    )?;
+    let (manifest, binding_gyp_sha256) = tar.finish()?;
     Ok(Artifact {
         manifest,
         binding_gyp_sha256,
@@ -123,6 +130,7 @@ pub(crate) fn inspect_verified(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn inspect(
     bytes: &[u8],
     integrity: &str,
@@ -169,24 +177,42 @@ fn base64_digest(hex: &str) -> String {
     result
 }
 
-fn crc32(bytes: &[u8]) -> u32 {
-    let mut table = [0u32; 256];
-    for (index, slot) in table.iter_mut().enumerate() {
-        let mut value = index as u32;
-        for _ in 0..8 {
-            value = (value >> 1) ^ (0xedb88320 & 0u32.wrapping_sub(value & 1));
-        }
-        *slot = value;
-    }
-    let mut crc = !0u32;
-    for byte in bytes {
-        crc = table[((crc as u8) ^ byte) as usize] ^ (crc >> 8);
-    }
-    !crc
+struct Crc32 {
+    value: u32,
+    table: [u32; 256],
 }
 
-fn gunzip(bytes: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(), String> {
-    output.clear();
+impl Crc32 {
+    fn new() -> Self {
+        let mut table = [0u32; 256];
+        for (index, slot) in table.iter_mut().enumerate() {
+            let mut value = index as u32;
+            for _ in 0..8 {
+                value = (value >> 1) ^ (0xedb88320 & 0u32.wrapping_sub(value & 1));
+            }
+            *slot = value;
+        }
+        Self { value: !0, table }
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.value = self.table[((self.value as u8) ^ byte) as usize] ^ (self.value >> 8);
+        }
+    }
+}
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = Crc32::new();
+    crc.update(bytes);
+    !crc.value
+}
+
+fn gunzip_stream(
+    bytes: &[u8],
+    sink: &mut impl FnMut(&[u8], &mut Budget) -> Result<(), String>,
+    budget: &mut Budget,
+) -> Result<(), String> {
     if bytes.len() < 18 || bytes[..3] != [0x1f, 0x8b, 8] || bytes[3] & 0xe0 != 0 {
         return Err("invalid gzip header".into());
     }
@@ -219,11 +245,11 @@ fn gunzip(bytes: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(),
         start += 2;
     }
     let payload = bytes.get(start..end).ok_or("truncated gzip header")?;
-    inflate(payload, output, budget)?;
-    if crc32(output) != u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) {
+    let (crc, size) = inflate_stream(payload, sink, budget)?;
+    if crc != u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) {
         return Err("gzip checksum mismatch".into());
     }
-    if output.len() as u32 != u32::from_le_bytes(bytes[end + 4..].try_into().unwrap()) {
+    if size as u32 != u32::from_le_bytes(bytes[end + 4..].try_into().unwrap()) {
         return Err("gzip expanded size mismatch".into());
     }
     Ok(())
@@ -353,8 +379,59 @@ fn dynamic_trees(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman), String> {
     ))
 }
 
-fn inflate(payload: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(), String> {
-    output.clear();
+type InflateSink<'a> = dyn FnMut(&[u8], &mut Budget) -> Result<(), String> + 'a;
+
+struct InflateOutput<'a> {
+    history: [u8; 32768],
+    count: usize,
+    buffered: usize,
+    crc: Crc32,
+    sink: &'a mut InflateSink<'a>,
+}
+
+impl InflateOutput<'_> {
+    fn flush(&mut self, budget: &mut Budget) -> Result<(), String> {
+        let count = std::mem::replace(&mut self.buffered, 0);
+        self.crc.update(&self.history[..count]);
+        (self.sink)(&self.history[..count], budget)?;
+        Ok(())
+    }
+
+    fn push(&mut self, byte: u8, budget: &mut Budget) -> Result<(), String> {
+        self.history[self.buffered] = byte;
+        self.buffered += 1;
+        self.count += 1;
+        if self.buffered == self.history.len() {
+            self.flush(budget)?;
+        }
+        Ok(())
+    }
+}
+
+fn inflate_stream(
+    payload: &[u8],
+    sink: &mut impl FnMut(&[u8], &mut Budget) -> Result<(), String>,
+    budget: &mut Budget,
+) -> Result<(u32, usize), String> {
+    let mut output = InflateOutput {
+        history: [0; 32768],
+        count: 0,
+        buffered: 0,
+        crc: Crc32::new(),
+        sink,
+    };
+    let result = inflate_blocks(payload, &mut output, budget);
+    let flushed = output.flush(budget);
+    result?;
+    flushed?;
+    Ok((!output.crc.value, output.count))
+}
+
+fn inflate_blocks(
+    payload: &[u8],
+    output: &mut InflateOutput<'_>,
+    budget: &mut Budget,
+) -> Result<(), String> {
     budget.check()?;
     let mut bits = Bits {
         bytes: payload,
@@ -369,15 +446,17 @@ fn inflate(payload: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<
                 if length ^ bits.read(16)? != 0xffff {
                     return Err("DEFLATE stored length mismatch".into());
                 }
-                if output.len() + length > MAX_TAR {
-                    return Err("expanded artifact exceeds 64 MiB".into());
+                if output.count + length > MAX_TAR {
+                    return Err("expanded artifact exceeds 128 MiB".into());
                 }
                 let start = bits.position / 8;
                 let bytes = payload
                     .get(start..start + length)
                     .ok_or("truncated DEFLATE stored block")?;
                 budget.expand(bytes.len())?;
-                output.extend_from_slice(bytes);
+                for byte in bytes {
+                    output.push(*byte, budget)?;
+                }
                 bits.position += length * 8;
             }
             kind @ (1 | 2) => {
@@ -410,7 +489,7 @@ fn compressed_block(
     bits: &mut Bits<'_>,
     literals: &Huffman,
     distances: &Huffman,
-    output: &mut Vec<u8>,
+    output: &mut InflateOutput<'_>,
     budget: &mut Budget,
 ) -> Result<(), String> {
     const LENGTH_BASE: [usize; 29] = [
@@ -431,11 +510,11 @@ fn compressed_block(
     loop {
         match literals.decode(bits)? {
             byte @ 0..=255 => {
-                if output.len() == MAX_TAR {
-                    return Err("expanded artifact exceeds 64 MiB".into());
+                if output.count == MAX_TAR {
+                    return Err("expanded artifact exceeds 128 MiB".into());
                 }
                 budget.expand(1)?;
-                output.push(byte as u8);
+                output.push(byte as u8, budget)?;
             }
             256 => return Ok(()),
             code @ 257..=285 => {
@@ -446,15 +525,16 @@ fn compressed_block(
                 }
                 let distance =
                     DISTANCE_BASE[distance_code] + bits.read(DISTANCE_EXTRA[distance_code])?;
-                if distance > output.len() {
+                if distance > output.count {
                     return Err("DEFLATE distance exceeds produced bytes".into());
                 }
-                if output.len() + length > MAX_TAR {
-                    return Err("expanded artifact exceeds 64 MiB".into());
+                if output.count + length > MAX_TAR {
+                    return Err("expanded artifact exceeds 128 MiB".into());
                 }
                 budget.expand(length)?;
                 for _ in 0..length {
-                    output.push(output[output.len() - distance]);
+                    let byte = output.history[(output.count - distance) % 32768];
+                    output.push(byte, budget)?;
                 }
             }
             _ => return Err("reserved DEFLATE length code".into()),
@@ -497,41 +577,97 @@ fn tar_number(field: &[u8]) -> Result<usize, String> {
     Ok(value)
 }
 
-fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<String>), String> {
-    struct Seen<'a> {
-        path: String,
-        directory: bool,
-        data: &'a [u8],
-        metadata_before_checksum: &'a [u8],
-        metadata_after_checksum: &'a [u8],
-        dot_alias: bool,
-        paired: bool,
+struct Seen {
+    path: String,
+    directory: bool,
+    data_sha256: String,
+    metadata_before_checksum: [u8; 48],
+    metadata_after_checksum: [u8; 356],
+    dot_alias: bool,
+    paired: bool,
+}
+
+struct TarEntry {
+    path: String,
+    directory: bool,
+    dot_alias: bool,
+    metadata_before_checksum: [u8; 48],
+    metadata_after_checksum: [u8; 356],
+    remaining: usize,
+    digest: Sha256,
+    manifest: Option<Vec<u8>>,
+}
+
+struct TarInspector {
+    block: [u8; 512],
+    buffered: usize,
+    paths: BTreeMap<String, Seen>,
+    entry_count: usize,
+    root: Option<String>,
+    manifest: Option<Vec<u8>>,
+    binding: Option<String>,
+    entry: Option<TarEntry>,
+    end_blocks: usize,
+}
+
+impl TarInspector {
+    fn new() -> Self {
+        Self {
+            block: [0; 512],
+            buffered: 0,
+            paths: BTreeMap::new(),
+            entry_count: 0,
+            root: None,
+            manifest: None,
+            binding: None,
+            entry: None,
+            end_blocks: 0,
+        }
     }
 
-    if tar.len() % 512 != 0 {
-        return Err("tar length is not block aligned".into());
-    }
-    let mut position = 0;
-    let mut paths: BTreeMap<String, Seen<'_>> = BTreeMap::new();
-    let mut entry_count = 0;
-    let mut root: Option<String> = None;
-    let mut manifest = None;
-    let mut binding = None;
-    loop {
-        let header = tar
-            .get(position..position + 512)
-            .ok_or("tar is missing its end markers")?;
-        if header.iter().all(|byte| *byte == 0) {
-            if tar.len() - position < 1024 || tar[position..].iter().any(|byte| *byte != 0) {
-                return Err("invalid tar end markers or trailing data".into());
+    fn write(&mut self, mut bytes: &[u8], budget: &mut Budget) -> Result<(), String> {
+        while !bytes.is_empty() {
+            let count = bytes.len().min(512 - self.buffered);
+            self.block[self.buffered..self.buffered + count].copy_from_slice(&bytes[..count]);
+            self.buffered += count;
+            bytes = &bytes[count..];
+            if self.buffered == 512 {
+                let block = self.block;
+                self.consume_block(&block, budget)?;
+                self.buffered = 0;
             }
-            break;
+        }
+        Ok(())
+    }
+
+    fn consume_block(&mut self, header: &[u8; 512], budget: &mut Budget) -> Result<(), String> {
+        if let Some(entry) = &mut self.entry {
+            let count = entry.remaining.min(512);
+            entry.digest.update(&header[..count]);
+            if let Some(manifest) = &mut entry.manifest {
+                manifest.extend_from_slice(&header[..count]);
+            }
+            entry.remaining -= count;
+            if header[count..].iter().any(|byte| *byte != 0) {
+                return Err("nonzero tar entry padding".into());
+            }
+            if entry.remaining == 0 {
+                self.complete_entry()?;
+            }
+            return Ok(());
+        }
+        if header.iter().all(|byte| *byte == 0) {
+            self.end_blocks += 1;
+            return Ok(());
+        }
+        if self.end_blocks != 0 {
+            return Err("invalid tar end markers or trailing data".into());
         }
         budget.entry()?;
-        if entry_count == MAX_ENTRIES {
+        if self.entry_count == MAX_ENTRIES {
             return Err("tar exceeds 10000 entries".into());
         }
-        entry_count += 1;
+        self.entry_count += 1;
         if &header[257..265] != b"ustar\x0000" {
             return Err("artifact requires POSIX ustar headers".into());
         }
@@ -626,13 +762,14 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
             return Err("unsupported nonportable tar path".into());
         }
         let (member_root, relative) = path.split_once('/').unwrap_or((&path, ""));
-        if root
+        if self
+            .root
             .as_deref()
             .is_some_and(|expected| expected != member_root)
         {
             return Err("tar contains inconsistent archive roots".into());
         }
-        root.get_or_insert_with(|| member_root.to_owned());
+        self.root.get_or_insert_with(|| member_root.to_owned());
         if relative.is_empty() && !directory {
             return Err("tar root is not a directory".into());
         }
@@ -642,7 +779,6 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         if dot_alias && (directory || matches!(relative, "package.json" | "binding.gyp")) {
             return Err("dot aliases of directories or lifecycle evidence are unsupported".into());
         }
-        let folded = path.to_ascii_lowercase();
         if matches!(
             relative.to_ascii_lowercase().as_str(),
             "package.json" | "binding.gyp"
@@ -650,16 +786,54 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
         {
             return Err("noncanonical lifecycle evidence tar path".into());
         }
-        let start = position + 512;
-        let padded = size.div_ceil(512) * 512;
-        let data = tar.get(start..start + size).ok_or("truncated tar entry")?;
-        let padding = tar
-            .get(start + size..start + padded)
-            .ok_or("truncated tar padding")?;
-        if padding.iter().any(|byte| *byte != 0) {
-            return Err("nonzero tar entry padding".into());
+
+        if relative == "package.json" && size > MAX_MANIFEST {
+            return Err("package manifest exceeds 1 MiB".into());
         }
-        if let Some(prior) = paths.get_mut(&folded) {
+        if relative == "binding.gyp" && size > MAX_BINDING {
+            return Err("binding.gyp exceeds 64 MiB".into());
+        }
+        let manifest = (relative == "package.json").then(|| Vec::with_capacity(size));
+        self.entry = Some(TarEntry {
+            path,
+            directory,
+            dot_alias,
+            metadata_before_checksum: header[100..148].try_into().unwrap(),
+            metadata_after_checksum: header[156..512].try_into().unwrap(),
+            remaining: size,
+            digest: Sha256::new(),
+            manifest,
+        });
+        if size == 0 {
+            self.complete_entry()?;
+        }
+        Ok(())
+    }
+
+    fn complete_entry(&mut self) -> Result<(), String> {
+        let TarEntry {
+            path,
+            directory,
+            dot_alias,
+            metadata_before_checksum,
+            metadata_after_checksum,
+            digest,
+            manifest,
+            ..
+        } = self.entry.take().unwrap();
+        let data_sha256 = digest.finish();
+        let folded = path.to_ascii_lowercase();
+        let relative = path
+            .split_once('/')
+            .map(|(_, relative)| relative)
+            .unwrap_or("");
+        if relative == "binding.gyp" {
+            self.binding = Some(data_sha256.clone());
+        }
+        if let Some(manifest) = manifest {
+            self.manifest = Some(manifest);
+        }
+        if let Some(prior) = self.paths.get_mut(&folded) {
             if prior.path != path
                 || prior.directory
                 || directory
@@ -668,56 +842,97 @@ fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<Strin
             {
                 return Err("duplicate case-folded tar path".into());
             }
-            if prior.data != data
-                || prior.metadata_before_checksum != &header[100..148]
-                || prior.metadata_after_checksum != &header[156..512]
+            if prior.data_sha256 != data_sha256
+                || prior.metadata_before_checksum != metadata_before_checksum
+                || prior.metadata_after_checksum != metadata_after_checksum
             {
                 return Err("conflicting dot-alias tar path".into());
             }
             prior.paired = true;
         } else {
-            paths.insert(
+            self.paths.insert(
                 folded,
                 Seen {
                     path: path.clone(),
                     directory,
-                    data,
-                    metadata_before_checksum: &header[100..148],
-                    metadata_after_checksum: &header[156..512],
+                    data_sha256,
+                    metadata_before_checksum,
+                    metadata_after_checksum,
                     dot_alias,
                     paired: false,
                 },
             );
         }
-        match relative {
-            "package.json" => {
-                if size > MAX_MANIFEST {
-                    return Err("package manifest exceeds 1 MiB".into());
+        Ok(())
+    }
+
+    fn finish(self) -> Result<(Vec<u8>, Option<String>), String> {
+        if self.buffered != 0 {
+            return Err("tar length is not block aligned".into());
+        }
+        if self.entry.is_some() {
+            return Err("truncated tar entry".into());
+        }
+        if self.end_blocks < 2 {
+            return Err("tar is missing its end markers".into());
+        }
+        if self
+            .paths
+            .values()
+            .any(|entry| entry.dot_alias && !entry.paired)
+        {
+            return Err("unpaired dot-alias tar path".into());
+        }
+        for path in self.paths.keys() {
+            for (offset, _) in path.match_indices('/') {
+                if self
+                    .paths
+                    .get(&path[..offset])
+                    .is_some_and(|entry| !entry.directory)
+                {
+                    return Err("tar file conflicts with a parent directory".into());
                 }
-                manifest = Some(data.to_vec());
-            }
-            "binding.gyp" => binding = Some(sha256(data)),
-            _ => {}
-        }
-        position = start + padded;
-    }
-    if paths.values().any(|entry| entry.dot_alias && !entry.paired) {
-        return Err("unpaired dot-alias tar path".into());
-    }
-    for path in paths.keys() {
-        for (offset, _) in path.match_indices('/') {
-            if paths
-                .get(&path[..offset])
-                .is_some_and(|entry| !entry.directory)
-            {
-                return Err("tar file conflicts with a parent directory".into());
             }
         }
+        Ok((
+            self.manifest.ok_or("tar is missing package/package.json")?,
+            self.binding,
+        ))
     }
-    Ok((
-        manifest.ok_or("tar is missing package/package.json")?,
-        binding,
-    ))
+}
+
+#[cfg(test)]
+fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<String>), String> {
+    let mut inspector = TarInspector::new();
+    inspector.write(tar, budget)?;
+    inspector.finish()
+}
+
+#[cfg(test)]
+fn gunzip(bytes: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(), String> {
+    output.clear();
+    gunzip_stream(
+        bytes,
+        &mut |bytes, _| {
+            output.extend_from_slice(bytes);
+            Ok(())
+        },
+        budget,
+    )
+}
+
+#[cfg(test)]
+fn inflate(bytes: &[u8], output: &mut Vec<u8>, budget: &mut Budget) -> Result<(), String> {
+    output.clear();
+    inflate_stream(
+        bytes,
+        &mut |bytes, _| {
+            output.extend_from_slice(bytes);
+            Ok(())
+        },
+        budget,
+    )
+    .map(|_| ())
 }
 
 #[cfg(test)]
@@ -767,6 +982,81 @@ mod tests {
 
     fn integrity(bytes: &[u8]) -> String {
         format!("sha512-{}", base64_digest(&sha512(bytes)))
+    }
+
+    #[test]
+    fn tar_streaming_preserves_alias_equality_across_chunk_boundaries() {
+        let data = (0..33000)
+            .map(|index| (index % 251) as u8)
+            .collect::<Vec<_>>();
+        let valid = tar(&[
+            ("package/package.json", b'0', b"{}"),
+            ("package/data", b'0', &data),
+            ("package/./data", b'0', &data),
+        ]);
+        for size in [1, 511, 512, 32768] {
+            let mut inspector = TarInspector::new();
+            let mut budget = Budget::new();
+            for chunk in valid.chunks(size) {
+                inspector.write(chunk, &mut budget).unwrap();
+            }
+            assert_eq!(inspector.finish().unwrap().0, b"{}");
+        }
+        let mut changed = data.clone();
+        *changed.last_mut().unwrap() ^= 1;
+        let invalid = tar(&[
+            ("package/package.json", b'0', b"{}"),
+            ("package/data", b'0', &data),
+            ("package/./data", b'0', &changed),
+        ]);
+        assert!(inspect_tar(&invalid, &mut Budget::new())
+            .unwrap_err()
+            .contains("conflicting dot-alias"));
+    }
+
+    #[test]
+    fn large_nonlifecycle_archive_is_inspected_completely() {
+        let bytes = include_bytes!("../tests/fixtures/archive/large-nonlifecycle.tgz");
+        let proof = verify(bytes, &integrity(bytes)).unwrap();
+        let facts = inspect_verified(proof, &mut Budget::new()).unwrap();
+        assert_eq!(facts.manifest, br#"{"name":"large","version":"1"}"#);
+        for (offset, expected) in [(8, "checksum"), (4, "expanded size")] {
+            let mut changed = bytes.to_vec();
+            let end = changed.len() - offset;
+            changed[end] ^= 1;
+            let proof = verify(&changed, &integrity(&changed)).unwrap();
+            assert!(inspect_verified(proof, &mut Budget::new())
+                .unwrap_err()
+                .contains(expected));
+        }
+        let truncated = &bytes[..bytes.len() - 10];
+        let proof = verify(truncated, &integrity(truncated)).unwrap();
+        assert!(inspect_verified(proof, &mut Budget::new()).is_err());
+        let mut budget = Budget::new();
+        budget.expanded_remaining = 64 * 1024 * 1024;
+        let proof = verify(bytes, &integrity(bytes)).unwrap();
+        assert!(inspect_verified(proof, &mut budget)
+            .unwrap_err()
+            .contains("expanded evidence"));
+        assert!(budget.check().is_err());
+        let mut budget = Budget::new();
+        budget.entries_remaining = 1;
+        let proof = verify(bytes, &integrity(bytes)).unwrap();
+        assert!(inspect_verified(proof, &mut budget)
+            .unwrap_err()
+            .contains("headers"));
+        assert!(budget.check().is_err());
+    }
+
+    #[test]
+    fn binding_keeps_its_existing_content_bound() {
+        let mut bytes = tar(&[("package/binding.gyp", b'0', b"")]);
+        bytes[124..136].copy_from_slice(format!("{:011o}\0", MAX_BINDING + 1).as_bytes());
+        checksum(&mut bytes[..512]);
+        assert_eq!(
+            inspect_tar(&bytes, &mut Budget::new()).unwrap_err(),
+            "binding.gyp exceeds 64 MiB"
+        );
     }
 
     #[test]
