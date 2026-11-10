@@ -1,0 +1,383 @@
+{
+  "acquisition": {
+    "accounted_input_bytes": 8725587168,
+    "available_archives": 5237,
+    "byte_budget": 17179869184,
+    "unavailable_archive_reason_counts": {
+      "artifact response exceeds compressed limit": 20
+    },
+    "unavailable_archives": 20,
+    "unique_archives": 5257,
+    "unknown_locator_occurrences_over_compressed_limit": 40,
+    "unknown_locator_occurrences_without_canonical_sha512": 497
+  },
+  "acquisition_source_commit": "f74978cdf0e3bba156eee39c733f6ed545650d4a",
+  "archive_profile_gap": {
+    "affected_complete_label_cases": [
+      "p19-6ddeff8e1194",
+      "p29-db79ea7739d5",
+      "p30-fe45960b0364"
+    ],
+    "approval_relevant_event_misses": 0,
+    "missed_case": "p19-6ddeff8e1194",
+    "missed_event": "manifest_changed for node_modules/@fastify/send",
+    "package": "@fastify/send",
+    "pax_header_name": "PaxHeader/index.html",
+    "pax_key": "mtime",
+    "pax_path": "package/test/fixtures/snow \u2603/index.html",
+    "size_record": "absent in 4.1.0, zero in 4.2.0 and 4.2.1",
+    "verified_archive_sha512": [
+      "4cc61e40b0814b2d93385995f798505a48936200bf484c7bbcc755fb09d9557e2db7c5412cace61fcbd5f4ecc97a1574f9705f83e5b13ccb79c29f890542ac57",
+      "cce07c2fdcf8e383e719b77535dee03573f3ffb6e70d1f19e0a353352c0b550b84ddc4c6b14f6a523d4de128d728ad13ab871ab99613c01fadaaf96aa2cb8ab3",
+      "0791ebf8816c3dba89250bba147136305a671df6cf9423954143d3766e8fc427229581ab110b2e95b3b4cfd6e581b8e7748c8b2706b63561482235e93e16f052"
+    ]
+  },
+  "candidate_binary_sha256": "89fe1f265f2b31ee9416a5c3f5d838e435f889037e9ecfa0cb940f956a3e96c5",
+  "candidate_replay": {
+    "all_pair_complete": 18,
+    "all_pair_floor": 0.8,
+    "all_pair_floor_met": false,
+    "all_pair_fraction": 0.6,
+    "conditional_floor": 0.95,
+    "conditional_floor_met": false,
+    "conditional_fraction": 0.8571428571428571,
+    "events_matched": 5709,
+    "events_missed": 1,
+    "fact_mismatch_processes": 0,
+    "label_complete_pair_complete": 18,
+    "max_process_rss_bytes": 848838656,
+    "max_process_wall_seconds": 59.60730116721243,
+    "median_of_case_median_wall_seconds": 21.263103166478686,
+    "processes": 150,
+    "protocol_valid_processes": 150,
+    "rounds": 5,
+    "stable_output_cases": 30,
+    "timeouts": 0,
+    "unexpected_allowed_outcomes": 0
+  },
+  "candidate_source_commit": "c140aed0cfc8ed30890d9a01766d2a8542bc9c21",
+  "cases": [
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p01-80eabf52d8cb",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "ravshansbox/pi-tps"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p02-93559ef9f51f",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "maceip/ESBT-web"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p03-37247003d6b9",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "Zlimon/runemanager"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p04-7cedc5268c94",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "GustavoEmpresarial/masterlegends"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p05-d46775dd69fb",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "andrelas6/uordou"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p06-85b721a799c2",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "l3s-learnweb/learnweb"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p07-644661df65be",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "mixstudioHZ/mff-spatial-designer"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p08-647599407726",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "ExeQue/lumberjack"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p09-1f3f4777aeed",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "nitinraturi/devbook.raturi.in"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p10-08505a45db88",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "joshuadavidnelson/scripts-to-footer"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p11-3233519b38b7",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "K9i-0/ccpocket"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p12-5db699d1faa3",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "Frazzled-Productions/website"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p13-07488850a0d5",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "Azentrius/website"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p14-eda801ed7396",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "nymrel/open-ucp"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p15-fb8997062af5",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "kkdev92/vscode-ext-kit"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p16-861a70753400",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "cmiic/glanceboard"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p17-00fa859f0569",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "elcafe7/bible_scroller"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p18-a633842718fa",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "elcafe7/word"
+    },
+    {
+      "event_misses": 1,
+      "fact_mismatches": 0,
+      "id": "p19-6ddeff8e1194",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "Johnaverse/chains-api"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p20-d450967dc244",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "sweatco/archie-hq"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p21-cd9aeb5ef193",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "staackyz/can-i-eat-now"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p22-0a4fe2ea13f6",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "ArohaLabs/aroha-protocol"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p23-caacea2e4416",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "atva0408-create/Vion-cli"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p24-c983ee8e0dee",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "LukeHolmes/SnapFlow"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p25-90ed21dbda9c",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "satheez/jwt-decoder"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p26-462e804da2f6",
+      "label_status": "partial",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "frolicchris/bubblefacts"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p27-2ff8b8459a94",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "tre-systems/confluon"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p28-c876aee0eea5",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": true,
+      "repository": "Brandcode-Studio/brandsystem-mcp"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p29-db79ea7739d5",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "cmiicbrg/school-election"
+    },
+    {
+      "event_misses": 0,
+      "fact_mismatches": 0,
+      "id": "p30-fe45960b0364",
+      "label_status": "complete",
+      "output_stable": true,
+      "processing_complete": false,
+      "repository": "BG-BRG-Enns/school-allocation"
+    }
+  ],
+  "collector_validation": {
+    "rejected_or_incomplete_snapshot_sides": 21,
+    "validated_snapshot_sides": 39
+  },
+  "file_sha256": {
+    "labels-freeze.json": "9c1174f6982ef232fb784406ed52c113825f439981cd88800d6d2a6480cd7dc3",
+    "pair-output/acquisition.json": "c0190c7b20cbfaa49e25f2cfd216224268523919cd5bbc3a86db7c2d6ba6f405",
+    "pair-output/collector-validation/receipts.json": "fc523b6da968eb9d6deb1b5be40d55a2fa255592af6243fe7ec92332d96d7498",
+    "pair-output/labels.json": "835d76d0451d5b198d3bdc981369e88e1e0544738155d842db55457946659b55",
+    "pair-output/protocol.json": "77474fce847ca67fec346980c1024c1379825f25b1adb69a8586e1ed2b7a86c2",
+    "pair-output/replay/plan.json": "0e9f9150094c007be01aa8338a976dbf111356513e8c30e499ccbd9dcadf8cd8",
+    "pair-output/replay/receipts.json": "4957db3bc425190e53fc185da3e2ffacca5f1653d0926b833d233dbeb25291db",
+    "pair-output/selection.json": "b5583febb7b3b1308f487fa42519a819a46cefea0a181ff03f1fb96e3f611cf1",
+    "pair-output/summary.json": "580e7582f30d3c0410f52e9244f299fbaec945030f52fedc45e739291069bf97",
+    "protocol.json": "774bca2b440581cf7a5ca6f8737de7b7a0be96d484136bd4bf08609327dca4bf",
+    "selection.json": "a376efd4108709a2269af36314197ffe1da412ff7d6740ea3eccc910208c45a9"
+  },
+  "frozen_before_product_replay": true,
+  "hosted_positive_comment_approval_run": false,
+  "independent_labels": {
+    "assessable_events": 5710,
+    "complete_pairs": 21,
+    "partial_pairs": 9,
+    "unknown_package_side_occurrences": {
+      "base": 289,
+      "head": 254
+    },
+    "unknown_reasons": {
+      "duplicate_json_key_main": 2,
+      "manifest_dependencies_differs_from_lock": 2,
+      "manifest_name_differs_from_lock": 1,
+      "manifest_version_differs_from_lock": 1,
+      "missing_evidence_locator": 537
+    }
+  },
+  "local_study_directory": "ecosystem_audit/next-cohort-20261110",
+  "outside_maintainer_comparison_run": false,
+  "public_package_lifecycle_scripts_executed": false,
+  "qualification_result": "failed declared 80 percent all-pair and 95 percent conditional completion floors",
+  "schema_version": 1,
+  "scope": "fourth frozen repository-disjoint historical npm v3 PR sample; advisory review only",
+  "selection": {
+    "attempt_statuses": {
+      "no_root_lock_change": 41,
+      "other_lock_version": 2,
+      "prior_cohort": 232,
+      "repository_already_selected": 2,
+      "selected": 30
+    },
+    "distinct_repositories": 30,
+    "pairs": 30
+  }
+}
