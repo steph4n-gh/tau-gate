@@ -17,6 +17,7 @@
   "separate_local_clean_rebuild_matches_archive_sbom_and_checksums": true,
   "independent_operator_rebuild": false,
   "published_assets_match_candidate": true,
+  "anonymous_public_archive_download_matches_candidate": true,
   "public_archive_clean_debian_12_x86_64_install_passed": true,
   "published_provenance_and_sbom_attestations_verified": true,
   "attestation_source_digest_and_workflow_pinned": true,
