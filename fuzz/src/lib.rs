@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::io::{Read, Write};
 
@@ -161,29 +162,38 @@ fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
     Some((manifest?, binding))
 }
 
-fn repaired_tar(data: &[u8]) -> Vec<u8> {
-    let mut bytes = data.to_vec();
+fn repaired_tar(data: &[u8], bytes: &mut Vec<u8>) {
+    bytes.clear();
+    bytes.extend_from_slice(data);
     for header in bytes.chunks_exact_mut(512) {
-        if &header[257..265] == b"ustar\0\0" {
+        if &header[257..265] == b"ustar\x0000" {
             header[148..156].fill(b' ');
             let checksum: usize = header.iter().map(|b| *b as usize).sum();
             header[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
         }
     }
-    bytes
+}
+
+thread_local! {
+    static TAR_REPAIR: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(INPUT));
 }
 
 pub fn tar(data: &[u8]) {
     if data.len() > INPUT {
         return;
     }
-    let bytes = if data.first() == Some(&1) {
-        repaired_tar(&data[1..])
-    } else {
-        data.to_vec()
+    let check = |bytes: &[u8]| {
+        if let Ok(actual) = archive::tar(bytes) {
+            assert_eq!(Some(actual), external_tar(bytes));
+        }
     };
-    if let Ok(actual) = archive::tar(&bytes) {
-        assert_eq!(Some(actual), external_tar(&bytes));
+    if data.first() == Some(&1) {
+        TAR_REPAIR.with_borrow_mut(|bytes| {
+            repaired_tar(&data[1..], bytes);
+            check(bytes);
+        });
+    } else {
+        check(data);
     }
 }
 
@@ -193,7 +203,9 @@ pub fn artifact(data: &[u8]) {
     }
     let bytes = if data.first() == Some(&1) {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&repaired_tar(&data[1..])).unwrap();
+        let mut repaired = Vec::new();
+        repaired_tar(&data[1..], &mut repaired);
+        encoder.write_all(&repaired).unwrap();
         encoder.finish().unwrap()
     } else {
         data.to_vec()
@@ -340,6 +352,61 @@ pub fn review(data: &[u8]) {
 #[cfg(test)]
 mod seed_checks {
     use super::*;
+
+    #[test]
+    fn checksum_repair_restores_corrupted_ustar_and_keeps_invalid_magic_rejected() {
+        let valid = std::fs::read("corpus/tar/ordinary").unwrap();
+        let expected = archive::tar(&valid).unwrap();
+        let mut corrupt = valid.clone();
+        corrupt[148] = if corrupt[148] == b'0' { b'1' } else { b'0' };
+        assert!(archive::tar(&corrupt).is_err());
+        let mut repaired = Vec::new();
+        repaired_tar(&corrupt, &mut repaired);
+        assert_eq!(archive::tar(&repaired).unwrap(), expected);
+        assert_eq!(repaired, valid);
+        let mut prefixed = vec![1];
+        prefixed.extend_from_slice(&corrupt);
+        tar(&prefixed);
+        TAR_REPAIR.with_borrow(|bytes| assert_eq!(archive::tar(bytes).unwrap(), expected));
+        let mut invalid = corrupt;
+        invalid[257] = b'x';
+        repaired_tar(&invalid, &mut repaired);
+        assert_eq!(repaired, invalid);
+        assert!(archive::tar(&repaired).is_err());
+    }
+
+    #[test]
+    fn tar_repair_reuse_scans_only_the_current_bounded_input() {
+        let valid = std::fs::read("corpus/tar/ordinary").unwrap();
+        let expected = archive::tar(&valid).unwrap();
+        let mut repair = vec![1];
+        repair.extend_from_slice(&valid);
+        for input in [repair.as_slice(), b"\x01bad", &[1], repair.as_slice()] {
+            tar(input);
+            TAR_REPAIR.with_borrow(|bytes| {
+                assert_eq!(bytes.len(), input.len() - 1);
+                assert!(bytes.capacity() <= INPUT);
+                if input.len() == repair.len() {
+                    assert_eq!(archive::tar(bytes).unwrap(), expected);
+                } else {
+                    assert_eq!(bytes, &input[1..]);
+                    assert!(archive::tar(bytes).is_err());
+                }
+            });
+            tar(&valid);
+            tar(b"bad");
+        }
+        let mut largest = vec![0; INPUT];
+        largest[0] = 1;
+        tar(&largest);
+        TAR_REPAIR.with_borrow(|bytes| {
+            assert_eq!(bytes.len(), INPUT - 1);
+            assert!(bytes.capacity() <= INPUT);
+            assert!(archive::tar(bytes).is_err());
+        });
+        tar(&repair);
+        TAR_REPAIR.with_borrow(|bytes| assert_eq!(archive::tar(bytes).unwrap(), expected));
+    }
 
     #[test]
     fn digest_bytes_have_stable_lowercase_hex() {
