@@ -1,5 +1,7 @@
 """The qualification selector must not count one repository repeatedly."""
 
+import base64
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -14,6 +16,57 @@ import qualification as q
 
 
 class RepositoryPairSelection(unittest.TestCase):
+    def test_archive_acquisition_retries_allowed_url_and_checks_sri(self):
+        archive = b"authored archive bytes"
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(archive).digest()).decode()
+        mirror = "https://registry.npmmirror.com/pkg/-/pkg-1.0.0.tgz"
+        registry = "https://registry.npmjs.org/pkg/-/pkg-1.0.0.tgz"
+
+        for urls, returned, expected_fetches, available in (
+            ((mirror, mirror), archive, [registry], True),
+            (("https://example.invalid/pkg.tgz", registry), archive,
+             ["https://example.invalid/pkg.tgz", registry], True),
+            ((mirror, mirror), b"wrong bytes", [registry], False),
+        ):
+            with self.subTest(urls=urls, available=available), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / "output"
+                output.mkdir()
+                q.save(output / "selection.json", {"pairs": [{"id": "p01"}], "source_input_bytes": 0})
+                fetches = []
+
+                def capture_extra(pair, side, output, budget):
+                    root = output / "inputs" / pair["id"] / side
+                    (root / "project").mkdir(parents=True)
+                    url = urls[0 if side == "base" else 1]
+                    lock = {"packages": {"node_modules/pkg": {"resolved": url, "integrity": integrity}}}
+                    source = {"status": "complete", "files": [], "absent": []}
+                    q.save(root / "project/package-lock.json", lock)
+                    q.save(root / "source.json", source)
+                    return root, lock, source
+
+                def fetch_archive(url, *, budget):
+                    fetches.append(url)
+                    if url == "https://example.invalid/pkg.tgz":
+                        raise ValueError("unsupported source")
+                    return returned
+
+                with patch.object(pairs, "capture_extra", capture_extra), patch.object(
+                    pairs.npm_evidence, "fetch_archive", fetch_archive
+                ):
+                    pairs.acquire(SimpleNamespace(output=output, offline_cache=Path(temporary) / "offline"))
+
+                receipt = q.load(output / "acquisition.json")
+                entry = next(iter(receipt["archives"].values()))
+                self.assertEqual(fetches, expected_fetches)
+                self.assertEqual(entry["status"] == "available", available)
+                self.assertEqual(entry["url"], urls[-1])
+                if available:
+                    self.assertEqual(entry["fetched_url"], registry)
+                    self.assertEqual(len(q.load(output / "inputs/p01/head/evidence/index.json")["packages"]), 1)
+                else:
+                    self.assertIn("SHA512 mismatch", entry["reason"])
+                    self.assertEqual(q.load(output / "inputs/p01/head/evidence/index.json")["packages"], [])
+
     def test_one_eligible_pair_per_repository(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

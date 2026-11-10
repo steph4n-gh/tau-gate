@@ -34,7 +34,7 @@ PROTOCOL = {
     "byte_budget": 4 * 1024 ** 3,
     "per_file_limit": 64 * 1024 ** 2,
     "existing_bounds": "npm_evidence and qualification_oracle existing per-snapshot, expanded, record and reference bounds remain in force",
-    "network": "GitHub API and pinned raw GitHub source only for source; artifact downloads only HTTPS registry.npmjs.org port 443 without redirects; existing offline cache is read-only",
+    "network": "GitHub API and pinned raw GitHub source only for source; artifact downloads only HTTPS registry.npmjs.org port 443 without redirects; registry.npmmirror.com lock URLs may use the same path on npmjs only when original SHA512 SRI matches; existing offline cache is read-only",
     "measurement": "five interleaved per-case local core runs, preserving stdout/stderr and hashes; run_bounded wall time and process peak RSS; acquisition and cache states reported separately; no human review-time estimate",
     "public_policy": "review --json without --enforce or approvals; no fabricated approvals; no public runtime-safety conclusion",
 }
@@ -268,6 +268,7 @@ def acquire(args):
     cache = output / "archive-cache"
     cache.mkdir(parents=True, exist_ok=True)
     archives = {}
+    attempted = set()
     for pair in selection["pairs"]:
         for side in ("base", "head"):
             root, lock, source = capture_extra(pair, side, output, budget)
@@ -279,10 +280,16 @@ def acquire(args):
                     key = q.archive_identity(record)
                 except (ValueError, TypeError):
                     continue
-                if key in archives:
-                    continue
                 destination = cache / (key + ".tgz")
                 offline = args.offline_cache / (key + ".tgz")
+                lock_url = record.get("resolved")
+                fetch_url = ("https://registry.npmjs.org/" + lock_url[len("https://registry.npmmirror.com/"):]
+                             if isinstance(lock_url, str) and lock_url.startswith("https://registry.npmmirror.com/")
+                             else lock_url)
+                attempt_source = str(offline) if offline.is_file() else fetch_url
+                if (key in archives and archives[key]["status"] == "available") or (key, attempt_source) in attempted:
+                    continue
+                attempted.add((key, attempt_source))
                 begin = time.monotonic()
                 mode = "offline_read_only_reuse" if offline.is_file() else "new_registry_download"
                 try:
@@ -291,7 +298,7 @@ def acquire(args):
                         raise ValueError("declared aggregate byte budget exhausted")
                     read_budget = npm_evidence.WorkBudget(read=remaining)
                     try:
-                        raw = npm_evidence.read_limited(offline, budget=read_budget) if offline.is_file() else npm_evidence.fetch_archive(record.get("resolved"), budget=read_budget)
+                        raw = npm_evidence.read_limited(offline, budget=read_budget) if offline.is_file() else npm_evidence.fetch_archive(fetch_url, budget=read_budget)
                     finally:
                         budget.account(remaining - read_budget.read_remaining)
                     if q.digest(raw, "sha512") != key:
@@ -301,9 +308,11 @@ def acquire(args):
                     else:
                         destination.write_bytes(raw)
                     archives[key] = {"status": "available", "mode": mode, "bytes": len(raw), "sha256": q.digest(raw),
-                                     "sha512": key, "url": record.get("resolved"), "elapsed_seconds": time.monotonic() - begin}
+                                     "sha512": key, "url": lock_url, "fetched_url": fetch_url if not offline.is_file() else None,
+                                     "elapsed_seconds": time.monotonic() - begin}
                 except (OSError, ValueError, TypeError) as exc:
-                    archives[key] = {"status": "unavailable", "mode": mode, "url": record.get("resolved"),
+                    archives[key] = {"status": "unavailable", "mode": mode, "url": lock_url,
+                                     "fetched_url": fetch_url if not offline.is_file() else None,
                                      "reason": str(exc), "elapsed_seconds": time.monotonic() - begin}
             print(json.dumps({"case": pair["id"], "side": side, "unique_archives": len(archives), "accounted_bytes": budget.used}), flush=True)
     for root, lock, source in snapshots:
