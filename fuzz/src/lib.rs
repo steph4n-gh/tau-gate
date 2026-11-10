@@ -141,8 +141,9 @@ pub fn deflate(data: &[u8]) {
     }
 }
 
-fn reference_tar_view(data: &[u8]) -> Option<Vec<u8>> {
-    let mut normalized = None;
+fn reference_tar_view(data: &[u8], normalized: &mut Vec<u8>) -> Option<bool> {
+    normalized.clear();
+    let mut copied = false;
     let mut offset = 0usize;
     while offset.checked_add(512)? <= data.len() {
         let header = &data[offset..offset + 512];
@@ -155,8 +156,11 @@ fn reference_tar_view(data: &[u8]) -> Option<Vec<u8>> {
             if &header[257..265] != b"ustar\x0000" && &header[257..265] != b"ustar  \0" {
                 return None;
             }
-            let view = normalized.get_or_insert_with(|| data.to_vec());
-            let repaired = &mut view[offset..offset + 512];
+            if !copied {
+                normalized.extend_from_slice(data);
+                copied = true;
+            }
+            let repaired = &mut normalized[offset..offset + 512];
             repaired[124..136].copy_from_slice(b"00000000000\0");
             repaired[148..156].fill(b' ');
             let checksum: usize = repaired.iter().map(|byte| *byte as usize).sum();
@@ -173,29 +177,50 @@ fn reference_tar_view(data: &[u8]) -> Option<Vec<u8>> {
             .checked_add(512)?
             .checked_add(size.checked_add(511)? / 512 * 512)?;
     }
-    normalized
+    Some(copied)
+}
+
+thread_local! {
+    static TAR_REFERENCE_VIEW: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(INPUT));
+    static TAR_REFERENCE_MANIFEST: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(INPUT));
+}
+
+fn external_tar_into(data: &[u8], manifest: &mut Vec<u8>) -> Option<Option<String>> {
+    manifest.clear();
+    TAR_REFERENCE_VIEW.with_borrow_mut(|view| {
+        let copied = reference_tar_view(data, view).unwrap_or(false);
+        let mut reader = tar::Archive::new(if copied { view.as_slice() } else { data });
+        let mut found_manifest = false;
+        let mut binding = None;
+        for entry in reader.entries().ok()? {
+            let mut entry = entry.ok()?;
+            let path = entry.path_bytes();
+            let relative = path.iter().position(|byte| *byte == b'/').map(|i| &path[i + 1..]);
+            if relative == Some(b"package.json".as_slice()) {
+                manifest.clear();
+                entry.read_to_end(manifest).ok()?;
+                found_manifest = true;
+            } else if relative == Some(b"binding.gyp".as_slice()) {
+                let mut digest = Sha256::new();
+                let mut chunk = [0; 4096];
+                loop {
+                    let count = entry.read(&mut chunk).ok()?;
+                    if count == 0 {
+                        break;
+                    }
+                    digest.update(&chunk[..count]);
+                }
+                binding = Some(hex_digest(digest.finalize()));
+            }
+        }
+        found_manifest.then_some(binding)
+    })
 }
 
 fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
-    let view = reference_tar_view(data);
-    let mut reader = tar::Archive::new(view.as_deref().unwrap_or(data));
-    let mut manifest = None;
-    let mut binding = None;
-    for entry in reader.entries().ok()? {
-        let mut entry = entry.ok()?;
-        let path = entry.path().ok()?.to_string_lossy().to_string();
-        let relative = path.split_once('/').map(|(_, relative)| relative);
-        if relative == Some("package.json") {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).ok()?;
-            manifest = Some(bytes);
-        } else if relative == Some("binding.gyp") {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).ok()?;
-            binding = Some(hex_digest(Sha256::digest(&bytes)));
-        }
-    }
-    Some((manifest?, binding))
+    let mut manifest = Vec::new();
+    let binding = external_tar_into(data, &mut manifest)?;
+    Some((manifest, binding))
 }
 
 fn repaired_tar(data: &[u8], bytes: &mut Vec<u8>) {
@@ -220,7 +245,11 @@ pub fn tar(data: &[u8]) {
     }
     let check = |bytes: &[u8]| {
         if let Ok(actual) = archive::tar(bytes) {
-            assert_eq!(Some(actual), external_tar(bytes));
+            TAR_REFERENCE_MANIFEST.with_borrow_mut(|manifest| {
+                let reference = external_tar_into(bytes, manifest)
+                    .map(|binding| (manifest.as_slice(), binding));
+                assert_eq!(Some((actual.0.as_slice(), actual.1)), reference);
+            });
         }
     };
     if data.first() == Some(&1) {
@@ -476,6 +505,15 @@ mod seed_checks {
         repaired_tar(&corrupt, &mut repaired);
         assert_eq!(archive::tar(&repaired), archive::tar(&bytes));
         tar(&repaired);
+    }
+
+    #[test]
+    fn reference_normalization_failure_uses_the_original_archive() {
+        let input = include_bytes!("../fixtures/reference-view-fallback.tar");
+        let mut repaired = Vec::new();
+        repaired_tar(&input[1..], &mut repaired);
+        assert_eq!(Some(archive::tar(&repaired).unwrap()), external_tar(&repaired));
+        tar(input);
     }
 
     #[test]

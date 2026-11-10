@@ -39,6 +39,13 @@ PROTOCOL = {
     "public_policy": "review --json without --enforce or approvals; no fabricated approvals; no public runtime-safety conclusion",
 }
 
+REPOSITORY_PROTOCOL = {
+    **PROTOCOL,
+    "selection": "ascending frozen cohort repository_rank; newest lock-changing commit timestamp then SHA then lock path; first parent; at most three attempted commits per repository; first eligible npm v3 pair per repository until target count",
+    "conditional_completion_floor": 0.95,
+    "denominators": "report independent-label availability, completion on label-complete pairs, and completion on all selected pairs; retain every unsupported and unavailable attempt",
+}
+
 
 def frozen(path, value):
     path = Path(path)
@@ -49,8 +56,14 @@ def frozen(path, value):
         q.save(path, value)
 
 
-def protocol(output):
-    frozen(output / "protocol.json", PROTOCOL)
+def protocol(output, repository_unique=False):
+    selected = REPOSITORY_PROTOCOL if repository_unique else PROTOCOL
+    if (output / "protocol.json").exists():
+        saved = q.load(output / "protocol.json")
+        if saved not in (PROTOCOL, REPOSITORY_PROTOCOL):
+            raise ValueError("unknown frozen pair protocol")
+    else:
+        frozen(output / "protocol.json", selected)
     return q.digest(q.read(output / "protocol.json"))
 
 
@@ -94,7 +107,8 @@ def history(repository, commit, lockfile, receipt):
 
 def freeze(args):
     output = args.output.resolve()
-    protocol_hash = protocol(output)
+    repository_unique = getattr(args, "one_pair_per_repository", False)
+    protocol_hash = protocol(output, repository_unique)
     if (output / "selection.json").exists():
         raise ValueError("selection already frozen; use acquire on this output")
     cohort = q.load(args.cohort)
@@ -163,15 +177,20 @@ def freeze(args):
                     continue
                 attempt["status"] = "npm3_eligible"
                 pairs.append({**attempt, "split": "holdout"})
+                if repository_unique:
+                    break
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 attempt.update(status="input_unavailable_or_invalid", reason=str(exc))
             if len(pairs) == args.count:
                 break
         if len(pairs) == args.count:
             break
+    if repository_unique and len({pair["repository"] for pair in pairs}) != len(pairs):
+        raise ValueError("repository-unique selection repeated a repository")
     frozen(output / "selection.json", {"schema_version": 1, "protocol_sha256": protocol_hash,
            "cohort_sha256": q.digest(q.read(args.cohort)), "snapshots_sha256": q.digest(q.read(args.snapshots)),
            "helper_sha256": q.digest(q.read(__file__)), "target_eligible_pairs": args.count,
+           "one_pair_per_repository": repository_unique,
            "pairCount": len(pairs), "projectCount": len({p["repository"] for p in pairs}),
            "attempts": attempts, "pairs": pairs, "source_input_bytes": budget.used,
            "acquisition_elapsed_seconds": time.monotonic() - started})
@@ -538,7 +557,7 @@ def summarize(output, selection, labels, receipts):
     complete = sum(c["complete"] for c in cases)
     events = sum(c["assessable_events"] for c in cases)
     matched = sum(c["event_matches"] for c in cases)
-    frozen(output / "summary.json", {"protocol_sha256": q.digest(q.read(output / "protocol.json")),
+    summary = {"protocol_sha256": q.digest(q.read(output / "protocol.json")),
            "selection_sha256": q.digest(q.read(output / "selection.json")), "labels_sha256": q.digest(q.read(output / "labels.json")),
            "attempt_statuses": dict(collections.Counter(a["status"] for a in selection["attempts"])),
            "pairs": count, "independent_labels_complete": sum(c["status"] == "complete" for c in labels["cases"]),
@@ -548,7 +567,21 @@ def summarize(output, selection, labels, receipts):
            "unknown_packages_by_side": {s: sum(c["unknown_packages"][s] for c in labels["cases"]) for s in ("base", "head")},
            "unexpected_allowed_outcomes": sum(r["unexpected_allowed_outcome"] for r in receipts),
            "incorrect_allowed_fixture_gate": "not assessed here; separate mandatory controlled gate",
-           "human_review_minutes": None, "safety_claim": "none; historical public reports are advisory", "cases": cases})
+           "human_review_minutes": None, "safety_claim": "none; historical public reports are advisory", "cases": cases}
+    if q.load(output / "protocol.json") == REPOSITORY_PROTOCOL:
+        label_status = {case["id"]: case["status"] for case in labels["cases"]}
+        oracle_valid = sum(label_status[case["id"]] == "complete" for case in cases)
+        conditional_complete = sum(case["complete"] for case in cases if label_status[case["id"]] == "complete")
+        sample_complete = count == selection["target_eligible_pairs"] and len({c["repository"] for c in cases}) == count
+        summary["sample_complete"] = sample_complete
+        summary["completion_floor_met"] = sample_complete and summary["completion_floor_met"]
+        summary["conditional_complete"] = conditional_complete
+        summary["conditional_completion_fraction"] = conditional_complete / oracle_valid if oracle_valid else None
+        summary["conditional_completion_floor"] = REPOSITORY_PROTOCOL["conditional_completion_floor"]
+        summary["conditional_completion_floor_met"] = bool(
+            sample_complete and oracle_valid
+            and conditional_complete / oracle_valid >= REPOSITORY_PROTOCOL["conditional_completion_floor"])
+    frozen(output / "summary.json", summary)
     render_html(output)
 
 
@@ -618,6 +651,7 @@ def main(argv=None):
             command.add_argument("--cohort", type=Path, required=True)
             command.add_argument("--snapshots", type=Path, required=True)
             command.add_argument("--count", type=int, default=30)
+            command.add_argument("--one-pair-per-repository", action="store_true")
         elif name == "acquire":
             command.add_argument("--offline-cache", type=Path, default=Path("/Volumes/Storage/taugate-qualification/archives"))
         elif name == "replay":

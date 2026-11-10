@@ -19,6 +19,11 @@ unchanged. An invalid octal size remains a rejection control.
 Checksum repair recognizes the exact POSIX and GNU USTAR header spellings that
 the production inspector accepts. A generated GNU seed checks the independent
 tar reader against the production facts.
+The optional reference view and the reference manifest use separate bounded
+scratch buffers across inputs. If the optional view cannot parse a tar field,
+the reference reader still sees the original bytes. A saved fuzz input checks
+that fallback. The independent tar reader still runs on every archive accepted
+by the production inspector.
 
 The eight targets cover JSON and digests, gzip, raw DEFLATE, tar, full artifact
 integrity, npm/pnpm/Yarn/config parsing, bounded valid FFI callers, and

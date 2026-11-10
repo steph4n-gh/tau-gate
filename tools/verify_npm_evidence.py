@@ -666,6 +666,42 @@ def approval_controls(binary, output, logs, timeout, results, reports):
         reports[case.name] = report
 
 
+def gnu_approval_controls(binary, output, logs, timeout, results, reports):
+    rows = fingerprint_rows(reports.get('valid_gnu_ustar_magic'))
+    if not rows:
+        results.append({'case': 'gnu_approval_fingerprint_discovery', 'pass': False,
+                        'error': 'No GNU USTAR approval fingerprint found.'})
+        return
+    approval = {'schema_version': 1, 'approvals': [
+        {'path': path, 'fingerprint': fingerprint} for path, fingerprint in rows]}
+
+    def gnu_artifact(manifest=None, payload=b'', extra=()):
+        return zipped(changed(tar_for(manifest, payload, extra), 257, b'ustar  \0', True))
+
+    corrupt = bytearray(gzip.decompress(gnu_artifact()))
+    corrupt[148] ^= 1
+    cases_to_run = [
+        Case('gnu_approval_allowed', 'Exact GNU USTAR archive with its own fingerprint is allowed.',
+             'allowed', artifact=gnu_artifact()),
+        Case('gnu_approval_command_changed', 'Changed install body in GNU USTAR archive invalidates old approval.',
+             'blocked', artifact=gnu_artifact({**MANIFEST, 'scripts': {'install': 'echo changed-body'}})),
+        Case('gnu_approval_payload_changed', 'Changed non-lifecycle bytes in GNU USTAR archive invalidate old approval.',
+             'blocked', artifact=gnu_artifact(payload=b'changed-payload')),
+        Case('gnu_approval_bad_checksum', 'Recomputed outer SRI cannot authorize a corrupt GNU USTAR header.',
+             'incomplete', artifact=zipped(corrupt)),
+        Case('gnu_approval_link_rejected', 'Previously approved GNU USTAR archive does not authorize a tar link.',
+             'incomplete', artifact=gnu_artifact(extra=[('package/link', b'', tarfile.SYMTYPE,
+                                                       'package/package.json')])),
+    ]
+    for case in cases_to_run:
+        folder = write_case(output / 'cases' / case.name, case)
+        approval_file = folder / 'approvals.json'
+        approval_file.write_bytes(encoded(approval))
+        result, report = run(binary, folder, case, logs, timeout, approval_file)
+        results.append(result)
+        reports[case.name] = report
+
+
 def root_approval_controls(binary, output, logs, timeout, results):
     def source_setup(changed_body=False, native=False, changed_native=False):
         def setup(folder, lock, root, index):
@@ -815,6 +851,7 @@ def main():
                 print(json.dumps({'case': case.name, 'exit': result.get('exit'), 'status': result.get('status'), 'policy': result.get('policy'), 'timeout': result.get('timeout'), 'inputs_unchanged': result.get('inputs_unchanged')}), flush=True)
     if not arguments.generate_only:
         approval_controls(binary, output, logs, arguments.timeout, results, reports)
+        gnu_approval_controls(binary, output, logs, arguments.timeout, results, reports)
         root_approval_controls(binary, output, logs, arguments.timeout, results)
         reference_controls(binary, arguments.reference_bundle.resolve(), output, logs, arguments.timeout, results)
     try:

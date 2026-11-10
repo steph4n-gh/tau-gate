@@ -590,8 +590,7 @@ struct Seen {
     path: String,
     directory: bool,
     data_sha256: String,
-    metadata_before_checksum: [u8; 48],
-    metadata_after_checksum: [u8; 356],
+    metadata_sha256: String,
     dot_alias: bool,
     paired: bool,
 }
@@ -733,27 +732,28 @@ impl TarInspector {
             }
             Err(reason) => return Err(reason),
         };
-        let joined = if prefix.is_empty() {
+        let mut path = if prefix.is_empty() {
             name.to_owned()
         } else {
             format!("{prefix}/{name}")
         };
-        let raw_path = if directory {
-            joined.strip_suffix('/').unwrap_or(&joined)
-        } else {
-            &joined
-        };
-        let (path, dot_alias) = match raw_path.split_once("/./") {
-            Some((archive_root, rest))
-                if !archive_root.contains('/') && !rest.is_empty() && !rest.contains("/./") =>
+        if directory && path.ends_with('/') {
+            path.pop();
+        }
+        let dot_alias = if let Some(offset) = path.find("/./") {
+            if path[..offset].contains('/')
+                || path[offset + 3..].is_empty()
+                || path[offset + 3..].contains("/./")
             {
-                (format!("{archive_root}/{rest}"), true)
+                return Err("unsupported dot tar path".into());
             }
-            Some(_) => return Err("unsupported dot tar path".into()),
-            None => (raw_path.to_owned(), false),
+            path.replace_range(offset + 1..offset + 3, "");
+            true
+        } else {
+            false
         };
         if path.split('/').any(|part| {
-            let base = part.split('.').next().unwrap().to_ascii_uppercase();
+            let base = part.split('.').next().unwrap().as_bytes();
             part.is_empty()
                 || part == "."
                 || part == ".."
@@ -763,10 +763,13 @@ impl TarInspector {
                     (b.is_ascii_graphic() || b == b' ')
                         && !matches!(b, b'\\' | b':' | b'*' | b'?' | b'"' | b'<' | b'>' | b'|')
                 })
-                || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+                || [b"CON".as_slice(), b"PRN", b"AUX", b"NUL"]
+                    .iter()
+                    .any(|reserved| base.eq_ignore_ascii_case(reserved))
                 || (base.len() == 4
-                    && (base.starts_with("COM") || base.starts_with("LPT"))
-                    && matches!(base.as_bytes()[3], b'1'..=b'9'))
+                    && (base[..3].eq_ignore_ascii_case(b"COM")
+                        || base[..3].eq_ignore_ascii_case(b"LPT"))
+                    && matches!(base[3], b'1'..=b'9'))
         }) {
             return Err("unsupported nonportable tar path".into());
         }
@@ -788,10 +791,9 @@ impl TarInspector {
         if dot_alias && (directory || matches!(relative, "package.json" | "binding.gyp")) {
             return Err("dot aliases of directories or lifecycle evidence are unsupported".into());
         }
-        if matches!(
-            relative.to_ascii_lowercase().as_str(),
-            "package.json" | "binding.gyp"
-        ) && !matches!(relative, "package.json" | "binding.gyp")
+        if (relative.eq_ignore_ascii_case("package.json")
+            || relative.eq_ignore_ascii_case("binding.gyp"))
+            && !matches!(relative, "package.json" | "binding.gyp")
         {
             return Err("noncanonical lifecycle evidence tar path".into());
         }
@@ -831,6 +833,10 @@ impl TarInspector {
             ..
         } = self.entry.take().unwrap();
         let data_sha256 = digest.finish();
+        let mut metadata = Sha256::new();
+        metadata.update(&metadata_before_checksum);
+        metadata.update(&metadata_after_checksum);
+        let metadata_sha256 = metadata.finish();
         let folded = path.to_ascii_lowercase();
         let relative = path
             .split_once('/')
@@ -851,10 +857,7 @@ impl TarInspector {
             {
                 return Err("duplicate case-folded tar path".into());
             }
-            if prior.data_sha256 != data_sha256
-                || prior.metadata_before_checksum != metadata_before_checksum
-                || prior.metadata_after_checksum != metadata_after_checksum
-            {
+            if prior.data_sha256 != data_sha256 || prior.metadata_sha256 != metadata_sha256 {
                 return Err("conflicting dot-alias tar path".into());
             }
             prior.paired = true;
@@ -862,11 +865,10 @@ impl TarInspector {
             self.paths.insert(
                 folded,
                 Seen {
-                    path: path.clone(),
+                    path,
                     directory,
                     data_sha256,
-                    metadata_before_checksum,
-                    metadata_after_checksum,
+                    metadata_sha256,
                     dot_alias,
                     paired: false,
                 },
@@ -1546,6 +1548,16 @@ mod tests {
         different_mode[2048 + 100..2048 + 108].copy_from_slice(b"0000755\0");
         checksum(&mut different_mode[2048..2560]);
         assert!(inspect_tar(&different_mode, &mut Budget::new())
+            .unwrap_err()
+            .contains("conflicting dot-alias"));
+        let mut different_type = tar(&[
+            ("package/package.json", b'0', manifest),
+            ("package/./dist/index.js", b'0', b"same"),
+            ("package/dist/index.js", b'0', b"same"),
+        ]);
+        different_type[2048 + 156] = 0;
+        checksum(&mut different_type[2048..2560]);
+        assert!(inspect_tar(&different_type, &mut Budget::new())
             .unwrap_err()
             .contains("conflicting dot-alias"));
     }
