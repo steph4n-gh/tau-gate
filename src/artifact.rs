@@ -665,8 +665,7 @@ fn parse_pax(data: &[u8], target: String) -> Result<PaxAttributes, &'static str>
             .ok_or("invalid PAX record")?;
         let key = std::str::from_utf8(&body[..equals]).map_err(|_| "invalid PAX key")?;
         let value = std::str::from_utf8(&body[equals + 1..]).map_err(|_| "invalid PAX value")?;
-        if !keys.insert(key.to_owned()) || value.bytes().any(|byte| !(b' '..=b'~').contains(&byte))
-        {
+        if !keys.insert(key.to_owned()) || value.chars().any(char::is_control) {
             return Err("ambiguous PAX record");
         }
         match key {
@@ -710,8 +709,33 @@ fn parse_pax(data: &[u8], target: String) -> Result<PaxAttributes, &'static str>
     })
 }
 
+fn parse_global_pax_comment(data: &[u8]) -> Result<(), &'static str> {
+    let space = data
+        .iter()
+        .position(|byte| *byte == b' ')
+        .ok_or("invalid global PAX comment")?;
+    if space == 0
+        || !data[..space].iter().all(u8::is_ascii_digit)
+        || (space > 1 && data[0] == b'0')
+        || std::str::from_utf8(&data[..space])
+            .ok()
+            .and_then(|n| n.parse::<usize>().ok())
+            != Some(data.len())
+        || !data.ends_with(b"\n")
+        || !data[space + 1..].starts_with(b"comment=")
+    {
+        return Err("invalid global PAX comment");
+    }
+    let value = &data[space + 9..data.len() - 1];
+    if value.is_empty() || value.iter().any(|byte| !(b' '..=b'~').contains(byte)) {
+        return Err("invalid global PAX comment");
+    }
+    Ok(())
+}
+
 struct PaxEntry {
     target: String,
+    global: bool,
     remaining: usize,
     data: Vec<u8>,
 }
@@ -749,6 +773,7 @@ struct TarInspector {
     entry: Option<TarEntry>,
     pax_entry: Option<PaxEntry>,
     pending_pax: Option<PaxAttributes>,
+    global_pax_seen: bool,
     end_blocks: usize,
 }
 
@@ -772,6 +797,7 @@ impl TarInspector {
             entry: None,
             pax_entry: None,
             pending_pax: None,
+            global_pax_seen: false,
             end_blocks: 0,
         }
     }
@@ -805,7 +831,11 @@ impl TarInspector {
             }
             if pax.remaining == 0 {
                 let pax = self.pax_entry.take().unwrap();
-                self.pending_pax = Some(parse_pax(&pax.data, pax.target)?);
+                if pax.global {
+                    parse_global_pax_comment(&pax.data)?;
+                } else {
+                    self.pending_pax = Some(parse_pax(&pax.data, pax.target)?);
+                }
             }
             return Ok(());
         }
@@ -862,6 +892,7 @@ impl TarInspector {
             b'0' | 0 => false,
             b'5' => true,
             b'x' if self.pending_pax.is_none() => false,
+            b'g' if self.entry_count == 1 && !self.global_pax_seen => false,
             _ => return Err("tar links, extensions and special records are unsupported"),
         };
         if header[157..257].iter().any(|byte| *byte != 0)
@@ -882,19 +913,30 @@ impl TarInspector {
         if size > MAX_TAR || (directory && size != 0) {
             return Err("invalid tar entry size");
         }
-        if header[156] == b'x' {
+        if matches!(header[156], b'x' | b'g') {
             if size == 0 || size > MAX_PAX || header[345..500].iter().any(|byte| *byte != 0) {
                 return Err("unsupported PAX header");
             }
             let name = tar_text(&header[..100])?;
-            let target = name
-                .strip_prefix("PaxHeader/")
-                .ok_or("unsupported PAX header")?;
-            if target.is_empty() {
-                return Err("unsupported PAX header");
-            }
+            let global = header[156] == b'g';
+            let target = if global {
+                if name != "pax_global_header" {
+                    return Err("unsupported PAX header");
+                }
+                self.global_pax_seen = true;
+                ""
+            } else {
+                let target = name
+                    .strip_prefix("PaxHeader/")
+                    .ok_or("unsupported PAX header")?;
+                if target.is_empty() {
+                    return Err("unsupported PAX header");
+                }
+                target
+            };
             self.pax_entry = Some(PaxEntry {
                 target: target.to_owned(),
+                global,
                 remaining: size,
                 data: Vec::with_capacity(size),
             });
@@ -1246,6 +1288,20 @@ mod tests {
             ("package/package.json", b'0', manifest),
         ]);
         assert_eq!(inspect_tar(&valid, &mut Budget::new()).unwrap().0, manifest);
+        let unicode = [
+            pax_record("path", "package/package.json"),
+            pax_record("size", &manifest.len().to_string()),
+            pax_record("NODETAR.package.author", "István"),
+        ]
+        .concat();
+        let unicode_archive = tar(&[
+            ("PaxHeader/package/package.json", b'x', unicode.as_bytes()),
+            ("package/package.json", b'0', manifest),
+        ]);
+        assert_eq!(
+            inspect_tar(&unicode_archive, &mut Budget::new()).unwrap().0,
+            manifest
+        );
         for invalid in [
             body(
                 "package/other.json",
@@ -1286,6 +1342,38 @@ mod tests {
             inspect_tar(&unpaired, &mut Budget::new()).unwrap_err(),
             "unpaired PAX header"
         );
+    }
+
+    #[test]
+    fn first_global_pax_comment_cannot_change_archive_paths() {
+        let manifest = br#"{"name":"pkg","version":"1"}"#;
+        let comment = pax_record("comment", "0123456789abcdef");
+        let valid = tar(&[
+            ("pax_global_header", b'g', comment.as_bytes()),
+            ("package/package.json", b'0', manifest),
+        ]);
+        assert_eq!(inspect_tar(&valid, &mut Budget::new()).unwrap().0, manifest);
+        for changed in [
+            tar(&[
+                (
+                    "pax_global_header",
+                    b'g',
+                    pax_record("path", "package/other.json").as_bytes(),
+                ),
+                ("package/package.json", b'0', manifest),
+            ]),
+            tar(&[
+                ("pax_global_header", b'g', comment.as_bytes()),
+                ("pax_global_header", b'g', comment.as_bytes()),
+                ("package/package.json", b'0', manifest),
+            ]),
+            tar(&[
+                ("package/package.json", b'0', manifest),
+                ("pax_global_header", b'g', comment.as_bytes()),
+            ]),
+        ] {
+            assert!(inspect_tar(&changed, &mut Budget::new()).is_err());
+        }
     }
 
     #[test]

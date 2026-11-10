@@ -224,19 +224,19 @@ def parse_pax(data, target):
             raise EvidenceError("invalid PAX record")
         try:
             key = key_bytes.decode("ascii")
-            value = value_bytes.decode("ascii")
+            value = value_bytes.decode("utf-8")
         except UnicodeError as exc:
             raise EvidenceError("invalid PAX text") from exc
-        if key in attributes or any(not 32 <= ord(char) <= 126 for char in value):
+        if key in attributes or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value):
             raise EvidenceError("ambiguous PAX record")
         if key in ("path", "size"):
             attributes[key] = value
         elif key in ("uid", "gid"):
-            if not value.isdecimal() or int(value) > 0xffffffff:
+            if not re.fullmatch(r"[0-9]+", value) or int(value) > 0xffffffff:
                 raise EvidenceError("invalid PAX owner")
             attributes[key] = value
         elif key in ("SCHILY.dev", "SCHILY.nlink", "SCHILY.ino"):
-            if not value.isdecimal() or int(value) > 0xffffffffffffffff:
+            if not re.fullmatch(r"[0-9]+", value) or int(value) > 0xffffffffffffffff:
                 raise EvidenceError("invalid PAX metadata")
             attributes[key] = value
         elif key.startswith("NODETAR.") and all(
@@ -248,6 +248,17 @@ def parse_pax(data, target):
     if attributes.get("path") != target or not re.fullmatch(r"(?:0|[1-9][0-9]*)", attributes.get("size", "")):
         raise EvidenceError("PAX path or size differs from regular header")
     return {"path": target, "size": int(attributes["size"])}
+
+
+def parse_global_pax_comment(data):
+    space = data.find(b" ")
+    if (space <= 0 or not re.fullmatch(rb"[1-9][0-9]*", data[:space])
+            or int(data[:space]) != len(data) or not data.endswith(b"\n")
+            or not data[space + 1:].startswith(b"comment=")):
+        raise EvidenceError("invalid global PAX comment")
+    value = data[space + 9:-1]
+    if not value or any(not 32 <= byte <= 126 for byte in value):
+        raise EvidenceError("invalid global PAX comment")
 
 
 def archive_facts(archive, integrity, *, budget=None):
@@ -275,6 +286,7 @@ def _archive_facts(archive, integrity, *, budget=None, capture=()):
     capture = set(capture)
     nested = {}
     pending_pax = None
+    global_pax_seen = False
     while True:
         header = stream.read(512)
         if len(header) != 512:
@@ -315,18 +327,26 @@ def _archive_facts(archive, integrity, *, budget=None, capture=()):
             raise EvidenceError(f"invalid tar header: {exc}") from exc
         if info is None:
             raise EvidenceError("unsupported tar entry type")
-        if info.type == tarfile.XHDTYPE and pending_pax is None:
+        if info.type in (tarfile.XHDTYPE, tarfile.XGLTYPE) and pending_pax is None:
             if info.size <= 0 or info.size > MAX_PAX or any(header[345:500]):
                 raise EvidenceError("unsupported PAX header")
             name = tar_text(header[:100])
-            if not name.startswith("PaxHeader/") or not name[len("PaxHeader/"):]:
+            global_pax = info.type == tarfile.XGLTYPE
+            if global_pax:
+                if global_pax_seen or entry_count != 1 or name != "pax_global_header":
+                    raise EvidenceError("unsupported PAX header")
+                global_pax_seen = True
+            elif not name.startswith("PaxHeader/") or not name[len("PaxHeader/"):]:
                 raise EvidenceError("unsupported PAX header")
             data = stream.read(info.size)
             padding_size = -info.size % 512
             padding = stream.read(padding_size)
             if len(data) != info.size or len(padding) != padding_size or any(padding):
                 raise EvidenceError("invalid PAX entry padding")
-            pending_pax = parse_pax(data, name[len("PaxHeader/"):])
+            if global_pax:
+                parse_global_pax_comment(data)
+            else:
+                pending_pax = parse_pax(data, name[len("PaxHeader/"):])
             offset += 512 + info.size + padding_size
             continue
         if info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):

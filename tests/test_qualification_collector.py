@@ -85,9 +85,9 @@ def pax_record(key, value):
     return str(length).encode() + body
 
 
-def pax_archive(path="package/package.json", size=len(MANIFEST), key="NODETAR.package.name"):
+def pax_archive(path="package/package.json", size=len(MANIFEST), key="NODETAR.package.name", value="pkg"):
     body = b"".join((pax_record("path", path), pax_record("size", str(size)),
-                     pax_record("uid", "718322462"), pax_record(key, "pkg")))
+                     pax_record("uid", "718322462"), pax_record(key, value)))
     pax = tarfile.TarInfo("PaxHeader/package/package.json")
     pax.type = tarfile.XHDTYPE
     pax.size = len(body)
@@ -99,6 +99,31 @@ def pax_archive(path="package/package.json", size=len(MANIFEST), key="NODETAR.pa
 
 
 class CollectorCompatibility(unittest.TestCase):
+    def test_global_pax_comment_and_unicode_ignored_metadata(self):
+        comment = pax_record("comment", "0123456789abcdef")
+        global_header = tarfile.TarInfo("pax_global_header")
+        global_header.type = tarfile.XGLTYPE
+        global_header.size = len(comment)
+        regular = tarfile.TarInfo("package/package.json")
+        regular.size = len(MANIFEST)
+
+        def make(body, *, before=True, twice=False):
+            global_header.size = len(body)
+            global_entry = (global_header.tobuf(format=tarfile.USTAR_FORMAT)
+                            + body + bytes(-len(body) % 512))
+            file_entry = (regular.tobuf(format=tarfile.USTAR_FORMAT)
+                          + MANIFEST + bytes(-len(MANIFEST) % 512))
+            entries = (global_entry + (global_entry if twice else b"") + file_entry
+                       if before else file_entry + global_entry)
+            return entries + bytes(1024)
+
+        self.assertEqual(check(make(comment))[0], MANIFEST)
+        self.assertEqual(check(pax_archive(key="NODETAR.package.author", value="István"))[0], MANIFEST)
+        for bad in (make(pax_record("path", "package/other.json")), make(comment, twice=True),
+                    make(comment, before=False), pax_archive(key="NODETAR.package.author", value="line\nbreak")):
+            with self.assertRaises(npm_evidence.EvidenceError):
+                check(bad)
+
     def test_bundled_child_is_read_from_verified_parent_archive(self):
         child = b'{"name":"child","version":"1","scripts":{"install":"echo child"}}'
         parent = b'{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["child"]}'
