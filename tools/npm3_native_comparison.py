@@ -13,7 +13,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 
 sys.dont_write_bytecode = True
@@ -235,7 +234,7 @@ def native_run(case, kind, project, canaries, env, output, npm_cmd, trusted_poli
 
 def write_summary(output, receipt):
     lines = ["# Controlled native approval comparison", "",
-             "This local experiment ran npm 11.19.1 with Node v26.9.0 against private loopback tarballs. "
+             f"This local experiment ran npm {receipt['versions']['npm-version']['value']} with Node {receipt['versions']['node-version']['value']} against private loopback tarballs. "
              "Every executed lifecycle body only wrote a named marker file. No public package script ran.", "",
              "Both native policies used `npm ci --strict-allow-scripts` with isolated configuration and cache. "
              "The first pins `name@version`. The stronger comparator pins the exact resolved tarball URL, which also contains its version. "
@@ -258,7 +257,7 @@ def write_summary(output, receipt):
               "These synthetic cases do not estimate prevalence, malicious intent, review time, performance, public registry mutability, "
               "or production CI behavior. The wrapper uses private baseline snapshots, not a live pull request. "
               "pnpm, workspaces, optional selection and implicit native builds are outside this comparison. "
-              "npm 11.19.1 is the installed comparator; no claim about a newer release is made.", "",
+              f"npm {receipt['versions']['npm-version']['value']} is the installed comparator; no claim about a newer release is made.", "",
               "The primary expectations were frozen before its first install. A separate development pilot established helper plumbing. "
               "All primary mismatches remain in receipt.json without changing the frozen matrix.", "",
               f"Completed {len(receipt['cases'])} cases with {len(receipt['unexpected_cases'])} unexpected cases. "
@@ -268,6 +267,7 @@ def write_summary(output, receipt):
 
 
 def run_comparison(output, npm, node, binary):
+    output = output.resolve()
     if output.exists() and any(output.iterdir()):
         raise EvidenceError("output must be absent or empty; prior experiments are never overwritten")
     output.mkdir(parents=True, exist_ok=True)
@@ -288,112 +288,112 @@ def run_comparison(output, npm, node, binary):
     npm_cmd = [node, npm]
     results = []
     try:
-        with tempfile.TemporaryDirectory(prefix="tau-native-comparison-") as temp:
-            private = Path(temp)
-            probe = private / "probe"
-            probe.mkdir()
-            env = environment(probe, node, base_url, probe / "canaries")
-            versions = {}
-            for label, command in (("node-version", [node, "--version"]), ("npm-version", npm_cmd + ["--version"]),
-                                   ("strict-capability", npm_cmd + ["config", "get", "strict-allow-scripts"])):
-                receipt, stdout = run(command, probe, env, output / "capability", label)
-                versions[label] = {"value": stdout.decode().strip(), "exit_code": receipt["returncode"]}
-            write_json(output / "source-receipt.json", dict(receipts, versions=versions, host={"system": platform.system(), "machine": platform.machine()}))
-            if versions["strict-capability"]["value"] != "false":
-                raise EvidenceError("installed npm strict-allow-scripts capability is unavailable")
-            frozen = {"schema_version": 1, "frozen_at": datetime.now(timezone.utc).isoformat(),
-                      "cases": [asdict(case) for case in CASES], "policies": list(POLICIES),
-                      "native_flags": ["--strict-allow-scripts", "--foreground-scripts", "--ignore-scripts=false"],
-                      "trust_boundary": "Trusted wrapper replaces head allowScripts with base policy and supplies base Tau-Gate approvals. Fresh approvals are controlled positive fixtures, never production approvals.",
-                      "development_pilot": "A separate development run preceded the final primary matrix. Expectations are informed by installed source and pilot observations. The primary matrix is not retuned after any primary outcome.",
-                      "candidate_sha256": receipts["tau_gate"]["sha256"],
-                      "oracle": "Case inputs independently determine intended changed bytes and marker labels; native outcomes come only from actual npm exit status and marker files. Tau-Gate output supplies its decision and fingerprints, never fixture ground truth.",
-                      "network": "Only controlled IPv4 loopback registry and original fixture archives. No public lifecycle scripts.",
-                      "scope": "Controlled sequential fixtures, not prevalence, speed, malicious-code detection, or production safety."}
-            write_json(output / "frozen-matrix.json", frozen)
-            matrix_hash = sha256((output / "frozen-matrix.json").read_bytes())
-            baselines = {}
-            for family in ("hook", "plain", "root"):
-                base = Case("baseline-" + family, "", baseline=family,
-                            command="approved" if family == "hook" else "",
-                            root_command="root-approved" if family == "root" else "")
-                directory = output / "baselines" / family
-                project, _, env = prepare(base, private / ("baseline-" + family), directory, npm_cmd, node, base_url, packages)
-                index, error = acquire(project, directory)
-                if error:
-                    raise EvidenceError("baseline acquisition failed: " + error)
-                empty = directory / "empty-approvals.json"
-                write_json(empty, {"schema_version": 2, "approvals": []})
-                _, report = tau_audit(binary, project, index, empty, env, directory / "tau", "discovery")
-                approvals = policy_from_report(report)
-                write_json(directory / "approvals.json", approvals)
-                for kind in POLICIES:
-                    write_json(directory / (kind + "-policy.json"), native_policy(kind, base, base_url))
-                baselines[family] = {"case": base, "approvals_path": directory / "approvals.json", "directory": directory}
-            for case in CASES:
-                directory = output / "cases" / case.name
-                project, canaries, env = prepare(case, private / case.name, directory, npm_cmd, node, base_url, packages)
-                canonical_manifest = (project / "package.json").read_bytes()
-                index, error = acquire(project, directory)
-                if error:
-                    evidence = directory / "evidence"
-                    (evidence / "artifacts").mkdir(parents=True, exist_ok=True)
-                    (evidence / "projects").mkdir(exist_ok=True)
-                    (evidence / "artifacts/fixture.tgz").write_bytes(fixture(case)["archive"])
-                    (evidence / "projects/package.json").write_bytes(canonical_manifest)
-                    write_json(index, {"schema_version": 1, "lock_sha256": sha256((project / "package-lock.json").read_bytes()),
-                                       "packages": [{"path": "", "project_manifest": "projects/package.json"}, {"path": INSTANCE, "artifact": "artifacts/fixture.tgz"}]})
-                if case.missing_evidence:
-                    bundle = json.loads(index.read_bytes())
-                    bundle["packages"] = [item for item in bundle["packages"] if item["path"] != INSTANCE]
-                    write_json(index, bundle)
-                approvals = json.loads(baselines[case.baseline]["approvals_path"].read_bytes())
-                policy_path = directory / "effective-approvals.json"
-                write_json(policy_path, approvals)
-                if case.fresh or case.self_edit:
-                    _, discovered = tau_audit(binary, project, index, policy_path, env, directory / "tau", "fresh-discovery")
-                    proposed = policy_from_report(discovered)
-                    write_json(directory / "proposed-approvals.json", proposed)
-                    if case.fresh:
-                        approvals = proposed
-                        write_json(policy_path, approvals)
-                tau_receipt, tau_report = tau_audit(binary, project, index, policy_path, env, directory / "tau", "enforce", True)
-                tau_result = {"outcome": tau_report["policy"]["outcome"], "exit_code": tau_receipt["returncode"],
-                              "acquisition_error": error, "head_policy_replaced": case.self_edit}
-                native = {}
-                for kind in POLICIES:
-                    trusted = native_policy(kind, case, base_url) if case.fresh else json.loads((baselines[case.baseline]["directory"] / (kind + "-policy.json")).read_bytes())
-                    native[kind] = native_run(case, kind, project, canaries, env, directory / kind, npm_cmd, trusted)
-                (project / "package.json").write_bytes(canonical_manifest)
-                expected = {"exact_version": case.expected_version, "exact_source_url": case.expected_source, "tau_gate": case.expected_tau}
-                observed = {kind: value["outcome"] for kind, value in native.items()} | {"tau_gate": tau_result["outcome"]}
-                mismatches = {key: {"expected": expected[key], "observed": value} for key, value in observed.items() if expected[key] != value}
-                markers = [case.command + "-install"] if case.command else []
-                if case.root_command:
-                    markers.append(case.root_command + "-install")
-                marker_checks = {kind: sorted(result["markers"]) == sorted(markers) if result["outcome"] == "executed" else not result["markers"] for kind, result in native.items()}
-                installed_checks = {kind: result["installed_manifest_matches_fixture"] is not False for kind, result in native.items()}
-                result = {"case": case.name, "change": case.change, "expected": expected, "observed": observed,
-                          "native": native, "tau_gate": tau_result, "mismatches": mismatches,
-                          "expected_execution_markers": markers, "marker_checks": marker_checks,
-                          "installed_manifest_checks": installed_checks,
-                          "fixture_archive_sha256": sha256(fixture(case)["archive"]),
-                          "lock_sha256": sha256((project / "package-lock.json").read_bytes())}
-                write_json(directory / "result.json", result)
-                results.append(result)
-                write_json(output / "progress.json", {"completed": len(results), "total": len(CASES), "last_case": case.name})
-                print(case.name + " " + json.dumps(observed, sort_keys=True), flush=True)
-            if sha256((output / "frozen-matrix.json").read_bytes()) != matrix_hash:
-                raise EvidenceError("frozen matrix changed during experiment")
-            receipt = {"schema_version": 1, "completed_at": datetime.now(timezone.utc).isoformat(),
-                       "frozen_matrix_sha256": matrix_hash, "source_receipt_sha256": sha256((output / "source-receipt.json").read_bytes()),
-                       "tau_gate_binary_unchanged": sha256(binary.read_bytes()) == receipts["tau_gate"]["sha256"],
-                       "cases": results, "unexpected_cases": [row["case"] for row in results if row["mismatches"] or not all(row["marker_checks"].values()) or not all(row["installed_manifest_checks"].values())],
-                       "loopback_requests": original_requests, "versions": versions}
-            write_json(output / "receipt.json", receipt)
-            write_summary(output, receipt)
-            write_json(output / "artifact-sha256.json", {str(path.relative_to(output)): sha256(path.read_bytes()) for path in sorted(output.rglob("*")) if path.is_file()})
-            return receipt
+        private = output / "private"
+        private.mkdir()
+        probe = private / "probe"
+        probe.mkdir()
+        env = environment(probe, node, base_url, probe / "canaries")
+        versions = {}
+        for label, command in (("node-version", [node, "--version"]), ("npm-version", npm_cmd + ["--version"]),
+                               ("strict-capability", npm_cmd + ["config", "get", "strict-allow-scripts"])):
+            receipt, stdout = run(command, probe, env, output / "capability", label)
+            versions[label] = {"value": stdout.decode().strip(), "exit_code": receipt["returncode"]}
+        write_json(output / "source-receipt.json", dict(receipts, versions=versions, host={"system": platform.system(), "machine": platform.machine()}))
+        if versions["strict-capability"]["value"] != "false":
+            raise EvidenceError("installed npm strict-allow-scripts capability is unavailable")
+        frozen = {"schema_version": 1, "frozen_at": datetime.now(timezone.utc).isoformat(),
+                  "cases": [asdict(case) for case in CASES], "policies": list(POLICIES),
+                  "native_flags": ["--strict-allow-scripts", "--foreground-scripts", "--ignore-scripts=false"],
+                  "trust_boundary": "Trusted wrapper replaces head allowScripts with base policy and supplies base Tau-Gate approvals. Fresh approvals are controlled positive fixtures, never production approvals.",
+                  "development_pilot": "A separate development run preceded the final primary matrix. Expectations are informed by installed source and pilot observations. The primary matrix is not retuned after any primary outcome.",
+                  "candidate_sha256": receipts["tau_gate"]["sha256"],
+                  "oracle": "Case inputs independently determine intended changed bytes and marker labels; native outcomes come only from actual npm exit status and marker files. Tau-Gate output supplies its decision and fingerprints, never fixture ground truth.",
+                  "network": "Only controlled IPv4 loopback registry and original fixture archives. No public lifecycle scripts.",
+                  "scope": "Controlled sequential fixtures, not prevalence, speed, malicious-code detection, or production safety."}
+        write_json(output / "frozen-matrix.json", frozen)
+        matrix_hash = sha256((output / "frozen-matrix.json").read_bytes())
+        baselines = {}
+        for family in ("hook", "plain", "root"):
+            base = Case("baseline-" + family, "", baseline=family,
+                        command="approved" if family == "hook" else "",
+                        root_command="root-approved" if family == "root" else "")
+            directory = output / "baselines" / family
+            project, _, env = prepare(base, private / ("baseline-" + family), directory, npm_cmd, node, base_url, packages)
+            index, error = acquire(project, directory)
+            if error:
+                raise EvidenceError("baseline acquisition failed: " + error)
+            empty = directory / "empty-approvals.json"
+            write_json(empty, {"schema_version": 2, "approvals": []})
+            _, report = tau_audit(binary, project, index, empty, env, directory / "tau", "discovery")
+            approvals = policy_from_report(report)
+            write_json(directory / "approvals.json", approvals)
+            for kind in POLICIES:
+                write_json(directory / (kind + "-policy.json"), native_policy(kind, base, base_url))
+            baselines[family] = {"case": base, "approvals_path": directory / "approvals.json", "directory": directory}
+        for case in CASES:
+            directory = output / "cases" / case.name
+            project, canaries, env = prepare(case, private / case.name, directory, npm_cmd, node, base_url, packages)
+            canonical_manifest = (project / "package.json").read_bytes()
+            index, error = acquire(project, directory)
+            if error:
+                evidence = directory / "evidence"
+                (evidence / "artifacts").mkdir(parents=True, exist_ok=True)
+                (evidence / "projects").mkdir(exist_ok=True)
+                (evidence / "artifacts/fixture.tgz").write_bytes(fixture(case)["archive"])
+                (evidence / "projects/package.json").write_bytes(canonical_manifest)
+                write_json(index, {"schema_version": 1, "lock_sha256": sha256((project / "package-lock.json").read_bytes()),
+                                   "packages": [{"path": "", "project_manifest": "projects/package.json"}, {"path": INSTANCE, "artifact": "artifacts/fixture.tgz"}]})
+            if case.missing_evidence:
+                bundle = json.loads(index.read_bytes())
+                bundle["packages"] = [item for item in bundle["packages"] if item["path"] != INSTANCE]
+                write_json(index, bundle)
+            approvals = json.loads(baselines[case.baseline]["approvals_path"].read_bytes())
+            policy_path = directory / "effective-approvals.json"
+            write_json(policy_path, approvals)
+            if case.fresh or case.self_edit:
+                _, discovered = tau_audit(binary, project, index, policy_path, env, directory / "tau", "fresh-discovery")
+                proposed = policy_from_report(discovered)
+                write_json(directory / "proposed-approvals.json", proposed)
+                if case.fresh:
+                    approvals = proposed
+                    write_json(policy_path, approvals)
+            tau_receipt, tau_report = tau_audit(binary, project, index, policy_path, env, directory / "tau", "enforce", True)
+            tau_result = {"outcome": tau_report["policy"]["outcome"], "exit_code": tau_receipt["returncode"],
+                          "acquisition_error": error, "head_policy_replaced": case.self_edit}
+            native = {}
+            for kind in POLICIES:
+                trusted = native_policy(kind, case, base_url) if case.fresh else json.loads((baselines[case.baseline]["directory"] / (kind + "-policy.json")).read_bytes())
+                native[kind] = native_run(case, kind, project, canaries, env, directory / kind, npm_cmd, trusted)
+            (project / "package.json").write_bytes(canonical_manifest)
+            expected = {"exact_version": case.expected_version, "exact_source_url": case.expected_source, "tau_gate": case.expected_tau}
+            observed = {kind: value["outcome"] for kind, value in native.items()} | {"tau_gate": tau_result["outcome"]}
+            mismatches = {key: {"expected": expected[key], "observed": value} for key, value in observed.items() if expected[key] != value}
+            markers = [case.command + "-install"] if case.command else []
+            if case.root_command:
+                markers.append(case.root_command + "-install")
+            marker_checks = {kind: sorted(result["markers"]) == sorted(markers) if result["outcome"] == "executed" else not result["markers"] for kind, result in native.items()}
+            installed_checks = {kind: result["installed_manifest_matches_fixture"] is not False for kind, result in native.items()}
+            result = {"case": case.name, "change": case.change, "expected": expected, "observed": observed,
+                      "native": native, "tau_gate": tau_result, "mismatches": mismatches,
+                      "expected_execution_markers": markers, "marker_checks": marker_checks,
+                      "installed_manifest_checks": installed_checks,
+                      "fixture_archive_sha256": sha256(fixture(case)["archive"]),
+                      "lock_sha256": sha256((project / "package-lock.json").read_bytes())}
+            write_json(directory / "result.json", result)
+            results.append(result)
+            write_json(output / "progress.json", {"completed": len(results), "total": len(CASES), "last_case": case.name})
+            print(case.name + " " + json.dumps(observed, sort_keys=True), flush=True)
+        if sha256((output / "frozen-matrix.json").read_bytes()) != matrix_hash:
+            raise EvidenceError("frozen matrix changed during experiment")
+        receipt = {"schema_version": 1, "completed_at": datetime.now(timezone.utc).isoformat(),
+                   "frozen_matrix_sha256": matrix_hash, "source_receipt_sha256": sha256((output / "source-receipt.json").read_bytes()),
+                   "tau_gate_binary_unchanged": sha256(binary.read_bytes()) == receipts["tau_gate"]["sha256"],
+                   "cases": results, "unexpected_cases": [row["case"] for row in results if row["mismatches"] or not all(row["marker_checks"].values()) or not all(row["installed_manifest_checks"].values())],
+                   "loopback_requests": original_requests, "versions": versions}
+        write_json(output / "receipt.json", receipt)
+        write_summary(output, receipt)
+        write_json(output / "artifact-sha256.json", {str(path.relative_to(output)): sha256(path.read_bytes()) for path in sorted(output.rglob("*")) if path.is_file()})
+        return receipt
     finally:
         server.shutdown()
         server.server_close()
