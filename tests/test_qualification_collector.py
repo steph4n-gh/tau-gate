@@ -78,6 +78,27 @@ def checksum(header):
 
 
 class CollectorCompatibility(unittest.TestCase):
+    def test_exact_gnu_ustar_magic_keeps_header_and_type_checks(self):
+        raw = bytearray(archive([("package/package.json", MANIFEST)]))
+        raw[257:265] = b"ustar  \0"
+        checksum(memoryview(raw)[:512])
+        self.assertEqual(check(raw)[0], MANIFEST)
+        for magic in (b"ustar 1\0", b"ustar \0\0", b"ustar  \x01"):
+            changed = raw.copy()
+            changed[257:265] = magic
+            checksum(memoryview(changed)[:512])
+            with self.assertRaises(npm_evidence.EvidenceError):
+                check(changed)
+        corrupt = raw.copy()
+        corrupt[100] ^= 1
+        with self.assertRaises(npm_evidence.EvidenceError):
+            check(corrupt)
+        link = raw.copy()
+        link[156] = ord("2")
+        checksum(memoryview(link)[:512])
+        with self.assertRaises(npm_evidence.EvidenceError):
+            check(link)
+
     def test_zero_tar_tail_must_be_block_aligned(self):
         raw = archive([("package/package.json", MANIFEST)])
         self.assertEqual(check(raw + bytes(512))[0], MANIFEST)

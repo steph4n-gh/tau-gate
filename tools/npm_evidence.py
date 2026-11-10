@@ -236,7 +236,7 @@ def archive_facts(archive, integrity, *, budget=None):
         entry_count += 1
         if budget is not None:
             budget.charge("headers_remaining", 1, "snapshot tar processing exceeds 250000 headers")
-        if header[257:265] != b"ustar\0" + b"00":
+        if header[257:265] not in (b"ustar\0" + b"00", b"ustar  \0"):
             raise EvidenceError("unsupported tar format; requires ustar")
         if any(header[157:257]) or any(header[500:]):
             raise EvidenceError("unsupported tar link or reserved metadata")

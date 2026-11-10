@@ -677,8 +677,8 @@ impl TarInspector {
             return Err("tar exceeds 10000 entries".into());
         }
         self.entry_count += 1;
-        if &header[257..265] != b"ustar\x0000" {
-            return Err("artifact requires POSIX ustar headers".into());
+        if &header[257..265] != b"ustar\x0000" && &header[257..265] != b"ustar  \0" {
+            return Err("artifact requires POSIX or GNU ustar headers".into());
         }
         let expected = tar_number(&header[148..156])?;
         let actual: usize = header
@@ -1327,6 +1327,29 @@ mod tests {
         hidden_name[99] = b'x';
         checksum(&mut hidden_name[..512]);
         assert!(inspect_tar(&hidden_name, &mut Budget::new()).is_err());
+    }
+
+    #[test]
+    fn exact_gnu_ustar_magic_keeps_header_and_type_checks() {
+        let original = tar(&[("package/package.json", b'0', b"{}")]);
+        let mut gnu = original.clone();
+        gnu[257..265].copy_from_slice(b"ustar  \0");
+        checksum(&mut gnu[..512]);
+        assert_eq!(inspect_tar(&gnu, &mut Budget::new()).unwrap().0, b"{}");
+
+        for magic in [b"ustar 1\0", b"ustar \0\0", b"ustar  \x01"] {
+            let mut invalid = gnu.clone();
+            invalid[257..265].copy_from_slice(magic);
+            checksum(&mut invalid[..512]);
+            assert!(inspect_tar(&invalid, &mut Budget::new()).is_err());
+        }
+        let mut bad_checksum = gnu.clone();
+        bad_checksum[100] ^= 1;
+        assert!(inspect_tar(&bad_checksum, &mut Budget::new()).is_err());
+        let mut link = gnu;
+        link[156] = b'2';
+        checksum(&mut link[..512]);
+        assert!(inspect_tar(&link, &mut Budget::new()).is_err());
     }
 
     #[test]

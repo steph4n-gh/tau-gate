@@ -415,6 +415,7 @@ def cases():
     assert len(facts['block_types']) > 1
     result.append(Case('valid_multiblock_mixed', 'zlib stream split by Z_SYNC_FLUSH across a tar block.', artifact=gzip_raw(baseline, raw), compression=facts))
     result.append(Case('valid_ustar_prefix', 'tarfile generates a USTAR prefix for a long regular filename.', artifact=zipped(tar_for(extra=[regular('package/' + 'subdir/' * 16 + 'blob.bin', b'x')]))))
+    result.append(Case('valid_gnu_ustar_magic', 'Exact GNU USTAR magic on the manifest header, with a POSIX USTAR following entry.', artifact=zipped(changed(baseline, 257, b'ustar  \0', True))))
     result.append(Case('valid_directory', 'Regular USTAR directory plus package manifest.', artifact=zipped(archive([('package/', b'', tarfile.DIRTYPE, ''), regular('package/package.json', encoded(MANIFEST))]))))
     result.append(Case('valid_nul_regular_type', 'USTAR NUL regular-file type.', artifact=zipped(archive([('package/package.json', encoded(MANIFEST), tarfile.AREGTYPE, '')]))))
     rng = random.Random(SEED)
@@ -473,6 +474,7 @@ def cases():
         'tar_nonzero_after_terminator': changed(baseline, data_end + 1024, b'x'),
         'tar_wrong_magic': changed(baseline, 257, b'zzzzz\0', True),
         'tar_wrong_version': changed(baseline, 263, b'99', True),
+        'tar_near_gnu_magic': changed(baseline, 257, b'ustar 1\0', True),
     }
     result.extend(Case(name, 'Targeted invalid USTAR with a valid gzip CRC/ISIZE and recomputed outer SRI.', 'incomplete', artifact=zipped(data)) for name, data in malformed_tar.items())
     for name, path in [('duplicate', 'package/package.json'), ('dot_alias', 'package/./package.json'), ('slash_alias', 'package//package.json'), ('dot_prefix_alias', './package/package.json'), ('parent_alias', 'package/x/../package.json'), ('absolute', '/package/package.json'), ('parent_escape', '../package/package.json'), ('backslash', 'package\\package.json')]:
