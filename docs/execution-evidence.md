@@ -18,11 +18,11 @@ An index has exactly these fields.
 }
 ```
 
-`path` is the exact raw npm v3 `packages` key. The root key is empty. Each non-link record has one locator. Link records have no locator and derive evidence from their exact source target. Duplicate or unknown fields, duplicate or extra instances, and a wrong lock hash reject the index. A missing instance remains explicitly incomplete.
+`path` is the exact raw npm v3 `packages` key. The root key is empty. Direct archive and source records each have one locator. Link records have no locator and derive evidence from their exact source target. An `inBundle: true` child with no own source or integrity has no locator; when directly declared by its parent, its facts come from nested files in that parent's verified archive. Duplicate or unknown fields, duplicate or extra instances, and a wrong lock hash reject the index. A missing instance remains explicitly incomplete.
 
 Locator files are relative to the index directory. Empty components, parent traversal, dot components, absolute paths, backslashes, control characters, symlinks, and nonregular files fail. The locator identifies original compressed archive bytes, never an extracted manifest that claims to be verified.
 
-Installed dependency instances require artifact locators and a supported direct archive source. Root and workspace records require source manifest locators. Source name, version, and dependency maps must agree with the corresponding lock record. An explicit `--manifest` must contain the same root bytes as the indexed root. A source manifest's sibling `binding.gyp` is read and hashed when present. Its absence is an explicit observation within that supplied directory. Source files retain caller trust and never become registry-artifact proof.
+Installed dependencies with their own archive source require artifact locators and a supported direct archive source. A bundled child can qualify only when its qualified parent archive directly declares the child in `bundleDependencies` or `bundledDependencies` and in `dependencies` or `optionalDependencies`, the child has an exact nested `node_modules/.../package.json` in that archive, and its manifest name and version agree with its lock record. A nested `binding.gyp` is hashed when present. The child report identifies the parent path, source, integrity, and original archive digest; a change to any of these invalidates its approval. Transitive or hoisted children, an absent or unqualified parent, missing child manifest, or conflicting install marker remain incomplete. Root and workspace records require source manifest locators. Source name, version, and dependency maps must agree with the corresponding lock record. An explicit `--manifest` must contain the same root bytes as the indexed root. A source manifest's sibling `binding.gyp` is read and hashed when present. Its absence is an explicit observation within that supplied directory. Source files retain caller trust and never become registry-artifact proof.
 
 ## Artifact profile
 
@@ -40,7 +40,7 @@ External evidence files and compressed archives have a 64 MiB limit. Expanded ta
 
 Reports identify the consumed index bytes in `evidence_index_sha256`. The root `manifest_sha256` also identifies the indexed root when `--manifest` is omitted. The explicit evidence scope is `npm_v3_artifacts_and_source_snapshots`.
 
-`execution_evidence` contains one record per locked instance. Each has `path`, `state`, `candidate`, `locked_install_marker`, `facts`, `reason`, and `approval_fingerprint`. States are `qualified`, `missing`, `unsupported`, or `conflict`. Only qualified evidence has a fingerprint. Facts distinguish `artifact`, `source_project`, and derived `workspace_link` evidence.
+`execution_evidence` contains one record per locked instance. Each has `path`, `state`, `candidate`, `locked_install_marker`, `facts`, `reason`, and `approval_fingerprint`. States are `qualified`, `missing`, `unsupported`, or `conflict`. Only qualified evidence has a fingerprint. Facts distinguish `artifact`, `bundled_artifact`, `source_project`, and derived `workspace_link` evidence.
 
 Lifecycle body hashes follow the qualified npm 11.19.1 `ci` rules.
 

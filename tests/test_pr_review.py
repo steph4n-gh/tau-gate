@@ -101,7 +101,7 @@ class PullRequestReview(unittest.TestCase):
         self.write("package-lock.json", json_data(self.lock))
         return self.commit("script-free base")
 
-    def archive(self, manifest):
+    def archive(self, manifest, extra=()):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as tar:
             data = json_data(manifest)
@@ -109,6 +109,11 @@ class PullRequestReview(unittest.TestCase):
             info.size = len(data)
             info.mode = 0o644
             tar.addfile(info, io.BytesIO(data))
+            for name, content in extra:
+                member = tarfile.TarInfo(name)
+                member.size = len(content)
+                member.mode = 0o644
+                tar.addfile(member, io.BytesIO(content))
         return gzip.compress(stream.getvalue(), mtime=0)
 
     def approvals(self):
@@ -203,6 +208,27 @@ class PullRequestReview(unittest.TestCase):
         self.assertIn("`root` --dependencies--> `node_modules/pkg`", text)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", text)
         self.assertNotIn("<script>", text)
+
+    def test_bundled_install_command_is_read_from_verified_parent(self):
+        command = "echo bundled-child"
+        child = json_data({"name": "child", "version": "1.0.0", "scripts": {"install": command}})
+        archive = self.archive(
+            {"name": "pkg", "version": "1.0.0", "dependencies": {"child": "1.0.0"},
+             "bundleDependencies": ["child"], "scripts": {"install": "echo dependency-canary > CANARY_EXECUTED"}},
+            [("package/node_modules/child/package.json", child)],
+        )
+        digest = hashlib.sha512(archive).digest()
+        (self.cache / (digest.hex() + ".tgz")).write_bytes(archive)
+        self.lock["packages"]["node_modules/pkg"]["integrity"] = "sha512-" + base64.b64encode(digest).decode()
+        self.lock["packages"]["node_modules/pkg/node_modules/child"] = {
+            "version": "1.0.0", "inBundle": True, "hasInstallScript": True}
+        self.write("package-lock.json", json_data(self.lock))
+        report, output = self.run_review(head=self.commit("add bundled child"), expected=1)
+        rows = {row["path"]: row for row in report["review"]["execution_changes"]}
+        child_row = rows["node_modules/pkg/node_modules/child"]
+        self.assertEqual(child_row["after"]["commands"], {"install": command})
+        self.assertEqual(child_row["after"]["facts"]["bundle_parent"], "node_modules/pkg")
+        self.assertIn(f"verified parent archive SHA-512 `{digest.hex()}`", (output / "summary.md").read_text())
 
     def test_older_checker_digest_field_uses_qualified_archive_facts(self):
         archive = self.archive({"name": "pkg", "version": "1.0.0", "scripts": {"install": "echo changed"}})

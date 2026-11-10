@@ -13,8 +13,8 @@ import subprocess
 import sys
 
 from npm_evidence import (
-    EvidenceError, MAX_FILE, MAX_MANIFEST, archive_facts, collect_evidence,
-    confined_file, is_registry_path, json_bytes, load_lock, manifest_facts,
+    EvidenceError, MAX_FILE, MAX_MANIFEST, archive_facts, archive_facts_nested, collect_evidence,
+    confined_file, declared_bundles, direct_bundle_name, is_registry_path, json_bytes, load_lock, manifest_facts,
     read_limited, safe_relative, sha256, strict_json,
 )
 
@@ -268,9 +268,35 @@ def command_text(output, label, evidence):
     evidence_dir = output / label / "evidence"
     index = strict_json(read_limited(evidence_dir / "index.json"))
     entry = next((item for item in index["packages"] if item["path"] == path), None)
-    if entry is None:
+    if entry is None and facts.get("kind") != "bundled_artifact":
         raise EvidenceError(f"qualified instance lacks a locator: {path!r}")
-    if facts.get("kind") == "artifact" and "artifact" in entry:
+    if facts.get("kind") == "bundled_artifact":
+        parent = facts["bundle_parent"]
+        parent_entry = next((item for item in index["packages"] if item["path"] == parent), None)
+        if parent_entry is None or "artifact" not in parent_entry or not path.startswith(parent + "/"):
+            raise EvidenceError(f"qualified bundled instance lacks a parent locator: {path!r}")
+        lock = strict_json(read_limited(output / label / "project" / "package-lock.json"))
+        parent_record = lock["packages"][parent]
+        child_record = lock["packages"].get(path, {})
+        if (parent_record.get("resolved") != facts.get("bundle_parent_source")
+                or parent_record.get("integrity") != facts.get("bundle_parent_integrity")
+                or child_record.get("inBundle") is not True):
+            raise EvidenceError(f"bundled source binding disagrees with reviewer view: {path!r}")
+        archive = read_limited(confined_file(evidence_dir, parent_entry["artifact"]))
+        relative = path[len(parent) + 1:]
+        _, parent_manifest, _, _, nested = archive_facts_nested(archive, parent_record["integrity"], {relative})
+        name = direct_bundle_name(relative)
+        if name is None or name not in declared_bundles(parent_manifest):
+            raise EvidenceError(f"bundled declaration disagrees with reviewer view: {path!r}")
+        selected = nested.get(relative, {})
+        data = selected.get("manifest")
+        if data is None or hashlib.sha512(archive).hexdigest() != facts.get("artifact_sha512"):
+            raise EvidenceError(f"bundled archive bytes disagree with reviewer view: {path!r}")
+        manifest = strict_json(data)
+        binding_hash = selected.get("binding_hash")
+        binding_gyp = binding_hash is not None
+        source_project = False
+    elif facts.get("kind") == "artifact" and "artifact" in entry:
         archive = read_limited(confined_file(evidence_dir, entry["artifact"]))
         lock = strict_json(read_limited(output / label / "project" / "package-lock.json"))
         integrity = lock["packages"][path]["integrity"]
@@ -507,7 +533,9 @@ def summary(report):
         path = markdown_text(row["path"] or "<root>")
         before, after = row["before"], row["after"]
         old_facts, new_facts = before.get("facts") or {}, after.get("facts") or {}
-        fields = [key for key in ("kind", "artifact_sha512", "manifest_sha256", "lifecycle", "binding_gyp_sha256", "implicit_node_gyp", "binary_entrypoints")
+        fields = [key for key in ("kind", "bundle_parent", "bundle_parent_source", "bundle_parent_integrity",
+                                  "artifact_sha512", "manifest_sha256", "lifecycle",
+                                  "binding_gyp_sha256", "implicit_node_gyp", "binary_entrypoints")
                   if old_facts.get(key) != new_facts.get(key)]
         lines.extend([f"### `{path}`", "", f"Changed: {', '.join(fields) or 'qualification or fingerprint'}.",
                       f"Introducer, proposed: {route_text(after['route'], row['path'])}.", ""])
@@ -516,6 +544,9 @@ def summary(report):
             evidence = f"manifest SHA-256 `{markdown_text(facts.get('manifest_sha256'))}`"
             if facts.get("kind") == "artifact":
                 evidence += f"; verified archive SHA-512 `{markdown_text(item.get('verified_artifact_sha512'))}`"
+            elif facts.get("kind") == "bundled_artifact":
+                evidence += (f"; bundled in `{markdown_text(facts.get('bundle_parent'))}`"
+                             f"; verified parent archive SHA-512 `{markdown_text(facts.get('artifact_sha512'))}`")
             elif facts.get("kind") == "source_project":
                 evidence += "; captured Git source manifest"
             elif facts.get("kind") == "workspace_link":

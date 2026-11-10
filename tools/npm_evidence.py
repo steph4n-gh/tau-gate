@@ -251,6 +251,14 @@ def parse_pax(data, target):
 
 
 def archive_facts(archive, integrity, *, budget=None):
+    return _archive_facts(archive, integrity, budget=budget, capture=())[0:4]
+
+
+def archive_facts_nested(archive, integrity, capture, *, budget=None):
+    return _archive_facts(archive, integrity, budget=budget, capture=capture)
+
+
+def _archive_facts(archive, integrity, *, budget=None, capture=()):
     if budget is not None and budget.exhausted is not None:
         raise EvidenceError(budget.exhausted)
     if len(archive) > MAX_FILE:
@@ -264,6 +272,8 @@ def archive_facts(archive, integrity, *, budget=None):
     root_name = None
     manifest_bytes = None
     binding_hash = None
+    capture = set(capture)
+    nested = {}
     pending_pax = None
     while True:
         header = stream.read(512)
@@ -369,12 +379,14 @@ def archive_facts(archive, integrity, *, budget=None):
             raise EvidenceError("tar file and parent path conflict")
         if info.size < 0 or info.size > MAX_EXPANDED or (info.isdir() and info.size) or offset + 512 + info.size > MAX_EXPANDED:
             raise EvidenceError("invalid tar size")
-        if relative == "package.json" and info.size > MAX_MANIFEST:
+        nested_manifest = relative.removesuffix("/package.json") if relative.endswith("/package.json") else None
+        nested_binding = relative.removesuffix("/binding.gyp") if relative.endswith("/binding.gyp") else None
+        if (relative == "package.json" or nested_manifest in capture) and info.size > MAX_MANIFEST:
             raise EvidenceError("invalid archived package.json")
-        if relative == "binding.gyp" and info.size > MAX_FILE:
+        if (relative == "binding.gyp" or nested_binding in capture) and info.size > MAX_FILE:
             raise EvidenceError("binding.gyp exceeds 64 MiB")
         digest = hashlib.sha256()
-        manifest_data = bytearray() if relative == "package.json" else None
+        manifest_data = bytearray() if relative == "package.json" or nested_manifest in capture else None
         remaining = info.size
         while remaining:
             data = stream.read(min(remaining, stream.CHUNK))
@@ -406,6 +418,10 @@ def archive_facts(archive, integrity, *, budget=None):
             manifest_bytes = bytes(manifest_data)
         elif relative == "binding.gyp":
             binding_hash = file_hash
+        if nested_manifest in capture:
+            nested.setdefault(nested_manifest, {})["manifest"] = bytes(manifest_data)
+        if nested_binding in capture:
+            nested.setdefault(nested_binding, {})["binding_hash"] = file_hash
         offset += 512 + info.size + padding_size
     if any(item["dot_alias"] and not item["paired"] for item in seen.values()):
         raise EvidenceError("unpaired dot-alias tar path")
@@ -414,7 +430,33 @@ def archive_facts(archive, integrity, *, budget=None):
     manifest = strict_json(manifest_bytes)
     if not isinstance(manifest, dict):
         raise EvidenceError("manifest must be an object")
-    return manifest_bytes, manifest, binding_hash is not None, binding_hash
+    return manifest_bytes, manifest, binding_hash is not None, binding_hash, nested
+
+
+def direct_bundle_name(relative):
+    if not relative.startswith("node_modules/"):
+        return None
+    name = relative[len("node_modules/"):]
+    if name.startswith("@"):
+        parts = name.split("/")
+        return name if len(parts) == 2 and len(parts[0]) > 1 and bool(parts[1]) else None
+    return name if name and "/" not in name else None
+
+
+def declared_bundles(manifest):
+    if "bundleDependencies" in manifest and "bundledDependencies" in manifest:
+        return set()
+    dependencies = set()
+    for field in ("dependencies", "optionalDependencies"):
+        value = manifest.get(field)
+        if isinstance(value, dict):
+            dependencies.update(value)
+    declared = manifest.get("bundleDependencies", manifest.get("bundledDependencies"))
+    if declared is True:
+        return dependencies
+    if isinstance(declared, list):
+        return {name for name in declared if isinstance(name, str) and name in dependencies}
+    return set()
 
 
 def manifest_facts(data, binding_gyp, source_project=False, binding_hash=None):
@@ -495,28 +537,57 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
     if len(index["packages"]) > MAX_NPM_RECORDS:
         raise EvidenceError("locator index exceeds 10000 package records")
     expected = {path: record for path, record in lock["packages"].items() if not record.get("link", False)}
-    seen = set()
-    results = []
-    budget = WorkBudget()
+    locators = {}
     for item in index["packages"]:
         if not isinstance(item, dict) or set(item) not in ({"path", "artifact"}, {"path", "project_manifest"}):
             raise EvidenceError("locator entry requires path and one supported evidence source")
         path = item["path"]
-        if not isinstance(path, str) or path in seen or path not in expected:
+        if not isinstance(path, str) or path in locators or path not in expected:
             raise EvidenceError("duplicate or unknown index instance")
-        seen.add(path)
+        locators[path] = item
+    bundle_children = {}
+    capture_by_parent = {}
+    for path, record in expected.items():
+        if (record.get("inBundle") is not True or "resolved" in record or "integrity" in record
+                or path in locators):
+            continue
+        ancestor = path
+        while "/node_modules/" in ancestor:
+            parent = ancestor.rsplit("/node_modules/", 1)[0]
+            if "artifact" in locators.get(parent, {}):
+                relative = path[len(parent) + 1:]
+                capture_by_parent.setdefault(parent, set()).add(relative)
+                bundle_children[path] = (parent, relative)
+                break
+            ancestor = parent
+    for path in bundle_children:
+        expected.pop(path)
+    results = []
+    budget = WorkBudget()
+    observed_nested = {}
+    observed_sha512 = {}
+    observed_declared = {}
+    parent_conflicts = {}
+    for item in index["packages"]:
+        path = item["path"]
         record = expected[path]
         if "artifact" in item:
             if not is_registry_path(path):
                 raise EvidenceError("project instance cannot use registry artifact evidence")
             archive_source(record.get("resolved"))
             archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]), budget=budget)
-            data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"), budget=budget)
+            data, manifest, binding_gyp, binding_hash, nested = _archive_facts(
+                archive, record.get("integrity"), budget=budget,
+                capture=capture_by_parent.get(path, ()))
+            observed_nested[path] = nested
+            observed_sha512[path] = hashlib.sha512(archive).hexdigest()
+            observed_declared[path] = declared_bundles(manifest)
             facts = manifest_facts(data, binding_gyp, binding_hash=binding_hash)
             facts.update({"kind": "artifact", "artifact_sha256": sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest(), "source": record.get("resolved"), "integrity": record.get("integrity")})
             expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
             facts["locked_install_marker"] = record.get("hasInstallScript")
             facts["marker_conflict"] = record.get("hasInstallScript") is False and bool(expected_marker)
+            parent_conflicts[path] = facts["marker_conflict"]
         else:
             if is_registry_path(path):
                 raise EvidenceError("supplied manifest cannot establish registry artifact binding")
@@ -535,8 +606,32 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
         check_identity(path, record, manifest)
         facts["path"] = path
         results.append(facts)
-    if seen != set(expected):
-        raise EvidenceError(f"missing evidence instances: {sorted(set(expected) - seen)}")
+    if set(locators) != set(expected):
+        raise EvidenceError(f"missing evidence instances: {sorted(set(expected) - set(locators))}")
+    for path, (parent, relative) in bundle_children.items():
+        if parent_conflicts.get(parent):
+            raise EvidenceError(f"bundle parent has conflicting install marker: {parent}")
+        name = direct_bundle_name(relative)
+        if name is None or name not in observed_declared.get(parent, set()):
+            raise EvidenceError(f"child is not a direct declared bundled dependency of its parent archive: {path}")
+        nested = observed_nested.get(parent, {}).get(relative, {})
+        data = nested.get("manifest")
+        if data is None:
+            raise EvidenceError(f"bundled package manifest absent from verified parent archive: {path}")
+        record = lock["packages"][path]
+        manifest = strict_json(data)
+        check_identity(path, record, manifest)
+        binding_hash = nested.get("binding_hash")
+        facts = manifest_facts(data, binding_hash is not None, binding_hash=binding_hash)
+        parent_record = lock["packages"][parent]
+        facts.update({"kind": "bundled_artifact", "artifact_sha512": observed_sha512[parent],
+                      "bundle_parent": parent, "bundle_parent_source": parent_record.get("resolved"),
+                      "bundle_parent_integrity": parent_record.get("integrity")})
+        expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
+        facts["locked_install_marker"] = record.get("hasInstallScript")
+        facts["marker_conflict"] = record.get("hasInstallScript") is False and bool(expected_marker)
+        facts["path"] = path
+        results.append(facts)
     return sorted(results, key=lambda item: item["path"])
 
 
@@ -586,6 +681,8 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
     budget = WorkBudget()
     for path, record in sorted(lock["packages"].items()):
         if record.get("link", False):
+            continue
+        if record.get("inBundle") is True and "resolved" not in record and "integrity" not in record:
             continue
         if is_registry_path(path):
             archive_source(record.get("resolved"))

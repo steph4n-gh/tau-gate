@@ -94,6 +94,19 @@ pub(crate) struct Artifact {
     pub manifest: Vec<u8>,
     pub binding_gyp_sha256: Option<String>,
     pub sha512: String,
+    pub nested: BTreeMap<String, NestedArtifact>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct NestedArtifact {
+    pub manifest: Option<Vec<u8>>,
+    pub binding_gyp_sha256: Option<String>,
+}
+
+struct TarContents {
+    manifest: Vec<u8>,
+    binding_gyp_sha256: Option<String>,
+    nested: BTreeMap<String, NestedArtifact>,
 }
 
 pub(crate) struct VerifiedArtifact<'a> {
@@ -121,22 +134,32 @@ pub(crate) fn verify<'a>(bytes: &'a [u8], integrity: &str) -> Result<VerifiedArt
     })
 }
 
+#[cfg(test)]
 pub(crate) fn inspect_verified(
     proof: VerifiedArtifact<'_>,
     budget: &mut Budget,
 ) -> Result<Artifact, String> {
+    inspect_verified_nested(proof, budget, &BTreeSet::new())
+}
+
+pub(crate) fn inspect_verified_nested(
+    proof: VerifiedArtifact<'_>,
+    budget: &mut Budget,
+    capture: &BTreeSet<String>,
+) -> Result<Artifact, String> {
     budget.check()?;
-    let mut tar = TarInspector::new();
+    let mut tar = TarInspector::with_capture(capture);
     gunzip_stream(
         proof.bytes,
         &mut |bytes, budget| tar.write(bytes, budget).map_err(str::to_owned),
         budget,
     )?;
-    let (manifest, binding_gyp_sha256) = tar.finish().map_err(str::to_owned)?;
+    let contents = tar.finish().map_err(str::to_owned)?;
     Ok(Artifact {
-        manifest,
-        binding_gyp_sha256,
+        manifest: contents.manifest,
+        binding_gyp_sha256: contents.binding_gyp_sha256,
         sha512: proof.sha512().to_owned(),
+        nested: contents.nested,
     })
 }
 
@@ -721,6 +744,8 @@ struct TarInspector {
     root: Option<String>,
     manifest: Option<Vec<u8>>,
     binding: Option<String>,
+    capture: BTreeSet<String>,
+    nested: BTreeMap<String, NestedArtifact>,
     entry: Option<TarEntry>,
     pax_entry: Option<PaxEntry>,
     pending_pax: Option<PaxAttributes>,
@@ -728,7 +753,12 @@ struct TarInspector {
 }
 
 impl TarInspector {
+    #[cfg(test)]
     fn new() -> Self {
+        Self::with_capture(&BTreeSet::new())
+    }
+
+    fn with_capture(capture: &BTreeSet<String>) -> Self {
         Self {
             block: [0; 512],
             buffered: 0,
@@ -737,6 +767,8 @@ impl TarInspector {
             root: None,
             manifest: None,
             binding: None,
+            capture: capture.clone(),
+            nested: BTreeMap::new(),
             entry: None,
             pax_entry: None,
             pending_pax: None,
@@ -955,13 +987,20 @@ impl TarInspector {
             return Err("noncanonical lifecycle evidence tar path");
         }
 
-        if relative == "package.json" && size > MAX_MANIFEST {
+        let captured_manifest = relative
+            .strip_suffix("/package.json")
+            .is_some_and(|parent| self.capture.contains(parent));
+        let captured_binding = relative
+            .strip_suffix("/binding.gyp")
+            .is_some_and(|parent| self.capture.contains(parent));
+        if (relative == "package.json" || captured_manifest) && size > MAX_MANIFEST {
             return Err("package manifest exceeds 1 MiB");
         }
-        if relative == "binding.gyp" && size > MAX_BINDING {
+        if (relative == "binding.gyp" || captured_binding) && size > MAX_BINDING {
             return Err("binding.gyp exceeds 64 MiB");
         }
-        let manifest = (relative == "package.json").then(|| Vec::with_capacity(size));
+        let manifest =
+            (relative == "package.json" || captured_manifest).then(|| Vec::with_capacity(size));
         self.entry = Some(TarEntry {
             path,
             directory,
@@ -1002,8 +1041,20 @@ impl TarInspector {
         if relative == "binding.gyp" {
             self.binding = Some(data_sha256.clone());
         }
+        if let Some(parent) = relative.strip_suffix("/binding.gyp") {
+            if self.capture.contains(parent) {
+                self.nested
+                    .entry(parent.to_owned())
+                    .or_default()
+                    .binding_gyp_sha256 = Some(data_sha256.clone());
+            }
+        }
         if let Some(manifest) = manifest {
-            self.manifest = Some(manifest);
+            if relative == "package.json" {
+                self.manifest = Some(manifest);
+            } else if let Some(parent) = relative.strip_suffix("/package.json") {
+                self.nested.entry(parent.to_owned()).or_default().manifest = Some(manifest);
+            }
         }
         if let Some(prior) = self.paths.get_mut(&folded) {
             if prior.path != path
@@ -1034,7 +1085,7 @@ impl TarInspector {
         Ok(())
     }
 
-    fn finish(self) -> Result<(Vec<u8>, Option<String>), &'static str> {
+    fn finish(self) -> Result<TarContents, &'static str> {
         if self.buffered != 0 {
             return Err("tar length is not block aligned");
         }
@@ -1065,10 +1116,11 @@ impl TarInspector {
                 }
             }
         }
-        Ok((
-            self.manifest.ok_or("tar is missing package/package.json")?,
-            self.binding,
-        ))
+        Ok(TarContents {
+            manifest: self.manifest.ok_or("tar is missing package/package.json")?,
+            binding_gyp_sha256: self.binding,
+            nested: self.nested,
+        })
     }
 }
 
@@ -1076,7 +1128,10 @@ impl TarInspector {
 fn inspect_tar(tar: &[u8], budget: &mut Budget) -> Result<(Vec<u8>, Option<String>), String> {
     let mut inspector = TarInspector::new();
     inspector.write(tar, budget).map_err(str::to_owned)?;
-    inspector.finish().map_err(str::to_owned)
+    inspector
+        .finish()
+        .map(|contents| (contents.manifest, contents.binding_gyp_sha256))
+        .map_err(str::to_owned)
 }
 
 #[cfg(test)]
@@ -1249,7 +1304,7 @@ mod tests {
             for chunk in valid.chunks(size) {
                 inspector.write(chunk, &mut budget).unwrap();
             }
-            assert_eq!(inspector.finish().unwrap().0, b"{}");
+            assert_eq!(inspector.finish().unwrap().manifest, b"{}");
         }
         let mut changed = data.clone();
         *changed.last_mut().unwrap() ^= 1;

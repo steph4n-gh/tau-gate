@@ -99,6 +99,65 @@ def pax_archive(path="package/package.json", size=len(MANIFEST), key="NODETAR.pa
 
 
 class CollectorCompatibility(unittest.TestCase):
+    def test_bundled_child_is_read_from_verified_parent_archive(self):
+        child = b'{"name":"child","version":"1","scripts":{"install":"echo child"}}'
+        parent = b'{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["child"]}'
+        parent_archive = gzip.compress(archive([
+            ("package/package.json", parent),
+            ("package/node_modules/child/package.json", child),
+        ]), mtime=0)
+        digest = hashlib.sha512(parent_archive).digest()
+        integrity = "sha512-" + base64.b64encode(digest).decode()
+        lock = {"lockfileVersion": 3, "packages": {
+            "": {"name": "app", "version": "1"},
+            "node_modules/pkg": {"version": "1", "resolved": "https://registry.npmjs.org/pkg/-/pkg-1.tgz",
+                                 "integrity": integrity},
+            "node_modules/pkg/node_modules/child": {"version": "1", "inBundle": True,
+                                                    "hasInstallScript": True},
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            project = base / "project"
+            project.mkdir()
+            (project / "package.json").write_bytes(b'{"name":"app","version":"1"}')
+            lock_path = project / "package-lock.json"
+            lock_path.write_bytes(npm_evidence.json_bytes(lock))
+            cache = base / "cache"
+            cache.mkdir()
+            (cache / (digest.hex() + ".tgz")).write_bytes(parent_archive)
+            index = npm_evidence.collect_evidence(lock_path, project, base / "evidence", cache)
+            rows = npm_evidence.validate_bundle(lock_path, index, project / "package.json")
+            bundled = next(row for row in rows if row["path"].endswith("/child"))
+            self.assertEqual(bundled["kind"], "bundled_artifact")
+            self.assertEqual(bundled["artifact_sha512"], digest.hex())
+            self.assertEqual(bundled["lifecycle"]["install"], hashlib.sha256(b"echo child").hexdigest())
+            self.assertEqual(len(json.loads(index.read_text())["packages"]), 2)
+            lock["packages"]["node_modules/pkg/node_modules/child"]["version"] = "2"
+            lock_path.write_bytes(npm_evidence.json_bytes(lock))
+            index_data = json.loads(index.read_text())
+            index_data["lock_sha256"] = npm_evidence.sha256(lock_path.read_bytes())
+            index.write_bytes(npm_evidence.json_bytes(index_data))
+            with self.assertRaisesRegex(npm_evidence.EvidenceError, "manifest version"):
+                npm_evidence.validate_bundle(lock_path, index, project / "package.json")
+            lock["packages"]["node_modules/pkg/node_modules/child"]["version"] = "1"
+            artifact_path = base / "evidence" / index_data["packages"][1]["artifact"]
+            for fields in ({"dependencies": {"child": "1"}},
+                           {"dependencies": {"child": "1"}, "bundleDependencies": ["other"]},
+                           {"bundleDependencies": ["child"]}):
+                changed_parent = npm_evidence.json_bytes({"name": "pkg", "version": "1", **fields})
+                changed_archive = gzip.compress(archive([
+                    ("package/package.json", changed_parent),
+                    ("package/node_modules/child/package.json", child),
+                ]), mtime=0)
+                lock["packages"]["node_modules/pkg"]["integrity"] = (
+                    "sha512-" + base64.b64encode(hashlib.sha512(changed_archive).digest()).decode())
+                lock_path.write_bytes(npm_evidence.json_bytes(lock))
+                index_data["lock_sha256"] = npm_evidence.sha256(lock_path.read_bytes())
+                index.write_bytes(npm_evidence.json_bytes(index_data))
+                artifact_path.write_bytes(changed_archive)
+                with self.assertRaisesRegex(npm_evidence.EvidenceError, "direct declared bundled dependency"):
+                    npm_evidence.validate_bundle(lock_path, index, project / "package.json")
+
     def test_narrow_pax_metadata_preserves_manifest_bytes(self):
         self.assertEqual(check(pax_archive())[0], MANIFEST)
         for changed in (pax_archive(path="package/other.json"),

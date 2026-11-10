@@ -305,6 +305,25 @@ def acquire(args):
             if record.get("link"):
                 continue
             if npm_evidence.is_registry_path(path):
+                if record.get("inBundle") is True and "resolved" not in record and "integrity" not in record:
+                    ancestor = path
+                    parent = None
+                    while "/node_modules/" in ancestor:
+                        candidate = ancestor.rsplit("/node_modules/", 1)[0]
+                        if candidate in lock["packages"] and "resolved" in lock["packages"][candidate]:
+                            parent = candidate
+                            break
+                        ancestor = candidate
+                    try:
+                        key = q.archive_identity(lock["packages"][parent]) if parent else None
+                        parent_receipt = archives[key] if key else None
+                        if parent_receipt is None or parent_receipt["status"] != "available":
+                            raise ValueError("bundle parent archive unavailable")
+                        packages[path] = {"status": "available", "source": "verified_parent_archive",
+                                          "parent": parent, "parent_sha512": key}
+                    except (ValueError, TypeError, KeyError) as exc:
+                        packages[path] = {"status": "unavailable", "reason": str(exc)}
+                    continue
                 try:
                     key = q.archive_identity(record)
                     receipt = archives[key]

@@ -326,6 +326,150 @@ fn canonical_integrity(archive: &[u8]) -> String {
     }
     integrity
 }
+
+#[test]
+fn bundled_child_uses_verified_parent_bytes_and_source_bound_approval() {
+    let source = "https://registry.npmjs.org/pkg/-/pkg-1.tgz";
+    let parent = br#"{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["child"]}"#;
+    let child = br#"{"name":"child","version":"1","scripts":{"install":"echo child"}}"#;
+    let entries = [
+        ("package/package.json", parent.as_slice()),
+        ("package/node_modules/child/package.json", child.as_slice()),
+    ];
+    let f = artifact_fixture(&entries, source);
+    let lock_with = |source: &str, archive: &[u8], child_version: &str, bundled: bool| {
+        format!(
+            r#"{{"lockfileVersion":3,"packages":{{"":{{"name":"app","version":"1"}},"node_modules/pkg":{{"version":"1","resolved":{},"integrity":"{}","dependencies":{{"child":"1"}}}},"node_modules/pkg/node_modules/child":{{"version":"{child_version}","inBundle":{bundled},"hasInstallScript":true}}}}}}"#,
+            J::String(source.into()).to_json(),
+            canonical_integrity(archive)
+        )
+    };
+    let original_archive = fs::read(f.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("lock.json", lock_with(source, &original_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    let report = json(&f.audit(false));
+    let evidence = report
+        .get("execution_evidence")
+        .and_then(J::as_array)
+        .unwrap();
+    let child_evidence = evidence
+        .iter()
+        .find(|e| e.get("path").and_then(J::as_str) == Some("node_modules/pkg/node_modules/child"))
+        .unwrap();
+    assert_eq!(
+        child_evidence.get("state").and_then(J::as_str),
+        Some("qualified")
+    );
+    assert_eq!(child_evidence.get("candidate"), Some(&J::Bool(true)));
+    assert_eq!(
+        child_evidence
+            .get("facts")
+            .unwrap()
+            .get("kind")
+            .and_then(J::as_str),
+        Some("bundled_artifact")
+    );
+    assert_eq!(
+        child_evidence
+            .get("facts")
+            .unwrap()
+            .get("bundle_parent_source")
+            .and_then(J::as_str),
+        Some(source)
+    );
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+
+    f.put(
+        "lock.json",
+        lock_with(
+            "https://registry.npmjs.org/pkg/-/else-1.tgz",
+            &original_archive,
+            "1",
+            true,
+        ),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 1, "blocked");
+
+    let changed_child = artifact_fixture(
+        &[
+            ("package/package.json", parent),
+            (
+                "package/node_modules/child/package.json",
+                br#"{"name":"child","version":"1","scripts":{"install":"echo changed"}}"#,
+            ),
+        ],
+        source,
+    );
+    let changed_archive = fs::read(changed_child.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &changed_archive);
+    f.put("lock.json", lock_with(source, &changed_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 1, "blocked");
+
+    f.put("bundle/pkg.tgz", &original_archive);
+    f.put("lock.json", lock_with(source, &original_archive, "2", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    f.put("lock.json", lock_with(source, &original_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    let mut corrupt = original_archive.clone();
+    corrupt[20] ^= 1;
+    f.put("bundle/pkg.tgz", corrupt);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    f.put("bundle/pkg.tgz", &original_archive);
+    f.put(
+        "lock.json",
+        lock_with(source, &original_archive, "1", false),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    let absent_child = artifact_fixture(&[("package/package.json", parent)], source);
+    let absent_archive = fs::read(absent_child.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &absent_archive);
+    f.put("lock.json", lock_with(source, &absent_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    let undeclared = artifact_fixture(
+        &[
+            ("package/package.json", br#"{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["other"]}"#),
+            ("package/node_modules/child/package.json", child),
+        ],
+        source,
+    );
+    let undeclared_archive = fs::read(undeclared.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &undeclared_archive);
+    f.put(
+        "lock.json",
+        lock_with(source, &undeclared_archive, "1", true),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    let uninstalled = artifact_fixture(
+        &[
+            (
+                "package/package.json",
+                br#"{"name":"pkg","version":"1","bundleDependencies":["child"]}"#,
+            ),
+            ("package/node_modules/child/package.json", child),
+        ],
+        source,
+    );
+    let uninstalled_archive = fs::read(uninstalled.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &uninstalled_archive);
+    f.put(
+        "lock.json",
+        lock_with(source, &uninstalled_archive, "1", true),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+}
 fn replace_integrity(f: &Fixture, integrity: Option<&str>) {
     let mut lock =
         MiniParser::parse_json(&fs::read_to_string(f.0.join("lock.json")).unwrap()).unwrap();

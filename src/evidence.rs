@@ -6,7 +6,7 @@ use crate::{
     review::{object, string},
 };
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::Read,
     path::{Component, Path, PathBuf},
@@ -35,6 +35,11 @@ enum State {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Kind {
     Artifact,
+    BundledArtifact {
+        parent: String,
+        source: String,
+        integrity: String,
+    },
     SourceProject,
     WorkspaceLink(String),
 }
@@ -60,12 +65,13 @@ impl Facts {
     fn kind(&self) -> &'static str {
         match self.kind {
             Kind::Artifact => "artifact",
+            Kind::BundledArtifact { .. } => "bundled_artifact",
             Kind::SourceProject => "source_project",
             Kind::WorkspaceLink(_) => "workspace_link",
         }
     }
     fn json(&self) -> J {
-        object([
+        let mut value = object([
             ("kind", string(self.kind())),
             ("name", optional(&self.name)),
             ("version", optional(&self.version)),
@@ -92,7 +98,20 @@ impl Facts {
             ("gypfile_false", J::Bool(self.gypfile_false)),
             ("implicit_node_gyp", J::Bool(self.implicit_node_gyp)),
             ("binary_entrypoints", self.binary_entrypoints.clone()),
-        ])
+        ]);
+        if let Kind::BundledArtifact {
+            parent,
+            source,
+            integrity,
+        } = &self.kind
+        {
+            if let J::Object(fields) = &mut value {
+                fields.insert("bundle_parent".into(), string(parent));
+                fields.insert("bundle_parent_source".into(), string(source));
+                fields.insert("bundle_parent_integrity".into(), string(integrity));
+            }
+        }
+        value
     }
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -269,6 +288,49 @@ fn keys(value: &J, expected: &[&str]) -> bool {
 fn registry(path: &str) -> bool {
     path.starts_with("node_modules/") || path.contains("/node_modules/")
 }
+fn direct_bundle_name(relative: &str) -> Option<&str> {
+    let name = relative.strip_prefix("node_modules/")?;
+    if name.is_empty() || name.contains("/node_modules/") {
+        return None;
+    }
+    if name.starts_with('@') {
+        let (scope, package) = name.split_once('/')?;
+        (scope.len() > 1 && !package.is_empty() && !package.contains('/')).then_some(name)
+    } else {
+        (!name.contains('/')).then_some(name)
+    }
+}
+fn declared_bundles(manifest: &J) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let dependencies: BTreeSet<String> = ["dependencies", "optionalDependencies"]
+        .into_iter()
+        .filter_map(|field| manifest.get(field).and_then(J::as_object))
+        .flat_map(|values| values.keys().cloned())
+        .collect();
+    if manifest.get("bundleDependencies").is_some() && manifest.get("bundledDependencies").is_some()
+    {
+        return names;
+    }
+    match manifest
+        .get("bundleDependencies")
+        .or_else(|| manifest.get("bundledDependencies"))
+    {
+        Some(J::Array(values)) => {
+            for value in values {
+                if let Some(name) = value.as_str() {
+                    if dependencies.contains(name) {
+                        names.insert(name.to_owned());
+                    }
+                }
+            }
+        }
+        Some(J::Bool(true)) => {
+            names = dependencies;
+        }
+        _ => {}
+    }
+    names
+}
 fn direct_archive_source(source: &str) -> bool {
     let Some(url) = source
         .strip_prefix("https://")
@@ -334,6 +396,21 @@ struct Work {
 struct ReadFacts {
     facts: Result<Facts, String>,
     verified_artifact_sha512: Option<String>,
+    nested: BTreeMap<String, artifact::NestedArtifact>,
+    declared_bundles: BTreeSet<String>,
+}
+
+struct BundleInput<'a> {
+    nested: &'a artifact::NestedArtifact,
+    parent: &'a str,
+    source: &'a str,
+    integrity: &'a str,
+    sha512: &'a str,
+}
+
+enum FactSource<'a> {
+    Direct(&'a BTreeSet<String>),
+    Bundle(BundleInput<'a>),
 }
 
 pub(crate) fn load(
@@ -381,7 +458,35 @@ pub(crate) fn load(
             return Err("duplicate or unknown index instance".into());
         }
     }
+    let mut capture_by_parent: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut bundle_children = BTreeMap::new();
+    for (path, record) in records {
+        if record.get("inBundle") != Some(&J::Bool(true))
+            || record.get("resolved").is_some()
+            || record.get("integrity").is_some()
+            || locators.contains_key(path.as_str())
+        {
+            continue;
+        }
+        let mut ancestor = path.as_str();
+        while let Some((parent, _)) = ancestor.rsplit_once("/node_modules/") {
+            if locators
+                .get(parent)
+                .is_some_and(|entry| entry.get("artifact").is_some())
+            {
+                let relative = path[parent.len() + 1..].to_owned();
+                capture_by_parent
+                    .entry(parent.to_owned())
+                    .or_default()
+                    .insert(relative.clone());
+                bundle_children.insert(path.clone(), (parent.to_owned(), relative));
+                break;
+            }
+            ancestor = parent;
+        }
+    }
     let mut result = BTreeMap::new();
+    let mut observed_bundles = BTreeMap::new();
     let root = index_path.parent().unwrap_or(Path::new("."));
     let mut work = Work {
         compressed: Vec::new(),
@@ -393,12 +498,28 @@ pub(crate) fn load(
             continue;
         }
         let evidence = if let Some(entry) = locators.get(path.as_str()) {
-            let read = read_facts(root, path, record, entry, root_hash, &mut work);
+            let capture = capture_by_parent.get(path).cloned().unwrap_or_default();
+            let read = if capture.is_empty() {
+                read_facts(root, path, record, entry, root_hash, &mut work)
+            } else {
+                read_facts_with_bundle(
+                    root,
+                    path,
+                    record,
+                    entry,
+                    root_hash,
+                    &mut work,
+                    FactSource::Direct(&capture),
+                )
+            };
             let mut evidence = match read.facts {
                 Ok(facts) => qualify(path, record, marker, facts),
                 Err(reason) => ExecutionEvidence::unknown(State::Unsupported, marker, reason),
             };
             evidence.verified_artifact_sha512 = read.verified_artifact_sha512;
+            if evidence.qualified() {
+                observed_bundles.insert(path.clone(), (read.nested, read.declared_bundles));
+            }
             evidence
         } else {
             ExecutionEvidence::unknown(
@@ -408,6 +529,70 @@ pub(crate) fn load(
             )
         };
         result.insert(path.clone(), evidence);
+    }
+    for (path, (parent, relative)) in bundle_children {
+        let record = &records[&path];
+        let marker = record.get("hasInstallScript").and_then(J::as_bool);
+        let declared = observed_bundles
+            .get(&parent)
+            .and_then(|(_, names)| direct_bundle_name(&relative).map(|name| names.contains(name)))
+            == Some(true);
+        let evidence = match (
+            result.get(&parent),
+            observed_bundles
+                .get(&parent)
+                .and_then(|(nested, _)| nested.get(&relative)),
+        ) {
+            (Some(parent_evidence), _) if parent_evidence.qualified() && !declared => {
+                ExecutionEvidence::unknown(
+                    State::Missing,
+                    marker,
+                    "child is not a direct declared bundled dependency of its parent archive",
+                )
+            }
+            (Some(parent_evidence), Some(nested)) if parent_evidence.qualified() => {
+                let parent_record = &records[&parent];
+                let bundle = BundleInput {
+                    nested,
+                    parent: &parent,
+                    source: parent_record.get("resolved").and_then(J::as_str).unwrap(),
+                    integrity: parent_record.get("integrity").and_then(J::as_str).unwrap(),
+                    sha512: parent_evidence
+                        .facts
+                        .as_ref()
+                        .unwrap()
+                        .artifact_sha512
+                        .as_deref()
+                        .unwrap(),
+                };
+                let read = read_facts_with_bundle(
+                    root,
+                    &path,
+                    record,
+                    &J::Null,
+                    None,
+                    &mut work,
+                    FactSource::Bundle(bundle),
+                );
+                match read.facts {
+                    Ok(facts) => qualify(&path, record, marker, facts),
+                    Err(reason) => ExecutionEvidence::unknown(State::Unsupported, marker, reason),
+                }
+            }
+            (Some(parent_evidence), _) if parent_evidence.qualified() => {
+                ExecutionEvidence::unknown(
+                    State::Missing,
+                    marker,
+                    "bundled package manifest absent from verified parent archive",
+                )
+            }
+            _ => ExecutionEvidence::unknown(
+                State::Missing,
+                marker,
+                "bundle parent lacks qualified archive evidence",
+            ),
+        };
+        result.insert(path, evidence);
     }
     for (path, record) in records {
         if record.get("link").and_then(J::as_bool) != Some(true) {
@@ -488,10 +673,56 @@ fn read_facts(
     root_hash: Option<&str>,
     work: &mut Work,
 ) -> ReadFacts {
+    read_facts_with_bundle(
+        root,
+        path,
+        record,
+        entry,
+        root_hash,
+        work,
+        FactSource::Direct(&BTreeSet::new()),
+    )
+}
+
+fn read_facts_with_bundle(
+    root: &Path,
+    path: &str,
+    record: &J,
+    entry: &J,
+    root_hash: Option<&str>,
+    work: &mut Work,
+    selection: FactSource<'_>,
+) -> ReadFacts {
     let mut verified_artifact_sha512 = None;
+    let mut nested = BTreeMap::new();
+    let mut bundle_names = BTreeSet::new();
+    let empty_capture = BTreeSet::new();
+    let capture = match &selection {
+        FactSource::Direct(capture) => *capture,
+        FactSource::Bundle(_) => &empty_capture,
+    };
+    let bundle = match &selection {
+        FactSource::Bundle(bundle) => Some(bundle),
+        FactSource::Direct(_) => None,
+    };
     let facts = (|| {
         work.budget.check()?;
-        let (bytes, binding, kind, artifact_sha512) = if let Some(value) = entry.get("artifact") {
+        let (bytes, binding, kind, artifact_sha512) = if let Some(bundle) = bundle {
+            (
+                bundle
+                    .nested
+                    .manifest
+                    .clone()
+                    .ok_or("bundled package manifest is absent")?,
+                bundle.nested.binding_gyp_sha256.clone(),
+                Kind::BundledArtifact {
+                    parent: bundle.parent.to_owned(),
+                    source: bundle.source.to_owned(),
+                    integrity: bundle.integrity.to_owned(),
+                },
+                Some(bundle.sha512.to_owned()),
+            )
+        } else if let Some(value) = entry.get("artifact") {
             if !registry(path) {
                 return Err("project instance cannot use artifact evidence".into());
             }
@@ -519,7 +750,8 @@ fn read_facts(
                 record.get("integrity").and_then(J::as_str).unwrap_or(""),
             )?;
             verified_artifact_sha512 = Some(verified.sha512().to_owned());
-            let archive = artifact::inspect_verified(verified, &mut work.budget)?;
+            let archive = artifact::inspect_verified_nested(verified, &mut work.budget, capture)?;
+            nested = archive.nested;
             (
                 archive.manifest,
                 archive.binding_gyp_sha256,
@@ -564,6 +796,9 @@ fn read_facts(
             (bytes, binding, Kind::SourceProject, None)
         };
         let manifest = parse(&bytes)?;
+        if !capture.is_empty() {
+            bundle_names = declared_bundles(&manifest);
+        }
         let m = manifest.as_object().ok_or("manifest must be an object")?;
         let name = record
             .get("name")
@@ -675,6 +910,8 @@ fn read_facts(
     ReadFacts {
         facts,
         verified_artifact_sha512,
+        nested,
+        declared_bundles: bundle_names,
     }
 }
 

@@ -67,6 +67,61 @@ class OracleTests(unittest.TestCase):
             facts, _ = self.snapshot(missing=missing)
             self.assertEqual(oracle.events(facts, facts), [])
 
+    def test_bundled_child_facts_come_from_parent_archive(self):
+        child = {"name": "child", "version": "1", "scripts": {"install": "echo child"}}
+        parent = {"name": "pkg", "version": "1.0.0", "dependencies": {"child": "1"},
+                  "bundleDependencies": ["child"]}
+        _, directory = self.snapshot(manifest=parent, extra=[("package/node_modules/child/package.json", encoded(child))])
+        lock_path = directory / "package-lock.json"
+        index_path = directory / "index.json"
+        lock = json.loads(lock_path.read_text())
+        lock["packages"]["node_modules/pkg/node_modules/child"] = {
+            "version": "1", "inBundle": True, "hasInstallScript": True}
+        lock_path.write_bytes(encoded(lock))
+        index = json.loads(index_path.read_text())
+        index["lock_sha256"] = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        index_path.write_bytes(encoded(index))
+        facts = oracle.snapshot_facts(lock_path, index_path, directory / "package.json")
+        self.assertEqual(facts["status"], "complete")
+        bundled = facts["packages"]["node_modules/pkg/node_modules/child"]
+        self.assertEqual(bundled["scripts"]["install"], "echo child")
+        self.assertEqual(bundled["artifact_sha512"], facts["packages"]["node_modules/pkg"]["artifact_sha512"])
+        self.assertEqual(bundled["bundle_parent"], "node_modules/pkg")
+        lock["packages"]["node_modules/pkg/node_modules/child"]["version"] = "2"
+        lock_path.write_bytes(encoded(lock))
+        index["lock_sha256"] = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        index_path.write_bytes(encoded(index))
+        facts = oracle.snapshot_facts(lock_path, index_path, directory / "package.json")
+        self.assertEqual(facts["packages"]["node_modules/pkg/node_modules/child"]["status"], "unknown")
+        for fields in ({"dependencies": {"child": "1"}},
+                       {"dependencies": {"child": "1"}, "bundleDependencies": ["other"]},
+                       {"bundleDependencies": ["child"]}):
+            _, negative = self.snapshot(
+                manifest={"name": "pkg", "version": "1.0.0", **fields},
+                extra=[("package/node_modules/child/package.json", encoded(child))])
+            negative_lock = negative / "package-lock.json"
+            negative_index = negative / "index.json"
+            negative_data = json.loads(negative_lock.read_text())
+            negative_data["packages"]["node_modules/pkg/node_modules/child"] = {
+                "version": "1", "inBundle": True, "hasInstallScript": True}
+            negative_lock.write_bytes(encoded(negative_data))
+            negative_index_data = json.loads(negative_index.read_text())
+            negative_index_data["lock_sha256"] = hashlib.sha256(negative_lock.read_bytes()).hexdigest()
+            negative_index.write_bytes(encoded(negative_index_data))
+            negative_facts = oracle.snapshot_facts(negative_lock, negative_index, negative / "package.json")
+            self.assertEqual(negative_facts["packages"]["node_modules/pkg/node_modules/child"]["status"], "unknown")
+            self.assertIn("direct declared", negative_facts["packages"]["node_modules/pkg/node_modules/child"]["reason"])
+
+    def test_dot_alias_needs_identical_regular_partner(self):
+        manifest = {"name": "pkg", "version": "1.0.0"}
+        for entries, expected in [
+            ([("package/./file", b"same"), ("package/file", b"same")], "known"),
+            ([("package/./file", b"same")], "unknown"),
+            ([("package/./file", b"left"), ("package/file", b"right")], "unknown"),
+        ]:
+            facts, _ = self.snapshot(manifest, extra=entries)
+            self.assertEqual(facts["packages"]["node_modules/pkg"]["status"], expected)
+
     def test_hook_changes_have_execution_obligation(self):
         before, _ = self.snapshot({"name": "pkg", "version": "1.0.0", "scripts": {"install": "old", "postinstall": "remove"}})
         after, _ = self.snapshot({"name": "pkg", "version": "1.0.0", "scripts": {"install": "new", "preinstall": "add"}})
