@@ -22,7 +22,7 @@ import npm_evidence
 
 MAX_FILE = 64 * 1024 * 1024
 MAX_OUTPUT = 64 * 1024 * 1024
-SCORING_SEMANTICS_VERSION = 3
+SCORING_SEMANTICS_VERSION = 4
 
 
 def digest(data, algorithm="sha256"):
@@ -547,7 +547,8 @@ def compare_events(expected, report, oracle_status):
 def compare_facts(facts, report):
     mismatches = []
     fields = {"manifest_sha256": "manifest_sha256", "artifact_sha512": "artifact_sha512",
-              "scripts": "lifecycle", "implicit_native": "implicit_node_gyp", "binding_sha256": "binding_gyp_sha256"}
+              "scripts": "lifecycle", "implicit_native": "implicit_node_gyp", "binding_sha256": "binding_gyp_sha256",
+              "source_manifest_version": "version"}
     for side, independent in facts.items():
         observed = {item["path"]: item for item in report.get(side, {}).get("execution_evidence") or []}
         for path, expected in independent["packages"].items():

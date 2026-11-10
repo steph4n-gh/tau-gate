@@ -5,6 +5,8 @@ import contextlib
 import io
 import json
 from pathlib import Path
+import shutil
+import threading
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -78,6 +80,27 @@ def main():
     assert resource["reused_offline_unique_compressed_bytes"] == len(blob)
     assert resource["other_or_failed_charged_archive_bytes"] == 0
     assert "Real historical changed-hook case" in (case_output / "report.html").read_text()
+    parallel = output / "parallel-study"
+    parallel.mkdir()
+    for name in ("selection.json", "acquisition.json", "protocol.json", "labels.json"):
+        shutil.copyfile(case_output / name, parallel / name)
+    shutil.copytree(case_output / "labels", parallel / "labels")
+    (parallel / "inputs").symlink_to(case_output / "inputs", target_is_directory=True)
+    simultaneous = threading.Barrier(2, timeout=5)
+    original_run = q.run_bounded
+
+    def simultaneous_run(*args):
+        simultaneous.wait()
+        return original_run(*args)
+
+    with patch.object(q, "run_bounded", simultaneous_run), contextlib.redirect_stdout(io.StringIO()):
+        sprint.replay(SimpleNamespace(output=parallel, binary=args.binary, rounds=2, timeout=180, jobs=2))
+    assert q.load(parallel / "replay/plan.json")["jobs"] == 2
+    assert q.load(parallel / "summary.json")["processing_complete"] == 2
+    for case in selection["pairs"]:
+        serial_hash = q.digest(q.read(case_output / "replay/round-1" / case["id"] / "stdout.bin"))
+        for round_number in (1, 2):
+            assert serial_hash == q.digest(q.read(parallel / f"replay/round-{round_number}" / case["id"] / "stdout.bin"))
     first = selection["pairs"][0]
     index_path = case_output / "inputs" / first["id"] / "base/evidence/index.json"
     index = q.load(index_path)
@@ -101,7 +124,7 @@ def main():
         pass
     else:
         raise AssertionError("changed source accepted after independent labels")
-    q.save(output / "controls.json", {"status": "passed", "scope": "controlled synthetic histories and archives; no dependency code executed", "controls": ["non3 and missing attempts retained", "two both-sides npm3 pairs selected", "nested project scope", "independent changed-hook label", "five interleaved real core runs", "assessable event recall", "unknown archive is not clean", "source mutation rejected", "standalone report"]})
+    q.save(output / "controls.json", {"status": "passed", "scope": "controlled synthetic histories and archives; no dependency code executed", "controls": ["non3 and missing attempts retained", "two both-sides npm3 pairs selected", "nested project scope", "independent changed-hook label", "five interleaved real core runs", "parallel output matches serial", "assessable event recall", "unknown archive is not clean", "source mutation rejected", "standalone report"]})
     print(json.dumps(q.load(output / "controls.json"), sort_keys=True))
 
 

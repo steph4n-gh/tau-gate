@@ -2,6 +2,7 @@
 """Freeze, independently label, and replay historical npm v3 update pairs."""
 import argparse
 import collections
+from concurrent.futures import ThreadPoolExecutor
 import html
 import json
 import os
@@ -466,37 +467,49 @@ def replay(args):
     binary = args.binary.resolve()
     binary_hash = q.digest(q.read(binary))
     frozen(destination / "plan.json", {"binary": str(binary), "binary_sha256": binary_hash,
-           "labels_sha256": q.digest(q.read(output / "labels.json")), "rounds": args.rounds,
-           "order": "round-major, ascending frozen pair order, even rounds reversed", "cache": "all artifacts local; operating-system cache not flushed; acquisition excluded"})
+           "labels_sha256": q.digest(q.read(output / "labels.json")), "rounds": args.rounds, "jobs": getattr(args, "jobs", 1),
+           "order": "round-major submission and receipt order; ascending frozen pair order, even rounds reversed", "cache": "all artifacts local; operating-system cache not flushed; acquisition excluded",
+           "timing_scope": "per-review process measurements; concurrent jobs are not a sequential latency comparison"})
+    jobs = getattr(args, "jobs", 1)
+    if not 1 <= jobs <= 4:
+        raise ValueError("replay jobs must be between 1 and 4")
+    if len({pair["id"] for pair in selection["pairs"]}) != len(selection["pairs"]):
+        raise ValueError("duplicate replay case ids")
+
+    def run_pair(item):
+        number, pair = item
+        folder = destination / f"round-{number}" / pair["id"]
+        argv = [str(binary), "review", "--json"]
+        for side in ("base", "head"):
+            root = output / "inputs" / pair["id"] / side
+            argv.extend(["--" + side, str(root / "project/package-lock.json"), "--" + side + "-manifest", str(root / "project/package.json"), "--" + side + "-evidence", str(root / "evidence/index.json")])
+        run = q.run_bounded(argv, folder, args.timeout)
+        report, error = {}, None
+        try:
+            report = q.load(folder / "stdout.bin")
+        except (OSError, ValueError) as exc:
+            error = str(exc)
+        expected, scores = q.score_case(facts[pair["id"]], report)
+        comparison = scores["comparison"]
+        status = report.get("status")
+        outcome = report.get("policy", {}).get("outcome")
+        expected_exit = 2 if status == "incomplete" or outcome == "incomplete" else 1 if outcome == "blocked" else 0
+        valid = run["termination"] == "exited" and run["exit_code"] == expected_exit and status in ("complete", "incomplete")
+        complete = valid and comparison["status"] == "complete" and not comparison["misses"] and not comparison["fact_mismatches"]
+        receipt = {"id": pair["id"], "round": number, "run": run, "report_status": status, "policy_outcome": outcome,
+                   "protocol_valid": valid, "processing_complete": complete, "comparison": comparison,
+                   "unexpected_allowed_outcome": outcome == "allowed", "parse_error": error,
+                   "label_status": label_by_id[pair["id"]]["status"]}
+        frozen(folder / "receipt.json", receipt)
+        return receipt
+
     receipts = []
-    for number in range(1, args.rounds + 1):
-        ordered = selection["pairs"] if number % 2 else list(reversed(selection["pairs"]))
-        for pair in ordered:
-            folder = destination / f"round-{number}" / pair["id"]
-            argv = [str(binary), "review", "--json"]
-            for side in ("base", "head"):
-                root = output / "inputs" / pair["id"] / side
-                argv.extend(["--" + side, str(root / "project/package-lock.json"), "--" + side + "-manifest", str(root / "project/package.json"), "--" + side + "-evidence", str(root / "evidence/index.json")])
-            run = q.run_bounded(argv, folder, args.timeout)
-            report, error = {}, None
-            try:
-                report = q.load(folder / "stdout.bin")
-            except (OSError, ValueError) as exc:
-                error = str(exc)
-            expected, scores = q.score_case(facts[pair["id"]], report)
-            comparison = scores["comparison"]
-            status = report.get("status")
-            outcome = report.get("policy", {}).get("outcome")
-            expected_exit = 2 if status == "incomplete" or outcome == "incomplete" else 1 if outcome == "blocked" else 0
-            valid = run["termination"] == "exited" and run["exit_code"] == expected_exit and status in ("complete", "incomplete")
-            complete = valid and comparison["status"] == "complete" and not comparison["misses"] and not comparison["fact_mismatches"]
-            receipt = {"id": pair["id"], "round": number, "run": run, "report_status": status, "policy_outcome": outcome,
-                       "protocol_valid": valid, "processing_complete": complete, "comparison": comparison,
-                       "unexpected_allowed_outcome": outcome == "allowed", "parse_error": error,
-                       "label_status": label_by_id[pair["id"]]["status"]}
-            frozen(folder / "receipt.json", receipt)
-            receipts.append(receipt)
-            print(json.dumps({"round": number, "id": pair["id"], "complete": complete, "status": status, "misses": comparison["misses"]}), flush=True)
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        for number in range(1, args.rounds + 1):
+            ordered = selection["pairs"] if number % 2 else list(reversed(selection["pairs"]))
+            for receipt in pool.map(run_pair, ((number, pair) for pair in ordered)):
+                receipts.append(receipt)
+                print(json.dumps({"round": number, "id": receipt["id"], "complete": receipt["processing_complete"], "status": receipt["report_status"], "misses": receipt["comparison"]["misses"]}), flush=True)
     if q.digest(q.read(binary)) != binary_hash:
         raise ValueError("candidate binary changed during replay")
     frozen(destination / "receipts.json", receipts)
@@ -610,6 +623,7 @@ def main(argv=None):
         elif name == "replay":
             command.add_argument("--binary", type=Path, required=True)
             command.add_argument("--rounds", type=int, default=5)
+            command.add_argument("--jobs", type=int, default=1)
             command.add_argument("--timeout", type=float, default=180)
         elif name == "validate":
             command.add_argument("--timeout", type=float, default=180)
@@ -617,8 +631,8 @@ def main(argv=None):
     try:
         if args.command == "freeze" and not 1 <= args.count <= 30:
             raise ValueError("pair count must be between 1 and 30")
-        if args.command == "replay" and (args.rounds < 1 or args.timeout <= 0):
-            raise ValueError("rounds and timeout must be positive")
+        if args.command == "replay" and (args.rounds < 1 or args.timeout <= 0 or not 1 <= args.jobs <= 4):
+            raise ValueError("rounds and timeout must be positive; jobs must be between 1 and 4")
         globals()[args.command](args)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         parser.exit(2, str(exc) + "\n")
