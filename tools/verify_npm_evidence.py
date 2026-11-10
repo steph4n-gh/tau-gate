@@ -496,6 +496,19 @@ def cases():
     result.append(Case('valid_narrow_pax', 'Per-file PAX metadata repeats the regular manifest path and size.',
                        artifact=zipped(archive([('PaxHeader/package/package.json', pax_payload, tarfile.XHDTYPE, ''),
                                                 regular('package/package.json', encoded(MANIFEST))]))))
+    unicode_pax = b''.join((pax_record('path', 'package/package.json'),
+                           pax_record('size', str(len(encoded(MANIFEST)))),
+                           pax_record('NODETAR.package.author', 'István')))
+    result.append(Case('valid_unicode_pax_metadata', 'UTF-8 in ignored PAX metadata cannot change file identity.',
+                       artifact=zipped(archive([('PaxHeader/package/package.json', unicode_pax, tarfile.XHDTYPE, ''),
+                                                regular('package/package.json', encoded(MANIFEST))]))))
+    comment = pax_record('comment', '0123456789abcdef')
+    result.append(Case('valid_initial_global_pax_comment', 'An initial global comment does not change extraction paths.',
+                       artifact=zipped(archive([('pax_global_header', comment, tarfile.XGLTYPE, ''),
+                                                regular('package/package.json', encoded(MANIFEST))]))))
+    result.append(Case('global_pax_path_override', 'Global PAX cannot rename an archived lifecycle input.',
+                       'incomplete', artifact=zipped(archive([('pax_global_header', pax_record('path', 'package/other.json'), tarfile.XGLTYPE, ''),
+                                                              regular('package/package.json', encoded(MANIFEST))]))))
     bad_pax = b''.join((pax_record('path', 'package/package.json'),
                         pax_record('size', str(len(encoded(MANIFEST)))),
                         pax_record('linkpath', 'pkg')))
