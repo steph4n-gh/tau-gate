@@ -222,7 +222,14 @@ def capture_extra(pair, side, output, budget):
             files[spec["path"]] = {k: spec[k] for k in ("sha256", "bytes", "url", "repository_path")}
         else:
             absent.append(spec)
-    lock = oracle._lock(q.read(project / "package-lock.json"))
+    try:
+        lock = oracle._lock(q.read(project / "package-lock.json"))
+    except oracle.OracleError as exc:
+        receipt = {"repository": pair["repository"], "commit": pair[side], "files": files,
+                   "absent": absent, "issues": [{"path": "package-lock.json", "reason": str(exc)}],
+                   "status": "partial", "trust": "caller-trusted exact raw GitHub commit URL; source scope is lock directory"}
+        frozen(root / "source.json", receipt)
+        return root, {"packages": {}}, receipt
     for path, record in sorted(lock["packages"].items()):
         if record.get("link") or npm_evidence.is_registry_path(path):
             continue
