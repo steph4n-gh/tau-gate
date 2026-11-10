@@ -20,6 +20,12 @@
       "summary.json": "1e12f18859e717eaa553cf18d752db8f1eed8fca052aeec84df2696b07317213"
     },
     "independent_labels_complete": 18,
+    "missing_locator_breakdown": {
+      "mirror_url_with_sha512_blocked_by_frozen_download_rule": 80,
+      "npmjs_url_with_sha512_deduplicated_after_blocked_mirror_attempt": 9,
+      "unsupported_git_source_with_sha512": 2,
+      "unsupported_git_source_without_sha512": 6
+    },
     "partial_issue_occurrences_by_side": {
       "archive exceeds member count": 4,
       "child is not a direct declared bundled dependency of its parent archive": 156,
