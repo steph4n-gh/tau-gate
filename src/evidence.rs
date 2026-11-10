@@ -99,6 +99,7 @@ impl Facts {
 pub(crate) struct ExecutionEvidence {
     state: State,
     facts: Option<Facts>,
+    verified_artifact_sha512: Option<String>,
     marker: Option<bool>,
     reason: Option<String>,
     fingerprint: Option<String>,
@@ -108,6 +109,7 @@ impl ExecutionEvidence {
         Self {
             state,
             facts: None,
+            verified_artifact_sha512: None,
             marker,
             reason: Some(reason.into()),
             fingerprint: None,
@@ -173,6 +175,10 @@ impl ExecutionEvidence {
             (
                 "facts",
                 self.facts.as_ref().map(Facts::json).unwrap_or(J::Null),
+            ),
+            (
+                "verified_artifact_sha512",
+                optional(&self.verified_artifact_sha512),
             ),
             ("reason", optional(&self.reason)),
             ("approval_fingerprint", optional(&self.fingerprint)),
@@ -322,8 +328,12 @@ fn direct_archive_source(source: &str) -> bool {
 
 struct Work {
     compressed: Vec<u8>,
-    expanded: Vec<u8>,
     budget: artifact::Budget,
+}
+
+struct ReadFacts {
+    facts: Result<Facts, String>,
+    verified_artifact_sha512: Option<String>,
 }
 
 pub(crate) fn load(
@@ -375,7 +385,6 @@ pub(crate) fn load(
     let root = index_path.parent().unwrap_or(Path::new("."));
     let mut work = Work {
         compressed: Vec::new(),
-        expanded: Vec::new(),
         budget: artifact::Budget::new(),
     };
     for (path, record) in records {
@@ -384,10 +393,13 @@ pub(crate) fn load(
             continue;
         }
         let evidence = if let Some(entry) = locators.get(path.as_str()) {
-            match read_facts(root, path, record, entry, root_hash, &mut work) {
+            let read = read_facts(root, path, record, entry, root_hash, &mut work);
+            let mut evidence = match read.facts {
                 Ok(facts) => qualify(path, record, marker, facts),
                 Err(reason) => ExecutionEvidence::unknown(State::Unsupported, marker, reason),
-            }
+            };
+            evidence.verified_artifact_sha512 = read.verified_artifact_sha512;
+            evidence
         } else {
             ExecutionEvidence::unknown(
                 State::Missing,
@@ -447,6 +459,7 @@ fn qualify(path: &str, record: &J, marker: Option<bool>, facts: Facts) -> Execut
             State::Qualified
         },
         facts: Some(facts),
+        verified_artifact_sha512: None,
         marker,
         reason: conflict.then(|| {
             "locked hasInstallScript contradicts inspected install lifecycle/native facts".into()
@@ -461,176 +474,188 @@ fn read_facts(
     entry: &J,
     root_hash: Option<&str>,
     work: &mut Work,
-) -> Result<Facts, String> {
-    work.budget.check()?;
-    let (bytes, binding, kind, artifact_sha512) = if let Some(value) = entry.get("artifact") {
-        if !registry(path) {
-            return Err("project instance cannot use artifact evidence".into());
-        }
-        if !record
-            .get("resolved")
-            .and_then(J::as_str)
-            .is_some_and(direct_archive_source)
-        {
-            return Err("artifact source requires a supported direct HTTP(S) archive URL".into());
-        }
-        let file = confined(
-            root,
-            value.as_str().ok_or("artifact locator must be a string")?,
-        )?;
-        read_regular_into(
-            &file,
-            MAX_FILE,
-            &mut work.compressed,
-            Some(&mut work.budget),
-        )?;
-        let archive = artifact::inspect(
-            &work.compressed,
-            record.get("integrity").and_then(J::as_str).unwrap_or(""),
-            &mut work.expanded,
-            &mut work.budget,
-        )?;
-        (
-            archive.manifest,
-            archive.binding_gyp_sha256,
-            Kind::Artifact,
-            Some(archive.sha512),
-        )
-    } else {
-        if registry(path) {
-            return Err("supplied manifest cannot establish registry artifact binding".into());
-        }
-        let file = confined(
-            root,
-            entry
-                .get("project_manifest")
-                .and_then(J::as_str)
-                .ok_or("project manifest locator must be a string")?,
-        )?;
-        read_regular_into(
-            &file,
-            MAX_MANIFEST,
-            &mut work.compressed,
-            Some(&mut work.budget),
-        )?;
-        let bytes = work.compressed.clone();
-        if path.is_empty() && root_hash.is_some_and(|h| h != sha256(&bytes)) {
-            return Err("index root manifest differs from supplied root input".into());
-        }
-        let binding_file = file.parent().unwrap().join("binding.gyp");
-        let binding = match fs::symlink_metadata(&binding_file) {
-            Ok(_) => {
-                read_regular_into(
-                    &binding_file,
-                    MAX_FILE,
-                    &mut work.compressed,
-                    Some(&mut work.budget),
-                )?;
-                Some(sha256(&work.compressed))
+) -> ReadFacts {
+    let mut verified_artifact_sha512 = None;
+    let facts = (|| {
+        work.budget.check()?;
+        let (bytes, binding, kind, artifact_sha512) = if let Some(value) = entry.get("artifact") {
+            if !registry(path) {
+                return Err("project instance cannot use artifact evidence".into());
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(format!("cannot inspect source binding.gyp: {e}")),
+            if !record
+                .get("resolved")
+                .and_then(J::as_str)
+                .is_some_and(direct_archive_source)
+            {
+                return Err(
+                    "artifact source requires a supported direct HTTP(S) archive URL".into(),
+                );
+            }
+            let file = confined(
+                root,
+                value.as_str().ok_or("artifact locator must be a string")?,
+            )?;
+            read_regular_into(
+                &file,
+                MAX_FILE,
+                &mut work.compressed,
+                Some(&mut work.budget),
+            )?;
+            let verified = artifact::verify(
+                &work.compressed,
+                record.get("integrity").and_then(J::as_str).unwrap_or(""),
+            )?;
+            verified_artifact_sha512 = Some(verified.sha512().to_owned());
+            let archive = artifact::inspect_verified(verified, &mut work.budget)?;
+            (
+                archive.manifest,
+                archive.binding_gyp_sha256,
+                Kind::Artifact,
+                Some(archive.sha512),
+            )
+        } else {
+            if registry(path) {
+                return Err("supplied manifest cannot establish registry artifact binding".into());
+            }
+            let file = confined(
+                root,
+                entry
+                    .get("project_manifest")
+                    .and_then(J::as_str)
+                    .ok_or("project manifest locator must be a string")?,
+            )?;
+            read_regular_into(
+                &file,
+                MAX_MANIFEST,
+                &mut work.compressed,
+                Some(&mut work.budget),
+            )?;
+            let bytes = work.compressed.clone();
+            if path.is_empty() && root_hash.is_some_and(|h| h != sha256(&bytes)) {
+                return Err("index root manifest differs from supplied root input".into());
+            }
+            let binding_file = file.parent().unwrap().join("binding.gyp");
+            let binding = match fs::symlink_metadata(&binding_file) {
+                Ok(_) => {
+                    read_regular_into(
+                        &binding_file,
+                        MAX_FILE,
+                        &mut work.compressed,
+                        Some(&mut work.budget),
+                    )?;
+                    Some(sha256(&work.compressed))
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => return Err(format!("cannot inspect source binding.gyp: {e}")),
+            };
+            (bytes, binding, Kind::SourceProject, None)
         };
-        (bytes, binding, Kind::SourceProject, None)
-    };
-    let manifest = parse(&bytes)?;
-    let m = manifest.as_object().ok_or("manifest must be an object")?;
-    let name = record
-        .get("name")
-        .and_then(J::as_str)
-        .map(str::to_owned)
-        .or_else(|| {
-            registry(path).then(|| path.rsplit("node_modules/").next().unwrap().to_owned())
-        });
-    if name
-        .as_deref()
-        .is_some_and(|name| manifest.get("name").and_then(J::as_str) != Some(name))
-    {
-        return Err(format!(
-            "manifest name does not match lock instance {path:?}"
-        ));
-    }
-    if manifest.get("version") != record.get("version") {
-        return Err(format!(
-            "manifest version does not match lock instance {path:?}"
-        ));
-    }
-    if !registry(path) {
-        for field in [
-            "dependencies",
-            "devDependencies",
-            "optionalDependencies",
-            "peerDependencies",
-        ] {
-            let empty = J::Object(BTreeMap::new());
-            if manifest.get(field).unwrap_or(&empty) != record.get(field).unwrap_or(&empty) {
-                return Err(format!(
-                    "source manifest {field} does not match lock instance {path:?}"
-                ));
+        let manifest = parse(&bytes)?;
+        let m = manifest.as_object().ok_or("manifest must be an object")?;
+        let name = record
+            .get("name")
+            .and_then(J::as_str)
+            .map(str::to_owned)
+            .or_else(|| {
+                registry(path).then(|| path.rsplit("node_modules/").next().unwrap().to_owned())
+            });
+        if name
+            .as_deref()
+            .is_some_and(|name| manifest.get("name").and_then(J::as_str) != Some(name))
+        {
+            return Err(format!(
+                "manifest name does not match lock instance {path:?}"
+            ));
+        }
+        if manifest.get("version") != record.get("version") {
+            return Err(format!(
+                "manifest version does not match lock instance {path:?}"
+            ));
+        }
+        if !registry(path) {
+            for field in [
+                "dependencies",
+                "devDependencies",
+                "optionalDependencies",
+                "peerDependencies",
+            ] {
+                let empty = J::Object(BTreeMap::new());
+                if manifest.get(field).unwrap_or(&empty) != record.get(field).unwrap_or(&empty) {
+                    return Err(format!(
+                        "source manifest {field} does not match lock instance {path:?}"
+                    ));
+                }
             }
         }
-    }
-    let empty = BTreeMap::new();
-    let scripts = match m.get("scripts") {
-        Some(s) => s.as_object().ok_or("invalid scripts map")?,
-        None => &empty,
-    };
-    if scripts.values().any(|v| v.as_str().is_none()) {
-        return Err("invalid script body".into());
-    }
-    let mut events = if path.is_empty() {
-        ROOT_EVENTS.to_vec()
-    } else {
-        DEPENDENCY_EVENTS.to_vec()
-    };
-    if !path.is_empty() && !registry(path) {
-        events.push("prepare");
-    }
-    let lifecycle: BTreeMap<String, String> = events
-        .into_iter()
-        .filter_map(|event| {
-            scripts
-                .get(event)
+        let empty = BTreeMap::new();
+        let scripts = match m.get("scripts") {
+            Some(s) => s.as_object().ok_or("invalid scripts map")?,
+            None => &empty,
+        };
+        if scripts.values().any(|v| v.as_str().is_none()) {
+            return Err("invalid script body".into());
+        }
+        let mut events = if path.is_empty() {
+            ROOT_EVENTS.to_vec()
+        } else {
+            DEPENDENCY_EVENTS.to_vec()
+        };
+        if !path.is_empty() && !registry(path) {
+            events.push("prepare");
+        }
+        let lifecycle: BTreeMap<String, String> = events
+            .into_iter()
+            .filter_map(|event| {
+                scripts
+                    .get(event)
+                    .and_then(J::as_str)
+                    .map(|s| (event.into(), sha256(s.as_bytes())))
+            })
+            .collect();
+        let gypfile_false = m.get("gypfile") == Some(&J::Bool(false));
+        let implicit_node_gyp = binding.is_some()
+            && !gypfile_false
+            && !["preinstall", "install"].iter().any(|event| {
+                scripts
+                    .get(*event)
+                    .and_then(J::as_str)
+                    .is_some_and(|s| !s.is_empty())
+            });
+        let install_candidate = implicit_node_gyp
+            || DEPENDENCY_EVENTS.iter().any(|event| {
+                scripts
+                    .get(*event)
+                    .and_then(J::as_str)
+                    .is_some_and(|s| !s.is_empty())
+            });
+        let active_lifecycle = scripts.iter().any(|(event, body)| {
+            lifecycle.contains_key(event) && body.as_str().is_some_and(|s| !s.is_empty())
+        });
+        Ok(Facts {
+            name: manifest.get("name").and_then(J::as_str).map(str::to_owned),
+            version: manifest
+                .get("version")
                 .and_then(J::as_str)
-                .map(|s| (event.into(), sha256(s.as_bytes())))
+                .map(str::to_owned),
+            kind,
+            artifact_sha512,
+            manifest_sha256: sha256(&bytes),
+            lifecycle,
+            binding_gyp_sha256: binding,
+            gypfile_false,
+            implicit_node_gyp,
+            binary_entrypoints: m.get("bin").cloned().unwrap_or(J::Null),
+            active_lifecycle,
+            install_candidate,
         })
-        .collect();
-    let gypfile_false = m.get("gypfile") == Some(&J::Bool(false));
-    let implicit_node_gyp = binding.is_some()
-        && !gypfile_false
-        && !["preinstall", "install"].iter().any(|event| {
-            scripts
-                .get(*event)
-                .and_then(J::as_str)
-                .is_some_and(|s| !s.is_empty())
-        });
-    let install_candidate = implicit_node_gyp
-        || DEPENDENCY_EVENTS.iter().any(|event| {
-            scripts
-                .get(*event)
-                .and_then(J::as_str)
-                .is_some_and(|s| !s.is_empty())
-        });
-    let active_lifecycle = scripts.iter().any(|(event, body)| {
-        lifecycle.contains_key(event) && body.as_str().is_some_and(|s| !s.is_empty())
-    });
-    Ok(Facts {
-        name: manifest.get("name").and_then(J::as_str).map(str::to_owned),
-        version: manifest
-            .get("version")
-            .and_then(J::as_str)
-            .map(str::to_owned),
-        kind,
-        artifact_sha512,
-        manifest_sha256: sha256(&bytes),
-        lifecycle,
-        binding_gyp_sha256: binding,
-        gypfile_false,
-        implicit_node_gyp,
-        binary_entrypoints: m.get("bin").cloned().unwrap_or(J::Null),
-        active_lifecycle,
-        install_candidate,
-    })
+    })();
+    if work.budget.check().is_err() {
+        verified_artifact_sha512 = None;
+    }
+    ReadFacts {
+        facts,
+        verified_artifact_sha512,
+    }
 }
 
 pub(crate) fn apply(evidence: &Evidence, graph: &mut DepGraph) {
@@ -719,24 +744,88 @@ mod tests {
         let entry = parse(br#"{"project_manifest":"package.json"}"#).unwrap();
         let mut work = Work {
             compressed: Vec::new(),
-            expanded: Vec::new(),
             budget: artifact::Budget::new(),
         };
         work.budget.read_remaining = 2 * bytes.len() as u64;
         let invalid_entry = parse(br#"{"project_manifest":"missing.json"}"#).unwrap();
-        assert!(read_facts(&root, "", &record, &invalid_entry, None, &mut work).is_err());
-        let facts = read_facts(&root, "", &record, &entry, None, &mut work).unwrap();
+        assert!(
+            read_facts(&root, "", &record, &invalid_entry, None, &mut work)
+                .facts
+                .is_err()
+        );
+        let facts = read_facts(&root, "", &record, &entry, None, &mut work)
+            .facts
+            .unwrap();
         assert_eq!(facts.manifest_sha256, sha256(bytes));
-        read_facts(&root, "", &record, &entry, None, &mut work).unwrap();
-        let reason = read_facts(&root, "", &record, &entry, None, &mut work).unwrap_err();
+        read_facts(&root, "", &record, &entry, None, &mut work)
+            .facts
+            .unwrap();
+        let reason = read_facts(&root, "", &record, &entry, None, &mut work)
+            .facts
+            .unwrap_err();
         let evidence = ExecutionEvidence::unknown(State::Unsupported, None, &reason);
         assert!(!evidence.qualified());
         assert!(evidence.facts.is_none());
         assert_eq!(
-            read_facts(&root, "", &record, &invalid_entry, None, &mut work).unwrap_err(),
+            read_facts(&root, "", &record, &invalid_entry, None, &mut work)
+                .facts
+                .unwrap_err(),
             reason
         );
         assert_eq!(facts.manifest_sha256, sha256(bytes));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn verified_byte_observations_do_not_leak_after_failed_or_exhausted_reads() {
+        let root =
+            std::env::temp_dir().join(format!("tau-byte-observation-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("pkg.tgz"), b"first").unwrap();
+        let record = parse(br#"{"version":"1","resolved":"https://registry.npmjs.org/pkg/-/pkg-1.tgz","integrity":"sha512-f92A293tFWMj02xFnl/RM6TYiMInMgz7cEK+n+s11/ByAeU1aXr5FOadb0ayqIZVyGwjcSiAUszU+pIFiwHT/Q=="}"#).unwrap();
+        let entry = parse(br#"{"artifact":"pkg.tgz"}"#).unwrap();
+        let mut work = Work {
+            compressed: Vec::new(),
+            budget: artifact::Budget::new(),
+        };
+        let read = read_facts(&root, "node_modules/pkg", &record, &entry, None, &mut work);
+        assert!(read.facts.is_err());
+        assert_eq!(
+            read.verified_artifact_sha512,
+            Some(crate::digest::sha512(b"first"))
+        );
+        let wrong_integrity = parse(br#"{"version":"1","resolved":"https://registry.npmjs.org/pkg/-/pkg-1.tgz","integrity":"sha512-invalid"}"#).unwrap();
+        let read = read_facts(
+            &root,
+            "node_modules/pkg",
+            &wrong_integrity,
+            &entry,
+            None,
+            &mut work,
+        );
+        assert!(read.facts.is_err());
+        assert!(read.verified_artifact_sha512.is_none());
+        for entry in [
+            br#"{"artifact":"missing.tgz"}"#.as_slice(),
+            br#"{"artifact":"../pkg.tgz"}"#,
+        ] {
+            let read = read_facts(
+                &root,
+                "node_modules/pkg",
+                &record,
+                &parse(entry).unwrap(),
+                None,
+                &mut work,
+            );
+            assert!(read.facts.is_err());
+            assert!(read.verified_artifact_sha512.is_none());
+        }
+        work.budget.read_remaining = 4;
+        for _ in 0..2 {
+            let read = read_facts(&root, "node_modules/pkg", &record, &entry, None, &mut work);
+            assert!(read.facts.is_err());
+            assert!(read.verified_artifact_sha512.is_none());
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }
