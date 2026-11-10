@@ -119,6 +119,148 @@ fn root_fixture() -> Fixture {
     f.index(LOCATORS);
     f
 }
+#[test]
+fn root_source_version_metadata_retains_exact_source_and_lock_approval_binding() {
+    let f = root_fixture();
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "bundle/projects/package.json",
+        ROOT.replace("\"version\":\"1\"", "\"version\":\"2\""),
+    );
+    outcome(&f.audit(true), 1, "blocked");
+    let report = json(&f.audit(false));
+    let evidence = &report
+        .get("execution_evidence")
+        .and_then(J::as_array)
+        .unwrap()[0];
+    assert_eq!(
+        evidence
+            .get("facts")
+            .unwrap()
+            .get("version")
+            .and_then(J::as_str),
+        Some("2")
+    );
+    let reason = evidence.get("reason").and_then(J::as_str).unwrap();
+    assert!(reason.contains("source version \"2\"") && reason.contains("locked version \"1\""));
+    let human = f.run(&[
+        "audit",
+        "--lock",
+        "lock.json",
+        "--evidence",
+        "bundle/index.json",
+    ]);
+    assert!(human.status.success());
+    let human = String::from_utf8(human.stdout).unwrap();
+    assert!(human.contains("NOTE snapshot evidence") && human.contains(reason));
+    f.put("supplied.json", ROOT);
+    let substituted = f.run(&[
+        "audit",
+        "--lock",
+        "lock.json",
+        "--manifest",
+        "supplied.json",
+        "--evidence",
+        "bundle/index.json",
+        "--json",
+    ]);
+    assert_eq!(substituted.status.code(), Some(2));
+    assert!(String::from_utf8(substituted.stdout)
+        .unwrap()
+        .contains("index root manifest differs"));
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "lock.json",
+        r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":"3"}}}"#,
+    );
+    f.index(LOCATORS);
+    outcome(&f.audit(true), 1, "blocked");
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "bundle/projects/package.json",
+        ROOT.replace("\"version\":\"1\"", "\"version\":\"4\""),
+    );
+    outcome(&f.audit(true), 1, "blocked");
+}
+
+#[test]
+fn root_version_metadata_does_not_waive_other_identity_or_dependency_checks() {
+    for manifest in [
+        r#"{"name":"other","version":"2"}"#,
+        r#"{"name":"app"}"#,
+        r#"{"name":"app","version":""}"#,
+        r#"{"name":"app","version":2}"#,
+        r#"{"name":"app","version":null}"#,
+        r#"{"name":"app","version":true}"#,
+    ] {
+        let f = root_fixture();
+        f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+        f.put("bundle/projects/package.json", manifest);
+        outcome(&f.audit(true), 2, "incomplete");
+    }
+    for field in [
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+    ] {
+        let f = root_fixture();
+        f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+        f.put(
+            "bundle/projects/package.json",
+            format!(r#"{{"name":"app","version":"2","{field}":{{"dep":"1"}}}}"#),
+        );
+        outcome(&f.audit(true), 2, "incomplete");
+    }
+    let f = root_fixture();
+    f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+    f.put(
+        "bundle/projects/package.json",
+        r#"{"name":"app","version":"2"}"#,
+    );
+    f.put(
+        "lock.json",
+        r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":""}}}"#,
+    );
+    f.index(LOCATORS);
+    outcome(&f.audit(true), 2, "incomplete");
+    f.put("lock.json", r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":"1","hasInstallScript":false}}}"#);
+    f.put(
+        "bundle/projects/package.json",
+        ROOT.replace("\"version\":\"1\"", "\"version\":\"2\""),
+    );
+    f.index(LOCATORS);
+    outcome(&f.audit(true), 2, "incomplete");
+}
+
+#[test]
+fn workspace_and_archive_versions_still_require_lock_identity() {
+    let f = root_fixture();
+    f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+    f.put(
+        "bundle/projects/package.json",
+        r#"{"name":"app","version":"1"}"#,
+    );
+    f.put(
+        "bundle/projects/local/package.json",
+        r#"{"name":"local","version":"2"}"#,
+    );
+    f.put("lock.json", r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":"1"},"packages/local":{"name":"local","version":"1"}}}"#);
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"packages/local","project_manifest":"projects/local/package.json"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+    let f = artifact_fixture(
+        &[("package/package.json", br#"{"name":"pkg","version":"2"}"#)],
+        "https://registry.npmjs.org/pkg/-/pkg-1.tgz",
+    );
+    unsupported_artifact(
+        &f,
+        "manifest version does not match lock instance \"node_modules/pkg\"",
+    );
+}
+
 fn artifact_fixture(entries: &[(&str, &[u8])], source: &str) -> Fixture {
     let f = Fixture::new();
     let mut tar = Vec::new();
@@ -151,7 +293,19 @@ fn artifact_fixture(entries: &[(&str, &[u8])], source: &str) -> Fixture {
     }
     archive.extend_from_slice(&(!crc).to_le_bytes());
     archive.extend_from_slice(&(tar.len() as u32).to_le_bytes());
-    let hex = sha512(&archive);
+    let integrity = canonical_integrity(&archive);
+    f.put("bundle/pkg.tgz", archive);
+    f.put(
+        "bundle/projects/package.json",
+        r#"{"name":"app","version":"1"}"#,
+    );
+    f.put("lock.json", format!(r#"{{"lockfileVersion":3,"packages":{{"":{{"name":"app","version":"1"}},"node_modules/pkg":{{"version":"1","resolved":{},"integrity":"{integrity}"}}}}}}"#, J::String(source.into()).to_json()));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+    f
+}
+fn canonical_integrity(archive: &[u8]) -> String {
+    let hex = sha512(archive);
     let digest: Vec<_> = (0..hex.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
@@ -170,27 +324,184 @@ fn artifact_fixture(entries: &[(&str, &[u8])], source: &str) -> Fixture {
             });
         }
     }
-    f.put("bundle/pkg.tgz", archive);
-    f.put(
-        "bundle/projects/package.json",
-        r#"{"name":"app","version":"1"}"#,
-    );
-    f.put("lock.json", format!(r#"{{"lockfileVersion":3,"packages":{{"":{{"name":"app","version":"1"}},"node_modules/pkg":{{"version":"1","resolved":{},"integrity":"{integrity}"}}}}}}"#, J::String(source.into()).to_json()));
-    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
-    f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
-    f
+    integrity
 }
-fn unsupported_artifact(f: &Fixture, expected_reason: &str) {
-    let output = f.audit(true);
-    outcome(&output, 2, "incomplete");
-    let report = json(&output);
+
+#[test]
+fn bundled_child_uses_verified_parent_bytes_and_source_bound_approval() {
+    let source = "https://registry.npmjs.org/pkg/-/pkg-1.tgz";
+    let parent = br#"{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["child"]}"#;
+    let child = br#"{"name":"child","version":"1","scripts":{"install":"echo child"}}"#;
+    let entries = [
+        ("package/package.json", parent.as_slice()),
+        ("package/node_modules/child/package.json", child.as_slice()),
+    ];
+    let f = artifact_fixture(&entries, source);
+    let lock_with = |source: &str, archive: &[u8], child_version: &str, bundled: bool| {
+        format!(
+            r#"{{"lockfileVersion":3,"packages":{{"":{{"name":"app","version":"1"}},"node_modules/pkg":{{"version":"1","resolved":{},"integrity":"{}","dependencies":{{"child":"1"}}}},"node_modules/pkg/node_modules/child":{{"version":"{child_version}","inBundle":{bundled},"hasInstallScript":true}}}}}}"#,
+            J::String(source.into()).to_json(),
+            canonical_integrity(archive)
+        )
+    };
+    let original_archive = fs::read(f.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("lock.json", lock_with(source, &original_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    let report = json(&f.audit(false));
     let evidence = report
+        .get("execution_evidence")
+        .and_then(J::as_array)
+        .unwrap();
+    let child_evidence = evidence
+        .iter()
+        .find(|e| e.get("path").and_then(J::as_str) == Some("node_modules/pkg/node_modules/child"))
+        .unwrap();
+    assert_eq!(
+        child_evidence.get("state").and_then(J::as_str),
+        Some("qualified")
+    );
+    assert_eq!(child_evidence.get("candidate"), Some(&J::Bool(true)));
+    assert_eq!(
+        child_evidence
+            .get("facts")
+            .unwrap()
+            .get("kind")
+            .and_then(J::as_str),
+        Some("bundled_artifact")
+    );
+    assert_eq!(
+        child_evidence
+            .get("facts")
+            .unwrap()
+            .get("bundle_parent_source")
+            .and_then(J::as_str),
+        Some(source)
+    );
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+
+    f.put(
+        "lock.json",
+        lock_with(
+            "https://registry.npmjs.org/pkg/-/else-1.tgz",
+            &original_archive,
+            "1",
+            true,
+        ),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 1, "blocked");
+
+    let changed_child = artifact_fixture(
+        &[
+            ("package/package.json", parent),
+            (
+                "package/node_modules/child/package.json",
+                br#"{"name":"child","version":"1","scripts":{"install":"echo changed"}}"#,
+            ),
+        ],
+        source,
+    );
+    let changed_archive = fs::read(changed_child.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &changed_archive);
+    f.put("lock.json", lock_with(source, &changed_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 1, "blocked");
+
+    f.put("bundle/pkg.tgz", &original_archive);
+    f.put("lock.json", lock_with(source, &original_archive, "2", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    f.put("lock.json", lock_with(source, &original_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    let mut corrupt = original_archive.clone();
+    corrupt[20] ^= 1;
+    f.put("bundle/pkg.tgz", corrupt);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    f.put("bundle/pkg.tgz", &original_archive);
+    f.put(
+        "lock.json",
+        lock_with(source, &original_archive, "1", false),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    let absent_child = artifact_fixture(&[("package/package.json", parent)], source);
+    let absent_archive = fs::read(absent_child.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &absent_archive);
+    f.put("lock.json", lock_with(source, &absent_archive, "1", true));
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    let undeclared = artifact_fixture(
+        &[
+            ("package/package.json", br#"{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["other"]}"#),
+            ("package/node_modules/child/package.json", child),
+        ],
+        source,
+    );
+    let undeclared_archive = fs::read(undeclared.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &undeclared_archive);
+    f.put(
+        "lock.json",
+        lock_with(source, &undeclared_archive, "1", true),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+
+    let uninstalled = artifact_fixture(
+        &[
+            (
+                "package/package.json",
+                br#"{"name":"pkg","version":"1","bundleDependencies":["child"]}"#,
+            ),
+            ("package/node_modules/child/package.json", child),
+        ],
+        source,
+    );
+    let uninstalled_archive = fs::read(uninstalled.0.join("bundle/pkg.tgz")).unwrap();
+    f.put("bundle/pkg.tgz", &uninstalled_archive);
+    f.put(
+        "lock.json",
+        lock_with(source, &uninstalled_archive, "1", true),
+    );
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+}
+fn replace_integrity(f: &Fixture, integrity: Option<&str>) {
+    let mut lock =
+        MiniParser::parse_json(&fs::read_to_string(f.0.join("lock.json")).unwrap()).unwrap();
+    let J::Object(root) = &mut lock else { panic!() };
+    let J::Object(packages) = root.get_mut("packages").unwrap() else {
+        panic!()
+    };
+    let J::Object(package) = packages.get_mut("node_modules/pkg").unwrap() else {
+        panic!()
+    };
+    if let Some(integrity) = integrity {
+        package.insert("integrity".into(), J::String(integrity.into()));
+    } else {
+        package.remove("integrity");
+    }
+    f.put("lock.json", lock.to_json());
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"node_modules/pkg","artifact":"pkg.tgz"}]"#);
+}
+fn package_evidence(report: &J) -> &J {
+    report
         .get("execution_evidence")
         .and_then(J::as_array)
         .unwrap()
         .iter()
         .find(|e| e.get("path").and_then(J::as_str) == Some("node_modules/pkg"))
-        .unwrap();
+        .unwrap()
+}
+fn unsupported_artifact(f: &Fixture, expected_reason: &str) {
+    let output = f.audit(true);
+    outcome(&output, 2, "incomplete");
+    let report = json(&output);
+    let evidence = package_evidence(&report);
     assert_eq!(
         evidence.get("state").and_then(J::as_str),
         Some("unsupported")
@@ -200,6 +511,7 @@ fn unsupported_artifact(f: &Fixture, expected_reason: &str) {
         Some(expected_reason)
     );
     assert_eq!(evidence.get("approval_fingerprint"), Some(&J::Null));
+    assert_eq!(evidence.get("facts"), Some(&J::Null));
 }
 #[test]
 fn matching_archive_integrity_does_not_qualify_git_or_directory_sources() {
@@ -629,6 +941,152 @@ fn review_reports_evidence_changes_and_requires_both_evidence_inputs() {
         changes[0].get("after_introducer_path").unwrap().to_json(),
         "[\"root\"]"
     );
+}
+#[test]
+fn review_reports_changed_verified_bytes_for_unsupported_artifacts() {
+    let source = "https://registry.npmjs.org/pkg/-/pkg-1.tgz";
+    let base = artifact_fixture(&[("package/package.json", b"\xff")], source);
+    let head = artifact_fixture(&[("package/package.json", b"\xfe")], source);
+    let output = base.run(&[
+        "review",
+        "--base",
+        "lock.json",
+        "--head",
+        head.0.join("lock.json").to_str().unwrap(),
+        "--base-evidence",
+        "bundle/index.json",
+        "--head-evidence",
+        head.0.join("bundle/index.json").to_str().unwrap(),
+        "--approvals",
+        "approvals.json",
+        "--enforce",
+        "--json",
+    ]);
+    outcome(&output, 2, "incomplete");
+    let report = json(&output);
+    let changes = report
+        .get("execution_evidence_changes")
+        .and_then(J::as_array)
+        .unwrap();
+    assert_eq!(changes.len(), 1);
+    assert_eq!(
+        changes[0].get("path").and_then(J::as_str),
+        Some("node_modules/pkg")
+    );
+    for (side, fixture) in [("before", &base), ("after", &head)] {
+        let evidence = changes[0].get(side).unwrap();
+        assert_eq!(
+            evidence.get("state").and_then(J::as_str),
+            Some("unsupported")
+        );
+        assert_eq!(evidence.get("facts"), Some(&J::Null));
+        assert_eq!(evidence.get("approval_fingerprint"), Some(&J::Null));
+        assert_eq!(
+            evidence.get("verified_artifact_sha512").and_then(J::as_str),
+            Some(sha512(&fs::read(fixture.0.join("bundle/pkg.tgz")).unwrap()).as_str())
+        );
+    }
+    assert_eq!(
+        changes[0].get("before").unwrap().get("reason"),
+        changes[0].get("after").unwrap().get("reason")
+    );
+}
+#[test]
+fn verified_bytes_survive_content_rejection_and_stale_approvals() {
+    let source = "https://registry.npmjs.org/pkg/-/pkg-1.tgz";
+    let manifest = br#"{"name":"pkg","version":"1","scripts":{"install":"node install.js"}}"#;
+    let original = artifact_fixture(&[("package/package.json", manifest)], source);
+    original.approve();
+    let approvals = fs::read(original.0.join("approvals.json")).unwrap();
+    for entries in [
+        vec![("package/package.json", b"\xff".as_slice())],
+        vec![(
+            "package/package.json",
+            br#"{"name":"other","version":"1"}"#.as_slice(),
+        )],
+        vec![
+            ("package/package.json", manifest.as_slice()),
+            ("package/Binding.gyp", b"{}".as_slice()),
+        ],
+    ] {
+        let invalid = artifact_fixture(&entries, source);
+        invalid.put("approvals.json", &approvals);
+        let output = invalid.audit(true);
+        outcome(&output, 2, "incomplete");
+        let report = json(&output);
+        let evidence = package_evidence(&report);
+        assert_eq!(
+            evidence.get("state").and_then(J::as_str),
+            Some("unsupported")
+        );
+        assert_eq!(evidence.get("facts"), Some(&J::Null));
+        assert_eq!(evidence.get("approval_fingerprint"), Some(&J::Null));
+        assert_eq!(
+            evidence.get("verified_artifact_sha512").and_then(J::as_str),
+            Some(sha512(&fs::read(invalid.0.join("bundle/pkg.tgz")).unwrap()).as_str())
+        );
+    }
+    let mut corrupt = fs::read(original.0.join("bundle/pkg.tgz")).unwrap();
+    let crc = corrupt.len() - 8;
+    corrupt[crc] ^= 1;
+    original.put("bundle/pkg.tgz", &corrupt);
+    replace_integrity(&original, Some(&canonical_integrity(&corrupt)));
+    let output = original.audit(true);
+    outcome(&output, 2, "incomplete");
+    let report = json(&output);
+    let evidence = package_evidence(&report);
+    assert_eq!(
+        evidence.get("state").and_then(J::as_str),
+        Some("unsupported")
+    );
+    assert_eq!(evidence.get("facts"), Some(&J::Null));
+    assert_eq!(evidence.get("approval_fingerprint"), Some(&J::Null));
+    assert_eq!(
+        evidence.get("verified_artifact_sha512").and_then(J::as_str),
+        Some(sha512(&corrupt).as_str())
+    );
+}
+#[test]
+fn unbound_or_unreadable_artifacts_have_no_verified_byte_observation() {
+    let source = "https://registry.npmjs.org/pkg/-/pkg-1.tgz";
+    let entries = [(
+        "package/package.json",
+        br#"{"name":"pkg","version":"1"}"#.as_slice(),
+    )];
+    let fixture = artifact_fixture(&entries, source);
+    let canonical = canonical_integrity(&fs::read(fixture.0.join("bundle/pkg.tgz")).unwrap());
+    for integrity in [
+        None,
+        Some("sha512-invalid"),
+        Some(canonical_integrity(b"different bytes").as_str()),
+        Some(canonical.trim_end_matches('=')),
+        Some(&format!("{canonical} {canonical}")),
+    ] {
+        replace_integrity(&fixture, integrity);
+        let output = fixture.audit(true);
+        outcome(&output, 2, "incomplete");
+        let report = json(&output);
+        let evidence = package_evidence(&report);
+        assert_eq!(evidence.get("verified_artifact_sha512"), Some(&J::Null));
+        assert_eq!(evidence.get("facts"), Some(&J::Null));
+        assert_eq!(evidence.get("approval_fingerprint"), Some(&J::Null));
+    }
+    replace_integrity(&fixture, Some(&canonical));
+    for locator in ["missing.tgz", "../pkg.tgz", "projects"] {
+        fixture.index(&format!(r#"[{{"path":"","project_manifest":"projects/package.json"}},{{"path":"node_modules/pkg","artifact":"{locator}"}}]"#));
+        let output = fixture.audit(true);
+        outcome(&output, 2, "incomplete");
+        assert_eq!(
+            package_evidence(&json(&output)).get("verified_artifact_sha512"),
+            Some(&J::Null)
+        );
+    }
+    fixture.put("bundle/index.json", b"{");
+    let output = fixture.audit(true);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(!String::from_utf8(output.stdout).unwrap().contains(&sha512(
+        &fs::read(fixture.0.join("bundle/pkg.tgz")).unwrap()
+    )));
 }
 #[test]
 fn supplied_files_are_unchanged_and_no_files_are_written() {

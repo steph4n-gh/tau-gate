@@ -1,0 +1,31 @@
+{
+  "archive_identities": 356,
+  "assessable_events_matched": 250,
+  "available_archives": 356,
+  "candidate_acquisition_helper_sha256": "f5a46109fad05bdc77a92479488096d078968eca358f12d27c8657f6278a99da",
+  "case_id": "p04-a7a9c63d8cc4",
+  "collector_sides_validated": 2,
+  "event_misses": 0,
+  "fact_mismatches": 0,
+  "independent_labels_complete": true,
+  "local_files_sha256": {
+    "acquisition.json": "2248af378df8eeea11667652506dd147b6e234b81733a56576c1537988f38d36",
+    "collector-validation/receipts.json": "e872af7901f9cae23c4df25a7e7eafa06ab2c3b61b7c0aa20a4f37a8c810f054",
+    "comparison.json": "0d7e5d349eb3816294ab56f346514a35fa1e41924fe9cd26fbd2cf320dc2fb85",
+    "labels.json": "171b8c0128992ffc8d17264c22df417c68ca3bddd033e3c12204a7177e309d06",
+    "review.json": "01d039ed35ef93244a56a1c27aa27b7d9bc8b5b331e48d0a96a6ccace242901b",
+    "selection.json": "63fb0cfc2f8f225240c55b0b1db247b08ec5b1bff3f1a107fbeb3d01b74d2e0c"
+  },
+  "mirror_url_npmjs_fetches": 63,
+  "new_download_bytes": 54764447,
+  "new_npmjs_downloads": 63,
+  "original_third_cohort_selection_sha256": "5ef21b281e9a1138eb7dd6a5bbe4ca7dac25da1c89a2e8c3d40110aad94251bf",
+  "product_binary_sha256": "89fe1f265f2b31ee9416a5c3f5d838e435f889037e9ecfa0cb940f956a3e96c5",
+  "product_policy_outcome": "advisory",
+  "product_report_status": "complete",
+  "public_lifecycle_scripts_executed": false,
+  "read_only_cache_reuses": 293,
+  "schema_version": 1,
+  "scope": "posthoc development replay of one previously seen third-cohort PR; zero frozen qualification credit",
+  "source_pr": "https://github.com/Faicad/faijs-freecad/pull/7"
+}

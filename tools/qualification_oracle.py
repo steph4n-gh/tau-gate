@@ -14,6 +14,7 @@ import urllib.parse
 
 
 MAX_FILE = 64 * 1024 * 1024
+MAX_EXPANDED = 256 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
 MAX_MEMBERS = 10000
 MAX_DEPTH = 128
@@ -127,20 +128,48 @@ class _ExpandedStream:
         self.count = 0
 
     def read(self, size=-1):
-        remaining = MAX_FILE - self.count
+        remaining = MAX_EXPANDED - self.count
         if size < 0 or size > remaining + 1:
             size = remaining + 1
         data = self.source.read(size)
         self.count += len(data)
-        if self.count > MAX_FILE:
+        if self.count > MAX_EXPANDED:
             raise OracleError("archive exceeds expanded limit")
         return data
 
 
 def _archive(data, integrity):
+    return _archive_with_nested(data, integrity, ())[0:4]
+
+
+def _paired_dot_aliases(data, aliases):
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+        members = {member.name: member for member in archive}
+        for alias in aliases:
+            normalized = alias.replace("/./", "/", 1)
+            left, right = members.get(alias), members.get(normalized)
+            if left is None or right is None or not left.isfile() or not right.isfile():
+                raise OracleError("unpaired dot tar path")
+            fields = ("mode", "uid", "gid", "mtime", "size", "type", "linkname", "uname", "gname")
+            if any(getattr(left, field) != getattr(right, field) for field in fields):
+                raise OracleError("conflicting dot tar path metadata")
+            left_stream, right_stream = archive.extractfile(left), archive.extractfile(right)
+            while True:
+                a, b = left_stream.read(65536), right_stream.read(65536)
+                if a != b:
+                    raise OracleError("conflicting dot tar path bytes")
+                if not a:
+                    break
+
+
+def _archive_with_nested(data, integrity, capture):
     conditions = _integrity(data, integrity)
+    capture = set(capture)
+    nested = {}
     found = {}
     seen = {}
+    seen_names = {}
+    aliases = []
     ambiguous = []
     root = None
     try:
@@ -150,7 +179,16 @@ def _archive(data, integrity):
                 for count, member in enumerate(archive, 1):
                     if count > MAX_MEMBERS:
                         raise OracleError("archive exceeds member count")
-                    name = member.name.rstrip("/") if member.isdir() else member.name
+                    raw_name = member.name.rstrip("/") if member.isdir() else member.name
+                    name = raw_name
+                    if "/./" in name:
+                        if (name.count("/./") != 1 or not name.startswith(name.split("/", 1)[0] + "/./")
+                                or not member.isfile() or member.pax_headers):
+                            raise OracleError("unsupported dot tar path")
+                        name = name.replace("/./", "/", 1)
+                        if name.endswith(("/package.json", "/binding.gyp")) and name.count("/") == 1:
+                            raise OracleError("dot alias of lifecycle input")
+                        aliases.append(raw_name)
                     _relative(name)
                     member_root, separator, relative = name.partition("/")
                     if root is None:
@@ -161,13 +199,17 @@ def _archive(data, integrity):
                         ambiguous.append("archive root is not a directory")
                     canonical = name.casefold()
                     if canonical in seen:
-                        ambiguous.append("duplicate or case-folded archive path")
+                        prior_names = seen_names[canonical]
+                        if not ({raw_name, *prior_names} == {name, name.replace("/", "/./", 1)}
+                                and len(prior_names) == 1 and not member.isdir()):
+                            ambiguous.append("duplicate or case-folded archive path")
                     ancestors = ["/".join(name.split("/")[:n]).casefold() for n in range(1, len(name.split("/")))]
                     if any(ancestor in seen and seen[ancestor] != "directory" for ancestor in ancestors):
                         ambiguous.append("archive ancestor is not a directory")
                     if not member.isdir() and any(prior.startswith(canonical + "/") for prior in seen):
                         ambiguous.append("archive file overlaps an ancestor")
                     seen[canonical] = "directory" if member.isdir() else "file"
+                    seen_names.setdefault(canonical, set()).add(raw_name)
                     if member.pax_headers or member.offset_data - member.offset > 512:
                         conditions.append("extended_tar_metadata")
                     if not re.fullmatch(r"[A-Za-z0-9._@+/-]+", name):
@@ -187,6 +229,19 @@ def _archive(data, integrity):
                         if len(value) != member.size:
                             raise OracleError("truncated lifecycle input")
                         found[relative] = value
+                    nested_manifest = relative.removesuffix("/package.json") if relative.endswith("/package.json") else None
+                    nested_binding = relative.removesuffix("/binding.gyp") if relative.endswith("/binding.gyp") else None
+                    if member.isfile() and (nested_manifest in capture or nested_binding in capture):
+                        limit = MAX_MANIFEST if nested_manifest in capture else MAX_FILE
+                        if member.size < 0 or member.size > limit:
+                            raise OracleError("bundled lifecycle input exceeds size limit")
+                        value = archive.extractfile(member).read(limit + 1)
+                        if len(value) != member.size:
+                            raise OracleError("truncated bundled lifecycle input")
+                        if nested_manifest in capture:
+                            nested.setdefault(nested_manifest, {})["manifest"] = value
+                        else:
+                            nested.setdefault(nested_binding, {})["binding"] = value
             while remainder := stream.read(65536):
                 if any(remainder):
                     raise OracleError("nonzero data after tar terminator")
@@ -194,11 +249,13 @@ def _archive(data, integrity):
         raise OracleError(f"invalid archive: {exc}") from exc
     if ambiguous:
         raise OracleError("; ".join(sorted(set(ambiguous))))
+    if aliases:
+        _paired_dot_aliases(data, aliases)
     if "package.json" not in found:
         raise OracleError("archive has no root-relative package.json")
     if root != "package":
         conditions.append("legacy_archive_root")
-    return found["package.json"], found.get("binding.gyp"), sorted(set(conditions)), root
+    return found["package.json"], found.get("binding.gyp"), sorted(set(conditions)), root, nested
 
 
 def _manifest(data, binding, scope, record, path):
@@ -213,7 +270,10 @@ def _manifest(data, binding, scope, record, path):
         expected_name = path.rsplit("node_modules/", 1)[-1]
     if expected_name is not None and value.get("name") != expected_name:
         raise OracleError("manifest name differs from lock identity")
-    if value.get("version") != record.get("version"):
+    root_version_metadata = (path == "" and scope == "root" and isinstance(value.get("version"), str)
+                             and bool(value["version"]) and isinstance(record.get("version"), str)
+                             and bool(record["version"]))
+    if value.get("version") != record.get("version") and not root_version_metadata:
         raise OracleError("manifest version differs from lock identity")
     if scope != "archive":
         for key in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
@@ -288,6 +348,23 @@ def snapshot_facts(lock_path: Path, index_path: Path, manifest: Path | None = No
         locators = {}
         index_issue = str(exc)
         result["issues"].append(index_issue)
+    capture_by_parent = {}
+    bundle_children = {}
+    for path, record in packages.items():
+        if (record.get("inBundle") is not True or "resolved" in record or "integrity" in record
+                or path in locators):
+            continue
+        ancestor = path
+        while "/node_modules/" in ancestor:
+            parent = ancestor.rsplit("/node_modules/", 1)[0]
+            if locators.get(parent, (None,))[0] == "artifact":
+                relative = path[len(parent) + 1:]
+                capture_by_parent.setdefault(parent, set()).add(relative)
+                bundle_children[path] = (parent, relative)
+                break
+            ancestor = parent
+    observed_bundles = {}
+    observed_declarations = {}
     for path, record in sorted(packages.items()):
         scope = "root" if not path else "archive" if "node_modules/" in path else "workspace"
         facts = {"status": "unknown", "scope": scope, "name": record.get("name", path.rsplit("node_modules/", 1)[-1] if scope == "archive" else None), "version": record.get("version"), "source": record.get("resolved"), "integrity": record.get("integrity")}
@@ -302,18 +379,44 @@ def snapshot_facts(lock_path: Path, index_path: Path, manifest: Path | None = No
         try:
             if index_issue:
                 raise OracleError(index_issue)
-            if path not in locators:
+            bundled = bundle_children.get(path)
+            if path not in locators and bundled is None:
                 raise OracleError("missing evidence locator")
-            kind, relative = locators[path]
-            source_path = _locator(Path(index_path).parent, relative)
-            if scope == "archive":
+            if bundled is not None:
+                parent, relative = bundled
+                parent_facts = result["packages"].get(parent, {})
+                if parent_facts.get("status") != "known" or parent_facts.get("marker_conflict"):
+                    raise OracleError("bundle parent lacks qualified archive facts")
+                name = relative.removeprefix("node_modules/") if relative.startswith("node_modules/") else None
+                if name and name.startswith("@"):
+                    parts = name.split("/")
+                    direct = len(parts) == 2 and len(parts[0]) > 1 and bool(parts[1])
+                else:
+                    direct = bool(name) and "/" not in name
+                if not direct or name not in observed_declarations.get(parent, set()):
+                    raise OracleError("child is not a direct declared bundled dependency of its parent archive")
+                selected = observed_bundles.get(parent, {}).get(relative, {})
+                if "manifest" not in selected:
+                    raise OracleError("bundled manifest absent from verified parent archive")
+                data, binding = selected["manifest"], selected.get("binding")
+                conditions = list(parent_facts.get("profile_conditions", []))
+                facts.update({"artifact_sha512": parent_facts["artifact_sha512"],
+                              "bundle_parent": parent,
+                              "bundle_parent_source": parent_facts["source"],
+                              "bundle_parent_integrity": parent_facts["integrity"]})
+            else:
+                kind, relative = locators[path]
+                source_path = _locator(Path(index_path).parent, relative)
+            if scope == "archive" and bundled is None:
                 if kind != "artifact" or not _archive_source(record.get("resolved")):
                     raise OracleError("non-archive source execution semantics are unknown")
                 archive = _read(source_path)
                 facts.update({"artifact_sha256": _sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest()})
-                data, binding, conditions, archive_root = _archive(archive, record.get("integrity"))
+                data, binding, conditions, archive_root, nested = _archive_with_nested(
+                    archive, record.get("integrity"), capture_by_parent.get(path, ()))
+                observed_bundles[path] = nested
                 facts["archive_root"] = archive_root
-            else:
+            elif bundled is None:
                 if kind != "project_manifest":
                     raise OracleError("source project requires a project manifest")
                 data = _read(source_path, MAX_MANIFEST)
@@ -326,7 +429,25 @@ def snapshot_facts(lock_path: Path, index_path: Path, manifest: Path | None = No
                 conditions = []
                 if any(child.name.casefold() in ("package.json", "binding.gyp") and child.name not in ("package.json", "binding.gyp") for child in source_path.parent.iterdir()):
                     raise OracleError("case alias of source lifecycle input")
-            facts.update(_manifest(data, binding, scope, record, path))
+            observed = _manifest(data, binding, scope, record, path)
+            if scope == "archive" and bundled is None:
+                parent_manifest = _json(data)
+                dependencies = set()
+                for field in ("dependencies", "optionalDependencies"):
+                    if isinstance(parent_manifest.get(field), dict):
+                        dependencies.update(parent_manifest[field])
+                if "bundleDependencies" not in parent_manifest or "bundledDependencies" not in parent_manifest:
+                    declared = parent_manifest.get("bundleDependencies", parent_manifest.get("bundledDependencies"))
+                    if declared is True:
+                        observed_declarations[path] = dependencies
+                    elif isinstance(declared, list):
+                        observed_declarations[path] = {item for item in declared if isinstance(item, str) and item in dependencies}
+            if scope == "root" and observed["version"] != record.get("version"):
+                observed["source_manifest_version"] = observed["version"]
+                observed["version"] = record.get("version")
+                conditions.append("root_version_metadata_disagreement")
+            facts.update(observed)
+            facts["marker_conflict"] = record.get("hasInstallScript") is False and observed["install_candidate"]
             facts.update({"status": "known", "profile_conditions": conditions})
         except (OracleError, OSError) as exc:
             facts["reason"] = str(exc)

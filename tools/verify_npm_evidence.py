@@ -54,6 +54,14 @@ def regular(name, data):
     return name, data, tarfile.REGTYPE, ''
 
 
+def pax_record(key, value):
+    body = f' {key}={value}\n'.encode()
+    length = len(body) + 1
+    while len(str(length)) + len(body) != length:
+        length = len(str(length)) + len(body)
+    return str(length).encode() + body
+
+
 def tar_for(manifest=None, payload=b'', extra=()):
     return archive([regular('package/package.json', encoded(manifest or MANIFEST)),
                     regular('package/blob.bin', payload), *extra])
@@ -415,6 +423,7 @@ def cases():
     assert len(facts['block_types']) > 1
     result.append(Case('valid_multiblock_mixed', 'zlib stream split by Z_SYNC_FLUSH across a tar block.', artifact=gzip_raw(baseline, raw), compression=facts))
     result.append(Case('valid_ustar_prefix', 'tarfile generates a USTAR prefix for a long regular filename.', artifact=zipped(tar_for(extra=[regular('package/' + 'subdir/' * 16 + 'blob.bin', b'x')]))))
+    result.append(Case('valid_gnu_ustar_magic', 'Exact GNU USTAR magic on the manifest header, with a POSIX USTAR following entry.', artifact=zipped(changed(baseline, 257, b'ustar  \0', True))))
     result.append(Case('valid_directory', 'Regular USTAR directory plus package manifest.', artifact=zipped(archive([('package/', b'', tarfile.DIRTYPE, ''), regular('package/package.json', encoded(MANIFEST))]))))
     result.append(Case('valid_nul_regular_type', 'USTAR NUL regular-file type.', artifact=zipped(archive([('package/package.json', encoded(MANIFEST), tarfile.AREGTYPE, '')]))))
     rng = random.Random(SEED)
@@ -473,12 +482,39 @@ def cases():
         'tar_nonzero_after_terminator': changed(baseline, data_end + 1024, b'x'),
         'tar_wrong_magic': changed(baseline, 257, b'zzzzz\0', True),
         'tar_wrong_version': changed(baseline, 263, b'99', True),
+        'tar_near_gnu_magic': changed(baseline, 257, b'ustar 1\0', True),
     }
     result.extend(Case(name, 'Targeted invalid USTAR with a valid gzip CRC/ISIZE and recomputed outer SRI.', 'incomplete', artifact=zipped(data)) for name, data in malformed_tar.items())
     for name, path in [('duplicate', 'package/package.json'), ('dot_alias', 'package/./package.json'), ('slash_alias', 'package//package.json'), ('dot_prefix_alias', './package/package.json'), ('parent_alias', 'package/x/../package.json'), ('absolute', '/package/package.json'), ('parent_escape', '../package/package.json'), ('backslash', 'package\\package.json')]:
         result.append(Case(f'tar_path_{name}', 'Extra manifest entry tests strict path and duplicate interpretation.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(MANIFEST)), regular(path, encoded(MANIFEST))]))))
     for name, kind in [('symlink', tarfile.SYMTYPE), ('hardlink', tarfile.LNKTYPE), ('fifo', tarfile.FIFOTYPE), ('character', tarfile.CHRTYPE), ('block', tarfile.BLKTYPE), ('pax', tarfile.XHDTYPE), ('pax_global', tarfile.XGLTYPE), ('gnu_longname', tarfile.GNUTYPE_LONGNAME), ('gnu_longlink', tarfile.GNUTYPE_LONGLINK), ('unknown_type', b'Z')]:
         result.append(Case(f'tar_type_{name}', f'Unsupported archive entry type {kind!r} with a valid manifest also present.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(MANIFEST)), ('package/unsupported', b'', kind, 'package/package.json')]))))
+    pax_payload = b''.join((pax_record('path', 'package/package.json'),
+                            pax_record('size', str(len(encoded(MANIFEST)))),
+                            pax_record('uid', '718322462'),
+                            pax_record('NODETAR.package.name', 'pkg')))
+    result.append(Case('valid_narrow_pax', 'Per-file PAX metadata repeats the regular manifest path and size.',
+                       artifact=zipped(archive([('PaxHeader/package/package.json', pax_payload, tarfile.XHDTYPE, ''),
+                                                regular('package/package.json', encoded(MANIFEST))]))))
+    unicode_pax = b''.join((pax_record('path', 'package/package.json'),
+                           pax_record('size', str(len(encoded(MANIFEST)))),
+                           pax_record('NODETAR.package.author', 'István')))
+    result.append(Case('valid_unicode_pax_metadata', 'UTF-8 in ignored PAX metadata cannot change file identity.',
+                       artifact=zipped(archive([('PaxHeader/package/package.json', unicode_pax, tarfile.XHDTYPE, ''),
+                                                regular('package/package.json', encoded(MANIFEST))]))))
+    comment = pax_record('comment', '0123456789abcdef')
+    result.append(Case('valid_initial_global_pax_comment', 'An initial global comment does not change extraction paths.',
+                       artifact=zipped(archive([('pax_global_header', comment, tarfile.XGLTYPE, ''),
+                                                regular('package/package.json', encoded(MANIFEST))]))))
+    result.append(Case('global_pax_path_override', 'Global PAX cannot rename an archived lifecycle input.',
+                       'incomplete', artifact=zipped(archive([('pax_global_header', pax_record('path', 'package/other.json'), tarfile.XGLTYPE, ''),
+                                                              regular('package/package.json', encoded(MANIFEST))]))))
+    bad_pax = b''.join((pax_record('path', 'package/package.json'),
+                        pax_record('size', str(len(encoded(MANIFEST)))),
+                        pax_record('linkpath', 'pkg')))
+    result.append(Case('pax_unknown_key', 'An unrecognized PAX key cannot change extraction meaning.',
+                       'incomplete', artifact=zipped(archive([('PaxHeader/package/package.json', bad_pax, tarfile.XHDTYPE, ''),
+                                                              regular('package/package.json', encoded(MANIFEST))]))))
     result.append(Case('tar_duplicate_prefix_path', 'Duplicate manifest encoded once in name and once with USTAR prefix.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(MANIFEST))])[:manifest_end] + changed(archive([regular('package.json', encoded(MANIFEST))]), 345, b'package', True))))
     result.append(Case('tar_missing_manifest', 'Archive has no package/package.json.', 'incomplete', artifact=zipped(archive([regular('package/README', b'x')]))))
     result.append(Case('manifest_invalid_json', 'Archive manifest is not valid JSON.', 'incomplete', artifact=zipped(archive([regular('package/package.json', b'{')]))))
@@ -597,7 +633,33 @@ def resource_cases():
     assert len(tar) == 64 * MIB and len(compressed) > 64 * MIB
     result.append(Case('limit_compressed', 'Expanded tar is exactly 64MiB. Stored block overhead makes compressed bytes exceed 64MiB.', 'incomplete', artifact=compressed, expected_reason='input exceeds 67108864 bytes'))
     tar += bytes(512)
-    result.append(Case('limit_expanded', 'Expanded tar exceeds 64MiB while compressed bytes remain below the compressed limit.', 'incomplete', artifact=zipped(tar), expected_reason='expanded artifact exceeds 64 MiB'))
+    result.append(Case('valid_large_expanded_64', 'Expanded tar exceeds the former 64MiB limit and remains within the bounded archive profile.', artifact=zipped(tar)))
+    tar += bytes(128 * MIB - len(tar))
+    result.append(Case('valid_expanded_128', 'Expanded tar is exactly the declared 128MiB limit.', artifact=zipped(tar)))
+    tar += bytes(256 * MIB - len(tar))
+    result.append(Case('valid_expanded_256', 'Expanded tar is exactly the declared 256MiB limit.', artifact=zipped(tar)))
+    result.append(Case('limit_expanded', 'Expanded tar exceeds 256MiB while compressed bytes remain below the compressed limit.', 'incomplete', artifact=zipped(tar + bytes(512)), expected_reason='expanded artifact exceeds 256 MiB'))
+    large = tar_for(payload=bytes(65 * MIB))
+    valid = zipped(large)
+    result.append(Case('valid_large_payload', 'A 65MiB regular file is streamed before the archive qualifies.', artifact=valid))
+    result.append(Case('large_tail_crc', 'A large archive with a valid early manifest has a corrupt gzip CRC.', 'incomplete', artifact=changed(valid, len(valid) - 8, bytes([valid[-8] ^ 1])), expected_reason='gzip checksum mismatch'))
+    result.append(Case('large_tail_isize', 'A large archive with a valid early manifest has a corrupt gzip ISIZE.', 'incomplete', artifact=changed(valid, len(valid) - 4, bytes([valid[-4] ^ 1])), expected_reason='gzip expanded size mismatch'))
+    result.append(Case('large_tail_truncated', 'A large archive is missing the last byte of its gzip footer.', 'incomplete', artifact=valid[:-1]))
+    result.append(Case('large_tail_member', 'A second gzip member follows a large archive.', 'incomplete', artifact=valid + zipped(b''), expected_reason='gzip contains trailing data or multiple members'))
+    result.append(Case('large_tail_trailing', 'A trailing byte follows a large archive.', 'incomplete', artifact=valid + b'x', expected_reason='gzip contains trailing data or multiple members'))
+    duplicate = tar_for(payload=bytes(65 * MIB), extra=[regular('package/package.json', encoded(MANIFEST))])
+    result.append(Case('large_late_duplicate', 'A duplicate package.json follows a 65MiB regular file.', 'incomplete', artifact=zipped(duplicate), expected_reason='duplicate case-folded tar path'))
+    padded = tar_for(payload=bytes(65 * MIB), extra=[regular('package/late.txt', b'x')])
+    padding_offset = 1024 + 512 + 65 * MIB + 512 + 1
+    result.append(Case('large_late_padding', 'Nonzero tar padding follows a late file after a 65MiB payload.', 'incomplete', artifact=zipped(changed(padded, padding_offset, b'x')), expected_reason='nonzero tar entry padding'))
+    overflow = bytearray(large)
+    overflow[1024 + 124:1024 + 136] = f'{128 * MIB:011o}\0'.encode()
+    overflow = tar_checksum(overflow, 1024)
+    result.append(Case('large_declared_size_overflow', 'A declared file size exceeds the remaining per-archive expansion allowance.', 'incomplete', artifact=zipped(overflow)))
+    native = zipped(tar_for(extra=[regular('package/binding.gyp', bytes(64 * MIB))]))
+    result.append(Case('valid_binding_gyp_64', 'binding.gyp is exactly its retained 64MiB lifecycle input limit.', artifact=native))
+    native = zipped(tar_for(extra=[regular('package/binding.gyp', bytes(64 * MIB + 1))]))
+    result.append(Case('limit_binding_gyp', 'binding.gyp retains its 64MiB lifecycle input limit under the expanded archive profile.', 'incomplete', artifact=native, expected_reason='binding.gyp exceeds 64 MiB'))
     return result
 
 
@@ -635,6 +697,42 @@ def approval_controls(binary, output, logs, timeout, results, reports):
         approval_file.write_bytes(encoded(supplied))
         if case.name == 'approval_legacy_coordinate_blocked':
             (folder / 'tau-gate.toml').write_text('whitelist = ["pkg@1.0.0"]\n')
+        result, report = run(binary, folder, case, logs, timeout, approval_file)
+        results.append(result)
+        reports[case.name] = report
+
+
+def gnu_approval_controls(binary, output, logs, timeout, results, reports):
+    rows = fingerprint_rows(reports.get('valid_gnu_ustar_magic'))
+    if not rows:
+        results.append({'case': 'gnu_approval_fingerprint_discovery', 'pass': False,
+                        'error': 'No GNU USTAR approval fingerprint found.'})
+        return
+    approval = {'schema_version': 1, 'approvals': [
+        {'path': path, 'fingerprint': fingerprint} for path, fingerprint in rows]}
+
+    def gnu_artifact(manifest=None, payload=b'', extra=()):
+        return zipped(changed(tar_for(manifest, payload, extra), 257, b'ustar  \0', True))
+
+    corrupt = bytearray(gzip.decompress(gnu_artifact()))
+    corrupt[148] ^= 1
+    cases_to_run = [
+        Case('gnu_approval_allowed', 'Exact GNU USTAR archive with its own fingerprint is allowed.',
+             'allowed', artifact=gnu_artifact()),
+        Case('gnu_approval_command_changed', 'Changed install body in GNU USTAR archive invalidates old approval.',
+             'blocked', artifact=gnu_artifact({**MANIFEST, 'scripts': {'install': 'echo changed-body'}})),
+        Case('gnu_approval_payload_changed', 'Changed non-lifecycle bytes in GNU USTAR archive invalidate old approval.',
+             'blocked', artifact=gnu_artifact(payload=b'changed-payload')),
+        Case('gnu_approval_bad_checksum', 'Recomputed outer SRI cannot authorize a corrupt GNU USTAR header.',
+             'incomplete', artifact=zipped(corrupt)),
+        Case('gnu_approval_link_rejected', 'Previously approved GNU USTAR archive does not authorize a tar link.',
+             'incomplete', artifact=gnu_artifact(extra=[('package/link', b'', tarfile.SYMTYPE,
+                                                       'package/package.json')])),
+    ]
+    for case in cases_to_run:
+        folder = write_case(output / 'cases' / case.name, case)
+        approval_file = folder / 'approvals.json'
+        approval_file.write_bytes(encoded(approval))
         result, report = run(binary, folder, case, logs, timeout, approval_file)
         results.append(result)
         reports[case.name] = report
@@ -789,6 +887,7 @@ def main():
                 print(json.dumps({'case': case.name, 'exit': result.get('exit'), 'status': result.get('status'), 'policy': result.get('policy'), 'timeout': result.get('timeout'), 'inputs_unchanged': result.get('inputs_unchanged')}), flush=True)
     if not arguments.generate_only:
         approval_controls(binary, output, logs, arguments.timeout, results, reports)
+        gnu_approval_controls(binary, output, logs, arguments.timeout, results, reports)
         root_approval_controls(binary, output, logs, arguments.timeout, results)
         reference_controls(binary, arguments.reference_bundle.resolve(), output, logs, arguments.timeout, results)
     try:
@@ -805,7 +904,7 @@ def main():
                'seed': SEED, 'source_starting_commit': STARTING_COMMIT, 'binary': str(binary), 'binary_sha256': final_binary_hash, 'binary_sha256_before': initial_binary_hash, 'verifier_sha256': final_verifier_hash, 'verifier_sha256_before': initial_verifier_hash,
                'binary_source_commit_if_accessible': commit, 'python': sys.version, 'zlib': zlib.ZLIB_VERSION,
                'method': 'Independent Python stdlib generation, exact CLI invocation per case, strict exit/status classification, timeout, and before/after complete input-tree hashes. Every malformed artifact has a recomputed lock SRI and index lock hash unless SRI or index binding is the named negative control.',
-               'coverage_limits': ['Synthetic and one npm-packed USTAR/gzip artifacts. This is not exhaustive DEFLATE or tar fuzzing.', 'No package manager, network, lifecycle scripts, benchmark, publisher authentication, or artifact safety claims.', 'Expected profile limits are 64MiB compressed/expanded, 1MiB manifest, and 10000 tar entries.', 'A JSON parse failure, unknown outcome, crash, timeout, or input write fails its case. Missing fingerprint discovery fails the approval slice.'],
+               'coverage_limits': ['Synthetic and one npm-packed USTAR/gzip artifacts. This is not exhaustive DEFLATE or tar fuzzing.', 'No package manager, network, lifecycle scripts, benchmark, publisher authentication, or artifact safety claims.', 'Expected profile limits are 64MiB compressed, 128MiB expanded, 1MiB manifest, 64MiB binding.gyp, and 10000 tar entries; snapshot caps remain 2GiB read, 4GiB expanded, and 250000 headers.', 'A JSON parse failure, unknown outcome, crash, timeout, or input write fails its case. Missing fingerprint discovery fails the approval slice.'],
                'counts': {'total': len(results), 'complete': sum(r.get('expected') == 'complete' for r in results), 'incomplete': sum(r.get('expected') == 'incomplete' for r in results), 'pass': sum(r.get('pass', False) for r in results), 'fail': sum(not r.get('pass', False) for r in results) if not arguments.generate_only else 0},
                'cases': results}
     (output / 'receipt.json').write_bytes(json.dumps(receipt, indent=2, sort_keys=True).encode() + b'\n')

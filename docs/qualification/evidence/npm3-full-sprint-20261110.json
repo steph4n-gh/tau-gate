@@ -1,0 +1,135 @@
+{
+  "candidate": {
+    "binary_sha256": "68984faa78311ff3d649bd86ce911153ceaef521d460b719b0a25e6973c9561d",
+    "frozen_manifest_sha256": "510a89da8744708076e2971e625127f6745b6eed38ad77b8144b3164d31c58a5",
+    "source_commit": "4fc111b30ee066567ca6eff4970ac26d1229da76"
+  },
+  "cohort": {
+    "capture_status_counts": {
+      "capture_unavailable": 3,
+      "captured": 90,
+      "no_project_lockfile_found": 207
+    },
+    "excluded_repositories": 600,
+    "npm3_lockfiles": 35,
+    "pair_count": 30,
+    "pair_repositories": 30,
+    "repositories": 300
+  },
+  "collector": {
+    "sides": 60,
+    "validated": 31
+  },
+  "controls": {
+    "evidence_pass": 327,
+    "evidence_total": 327,
+    "native_total": 17,
+    "native_unexpected": 0,
+    "wrapper_pass": 20,
+    "wrapper_total": 20
+  },
+  "graph": {
+    "arborist_edges": {
+      "True": 35
+    },
+    "arborist_paths": {
+      "True": 35
+    },
+    "cases": 35,
+    "ecosystems_coordinates": {
+      "False": 2,
+      "True": 33
+    },
+    "name_version_mismatch_cases": 2,
+    "topology_status": {
+      "complete": 35
+    }
+  },
+  "human_benefit": "not measured",
+  "local_file_sha256": {
+    "evidence-controls/receipt.json": "863b69d7f8af69edc8e666a652365d7073517778c62cc2055f437a184d98648f",
+    "fresh/cohort.json": "3f2d93fd96544ff5ae87db03cbbb5fd3f7cc8b1c6945a36f7678f8685945d671",
+    "fresh/inventory.json": "cebc03d2a16382188f94c5364e0af2d998af2fed989e3825de5c65fdd14c10a5",
+    "fresh/snapshots.json": "1be69fd99a5ec8690e4051e38de3c941deac9a98bad99a78346e8ba7562b42de",
+    "frozen.json": "510a89da8744708076e2971e625127f6745b6eed38ad77b8144b3164d31c58a5",
+    "graph-comparison/results.json": "9d9f27efa3c6421557b10f3b3f1077936392f36dff5339e78b06597d25c2f78d",
+    "native-controls/receipt.json": "7cf06c83fd764747871cd6c42470fad229075708905da5ef7eb6380bf505870a",
+    "nx-real-update-v2.html": "5db6114212a9b5df6d543270278b8437201ab997d7697700e02dcb8dc50b2984",
+    "nx-real-update-v2.receipt.json": "a3ba83da01de467773346530d957323e0472381af2c61b0db9aab439b4f70241",
+    "pair-qualification/acquisition.json": "b7db8bb4df16a45099a18e773b0da519ce34e5c54bc42148985fbee5fe4584a3",
+    "pair-qualification/collector-validation/receipts.json": "6e4b6934c5b51f423833f1788599b2f7011d5a9a14eec352e77cb7bf96d070bd",
+    "pair-qualification/labels.json": "d118e93801ddb0121ac6eaa6c7e27a8c51a657fdd8961c9212bb2c61fd0da181",
+    "pair-qualification/protocol.json": "72cc335726bfda427ecf11a2393472a05eacbf2cc1e9c751b3cd0ea56dff8ee7",
+    "pair-qualification/replay/plan.json": "60bb384f8deb73c3fa251858261dcfccca758e797fbd4dffb59b6dee0d0f6467",
+    "pair-qualification/replay/receipts.json": "3fb19f93e3dddfcc8d790e3d3b239d6454d40c51071992e4c31ea6b943f9aa20",
+    "pair-qualification/resource-accounting.json": "cbd7677614c3252c17a402e4b601779b4949856ecc25282d7076c4a1274046f0",
+    "pair-qualification/selection.json": "00462b9e679221179db1516507664dcc2531c9a42c4567f7a396ce02209552ac",
+    "pair-qualification/summary.json": "5d9ca014b07ed0fdb4b341106412bc693d46f6e62198d94ddaa73953947eddd1",
+    "prior-regression/repair-comparison.json": "6461d5d6514c49f988722882eeb4585a892590bfd7da1db74fb4f6eb59e8b852",
+    "tar-memory/exact/receipt.json": "b6b41c8c616ac68c0aa863408cd906d6f151e0a4f0219b9f8ae3be742bfb318d",
+    "unseen-regression/repair-comparison.json": "266934536cf85ec7e59b38d98df7b62d92f890080c66c39993cfbb2794e80289",
+    "wrapper-controls/receipt.json": "f402c1a03941c7ec4d3e58712b99c3fa3a5e11648fbd533a761c58c3e6562ff7"
+  },
+  "qualification_decision": "failed end-to-end 80% completion and five-of-five 512MiB tar ASan; conditional 95% and exact-event gates passed on this sample",
+  "real_update": {
+    "case": "r181-5fda2b9ff745",
+    "package_path": "node_modules/nx",
+    "pair_status": "incomplete",
+    "repository": "aws/aws-sdk-js-crypto-helpers",
+    "view_helper_sha256": "b08205c8cbe62810bdf52484707ed46bca6b148c5e644396baa1331e357b550d"
+  },
+  "release_status": "not qualified; no new release or consumer rollout",
+  "replay": {
+    "byte_stable_cases": 30,
+    "event_misses": 0,
+    "fact_mismatches": 0,
+    "max_peak_rss_bytes": 1298743296,
+    "max_wall_seconds": 100.17397379106842,
+    "rounds": 5
+  },
+  "resources": {
+    "acquisition_wall_seconds": 209.8466409589164,
+    "combined_acquisition_charged_bytes": 4294967296,
+    "combined_budget_bytes": 4294967296,
+    "newly_downloaded_unique_compressed_bytes": 3182390323,
+    "reused_offline_unique_compressed_bytes": 1051620635
+  },
+  "schema_version": 1,
+  "scope": "Frozen npm v3 fourth cohort, one historical pair per repository; local advisory replay and controls; no public lifecycle execution",
+  "score": {
+    "assessable_events": 2791,
+    "completion_floor": 0.8,
+    "completion_floor_met": false,
+    "completion_fraction": 0.3333333333333333,
+    "conditional_complete": 10,
+    "conditional_completion_floor": 0.95,
+    "conditional_completion_floor_met": true,
+    "conditional_completion_fraction": 1.0,
+    "independent_labels_complete": 10,
+    "matched_events": 2791,
+    "pairs": 30,
+    "processing_complete": 10,
+    "sample_complete": true,
+    "unexpected_allowed_outcomes": 0
+  },
+  "tar_asan": {
+    "all_pass": false,
+    "binary_sha256": "95d4ef5148854973fb0f9adef51f6b3ebbd33d321f233305a731545d47ae0d37",
+    "passed": 4,
+    "peaks_mib_reported": [
+      457,
+      477,
+      517,
+      475,
+      509
+    ],
+    "rounds": 5,
+    "source_commit": "4fc111b30ee066567ca6eff4970ac26d1229da76"
+  },
+  "test_logs_sha256": {
+    "clippy.log": "0d47986391d720634f0d1b0ee89a192b52c1dd2826b271a89501cdaf2c0f8e69",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "python-tests.log": "a561c7caf3e9ef515d4deba6ce9b8a2a053fce34da7b74f02a04a4717ec03b50",
+    "rust-tests.log": "3edb677054b67ec4cf5b85af3807292ceef5cfc42ace5432229116f6390f1398"
+  }
+}

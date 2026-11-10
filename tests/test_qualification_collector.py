@@ -30,8 +30,46 @@ def archive(entries):
 
 def check(raw):
     zipped = gzip.compress(raw, mtime=0)
+    return check_zipped(zipped)
+
+
+def check_zipped(zipped, *, budget=None):
     sri = "sha512-" + base64.b64encode(hashlib.sha512(zipped).digest()).decode()
-    return npm_evidence.archive_facts(zipped, sri)
+    return npm_evidence.archive_facts(zipped, sri, budget=budget)
+
+
+def large_archive(*, extra=(), expanded_size=None, payload_name="package/blob.bin",
+                  payload_size=65 * 1024 ** 2, alias_name=None, alias_last_byte=b"\0"):
+    output = io.BytesIO()
+    expanded = 0
+    with gzip.GzipFile(fileobj=output, mode="wb", mtime=0) as zipped:
+        def write(data):
+            nonlocal expanded
+            zipped.write(data)
+            expanded += len(data)
+
+        def entry(name, size):
+            info = tarfile.TarInfo(name)
+            info.size = size
+            write(info.tobuf(format=tarfile.USTAR_FORMAT))
+
+        entry("package/package.json", len(MANIFEST))
+        write(MANIFEST + bytes(-len(MANIFEST) % 512))
+        for name in [payload_name] + ([alias_name] if alias_name is not None else []):
+            entry(name, payload_size)
+            for offset in range(0, payload_size, 64 * 1024):
+                size = min(64 * 1024, payload_size - offset)
+                final = alias_last_byte if name == alias_name and offset + size == payload_size else b"\0"
+                write(bytes(size - 1) + final)
+            write(bytes(-payload_size % 512))
+        for name, data in extra:
+            entry(name, len(data))
+            write(data + bytes(-len(data) % 512))
+        write(bytes(1024))
+        if expanded_size is not None:
+            while expanded < expanded_size:
+                write(bytes(min(64 * 1024, expanded_size - expanded)))
+    return output.getvalue(), expanded
 
 
 def checksum(header):
@@ -39,7 +77,197 @@ def checksum(header):
     header[148:156] = f"{sum(header):06o}\0 ".encode()
 
 
+def pax_record(key, value):
+    body = f" {key}={value}\n".encode()
+    length = len(body) + 1
+    while len(str(length)) + len(body) != length:
+        length = len(str(length)) + len(body)
+    return str(length).encode() + body
+
+
+def pax_archive(path="package/package.json", size=len(MANIFEST), key="NODETAR.package.name", value="pkg"):
+    body = b"".join((pax_record("path", path), pax_record("size", str(size)),
+                     pax_record("uid", "718322462"), pax_record(key, value)))
+    pax = tarfile.TarInfo("PaxHeader/package/package.json")
+    pax.type = tarfile.XHDTYPE
+    pax.size = len(body)
+    regular = tarfile.TarInfo("package/package.json")
+    regular.size = len(MANIFEST)
+    return (pax.tobuf(format=tarfile.USTAR_FORMAT) + body + bytes(-len(body) % 512)
+            + regular.tobuf(format=tarfile.USTAR_FORMAT) + MANIFEST
+            + bytes(-len(MANIFEST) % 512) + bytes(1024))
+
+
 class CollectorCompatibility(unittest.TestCase):
+    def test_global_pax_comment_and_unicode_ignored_metadata(self):
+        comment = pax_record("comment", "0123456789abcdef")
+        global_header = tarfile.TarInfo("pax_global_header")
+        global_header.type = tarfile.XGLTYPE
+        global_header.size = len(comment)
+        regular = tarfile.TarInfo("package/package.json")
+        regular.size = len(MANIFEST)
+
+        def make(body, *, before=True, twice=False):
+            global_header.size = len(body)
+            global_entry = (global_header.tobuf(format=tarfile.USTAR_FORMAT)
+                            + body + bytes(-len(body) % 512))
+            file_entry = (regular.tobuf(format=tarfile.USTAR_FORMAT)
+                          + MANIFEST + bytes(-len(MANIFEST) % 512))
+            entries = (global_entry + (global_entry if twice else b"") + file_entry
+                       if before else file_entry + global_entry)
+            return entries + bytes(1024)
+
+        self.assertEqual(check(make(comment))[0], MANIFEST)
+        self.assertEqual(check(pax_archive(key="NODETAR.package.author", value="István"))[0], MANIFEST)
+        for bad in (make(pax_record("path", "package/other.json")), make(comment, twice=True),
+                    make(comment, before=False), pax_archive(key="NODETAR.package.author", value="line\nbreak")):
+            with self.assertRaises(npm_evidence.EvidenceError):
+                check(bad)
+
+    def test_bundled_child_is_read_from_verified_parent_archive(self):
+        child = b'{"name":"child","version":"1","scripts":{"install":"echo child"}}'
+        parent = b'{"name":"pkg","version":"1","dependencies":{"child":"1"},"bundleDependencies":["child"]}'
+        parent_archive = gzip.compress(archive([
+            ("package/package.json", parent),
+            ("package/node_modules/child/package.json", child),
+        ]), mtime=0)
+        digest = hashlib.sha512(parent_archive).digest()
+        integrity = "sha512-" + base64.b64encode(digest).decode()
+        lock = {"lockfileVersion": 3, "packages": {
+            "": {"name": "app", "version": "1"},
+            "node_modules/pkg": {"version": "1", "resolved": "https://registry.npmjs.org/pkg/-/pkg-1.tgz",
+                                 "integrity": integrity},
+            "node_modules/pkg/node_modules/child": {"version": "1", "inBundle": True,
+                                                    "hasInstallScript": True},
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            project = base / "project"
+            project.mkdir()
+            (project / "package.json").write_bytes(b'{"name":"app","version":"1"}')
+            lock_path = project / "package-lock.json"
+            lock_path.write_bytes(npm_evidence.json_bytes(lock))
+            cache = base / "cache"
+            cache.mkdir()
+            (cache / (digest.hex() + ".tgz")).write_bytes(parent_archive)
+            index = npm_evidence.collect_evidence(lock_path, project, base / "evidence", cache)
+            rows = npm_evidence.validate_bundle(lock_path, index, project / "package.json")
+            bundled = next(row for row in rows if row["path"].endswith("/child"))
+            self.assertEqual(bundled["kind"], "bundled_artifact")
+            self.assertEqual(bundled["artifact_sha512"], digest.hex())
+            self.assertEqual(bundled["lifecycle"]["install"], hashlib.sha256(b"echo child").hexdigest())
+            self.assertEqual(len(json.loads(index.read_text())["packages"]), 2)
+            lock["packages"]["node_modules/pkg/node_modules/child"]["version"] = "2"
+            lock_path.write_bytes(npm_evidence.json_bytes(lock))
+            index_data = json.loads(index.read_text())
+            index_data["lock_sha256"] = npm_evidence.sha256(lock_path.read_bytes())
+            index.write_bytes(npm_evidence.json_bytes(index_data))
+            with self.assertRaisesRegex(npm_evidence.EvidenceError, "manifest version"):
+                npm_evidence.validate_bundle(lock_path, index, project / "package.json")
+            lock["packages"]["node_modules/pkg/node_modules/child"]["version"] = "1"
+            artifact_path = base / "evidence" / index_data["packages"][1]["artifact"]
+            for fields in ({"dependencies": {"child": "1"}},
+                           {"dependencies": {"child": "1"}, "bundleDependencies": ["other"]},
+                           {"bundleDependencies": ["child"]}):
+                changed_parent = npm_evidence.json_bytes({"name": "pkg", "version": "1", **fields})
+                changed_archive = gzip.compress(archive([
+                    ("package/package.json", changed_parent),
+                    ("package/node_modules/child/package.json", child),
+                ]), mtime=0)
+                lock["packages"]["node_modules/pkg"]["integrity"] = (
+                    "sha512-" + base64.b64encode(hashlib.sha512(changed_archive).digest()).decode())
+                lock_path.write_bytes(npm_evidence.json_bytes(lock))
+                index_data["lock_sha256"] = npm_evidence.sha256(lock_path.read_bytes())
+                index.write_bytes(npm_evidence.json_bytes(index_data))
+                artifact_path.write_bytes(changed_archive)
+                with self.assertRaisesRegex(npm_evidence.EvidenceError, "direct declared bundled dependency"):
+                    npm_evidence.validate_bundle(lock_path, index, project / "package.json")
+
+    def test_narrow_pax_metadata_preserves_manifest_bytes(self):
+        self.assertEqual(check(pax_archive())[0], MANIFEST)
+        for changed in (pax_archive(path="package/other.json"),
+                        pax_archive(size=0), pax_archive(key="linkpath"),
+                        pax_archive(key="SCHILY.xattr.user.test")):
+            with self.assertRaises(npm_evidence.EvidenceError):
+                check(changed)
+
+    def test_exact_gnu_ustar_magic_keeps_header_and_type_checks(self):
+        raw = bytearray(archive([("package/package.json", MANIFEST)]))
+        raw[257:265] = b"ustar  \0"
+        checksum(memoryview(raw)[:512])
+        self.assertEqual(check(raw)[0], MANIFEST)
+        for magic in (b"ustar 1\0", b"ustar \0\0", b"ustar  \x01"):
+            changed = raw.copy()
+            changed[257:265] = magic
+            checksum(memoryview(changed)[:512])
+            with self.assertRaises(npm_evidence.EvidenceError):
+                check(changed)
+        corrupt = raw.copy()
+        corrupt[100] ^= 1
+        with self.assertRaises(npm_evidence.EvidenceError):
+            check(corrupt)
+        link = raw.copy()
+        link[156] = ord("2")
+        checksum(memoryview(link)[:512])
+        with self.assertRaises(npm_evidence.EvidenceError):
+            check(link)
+
+    def test_zero_tar_tail_must_be_block_aligned(self):
+        raw = archive([("package/package.json", MANIFEST)])
+        self.assertEqual(check(raw + bytes(512))[0], MANIFEST)
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "block aligned"):
+            check(raw + b"\0")
+
+    def test_large_dot_alias_requires_complete_file_identity(self):
+        for first, second in [("package/./blob.bin", "package/blob.bin"),
+                              ("package/blob.bin", "package/./blob.bin")]:
+            zipped, _ = large_archive(payload_name=first, payload_size=33 * 1024 ** 2,
+                                      alias_name=second)
+            self.assertEqual(check_zipped(zipped)[0], MANIFEST)
+        zipped, _ = large_archive(payload_name="package/./blob.bin", payload_size=33 * 1024 ** 2,
+                                  alias_name="package/blob.bin", alias_last_byte=b"x")
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "conflicting dot-alias"):
+            check_zipped(zipped)
+
+    def test_large_archive_and_exact_expanded_limit_qualify(self):
+        zipped, expanded = large_archive(extra=[("package/binding.gyp", b"native")])
+        budget = npm_evidence.WorkBudget(expanded=expanded, headers=3)
+        manifest_bytes, manifest, native, binding = check_zipped(zipped, budget=budget)
+        self.assertEqual(manifest_bytes, MANIFEST)
+        self.assertEqual(manifest, {"name": "pkg", "version": "1"})
+        self.assertTrue(native)
+        self.assertEqual(binding, hashlib.sha256(b"native").hexdigest())
+        self.assertEqual(budget.expanded_remaining, 0)
+        self.assertEqual(budget.headers_remaining, 0)
+        zipped, _ = large_archive(expanded_size=128 * 1024 ** 2)
+        self.assertEqual(check_zipped(zipped)[0], MANIFEST)
+        zipped, _ = large_archive(payload_name="package/binding.gyp", payload_size=64 * 1024 ** 2)
+        self.assertEqual(check_zipped(zipped)[2:], (True, hashlib.sha256(bytes(64 * 1024 ** 2)).hexdigest()))
+
+    def test_large_archive_tail_and_work_limits_remain_fail_closed(self):
+        zipped, expanded = large_archive()
+        bad_crc = bytearray(zipped)
+        bad_crc[-8] ^= 1
+        bad_size = bytearray(zipped)
+        bad_size[-4] ^= 1
+        malformed = [bad_crc, bad_size, zipped[:-1], zipped + b"x",
+                     zipped + gzip.compress(b"", mtime=0),
+                     large_archive(extra=[("package/package.json", MANIFEST)])[0]]
+        for data in malformed:
+            with self.subTest(tail=hashlib.sha256(data).hexdigest()):
+                with self.assertRaises(npm_evidence.EvidenceError):
+                    check_zipped(data)
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "snapshot expanded evidence"):
+            check_zipped(zipped, budget=npm_evidence.WorkBudget(expanded=expanded - 1))
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "snapshot tar processing"):
+            check_zipped(zipped, budget=npm_evidence.WorkBudget(headers=1))
+        oversized, _ = large_archive(expanded_size=256 * 1024 ** 2 + 512)
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "decompressed limit"):
+            check_zipped(oversized)
+        binding, _ = large_archive(payload_name="package/binding.gyp")
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "binding.gyp"):
+            check_zipped(binding)
+
     def test_single_nonpackage_root_and_printable_paths(self):
         raw = archive([
             ("node v24.12/package.json", MANIFEST),

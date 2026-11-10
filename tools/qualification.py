@@ -22,7 +22,7 @@ import npm_evidence
 
 MAX_FILE = 64 * 1024 * 1024
 MAX_OUTPUT = 64 * 1024 * 1024
-SCORING_SEMANTICS_VERSION = 2
+SCORING_SEMANTICS_VERSION = 4
 
 
 def digest(data, algorithm="sha256"):
@@ -518,9 +518,15 @@ def compare_events(expected, report, oracle_status):
                 side = "after" if kind == "added" else "before"
                 observed = bool(change and (change.get(side) or {}).get("facts"))
             elif kind in execution_fields:
-                before = ((change or {}).get("before") or {}).get("facts") or {}
-                after = ((change or {}).get("after") or {}).get("facts") or {}
+                old_evidence = (change or {}).get("before") or {}
+                new_evidence = (change or {}).get("after") or {}
+                before = dict(old_evidence.get("facts") or {})
+                after = dict(new_evidence.get("facts") or {})
                 field = execution_fields[kind]
+                if kind == "artifact_changed":
+                    for values, evidence in ((before, old_evidence), (after, new_evidence)):
+                        if field not in values and evidence.get("verified_artifact_sha512") is not None:
+                            values[field] = evidence["verified_artifact_sha512"]
                 observed = field in before or field in after
                 observed = observed and before.get(field) != after.get(field)
                 if kind.startswith("lifecycle_"):
@@ -541,7 +547,8 @@ def compare_events(expected, report, oracle_status):
 def compare_facts(facts, report):
     mismatches = []
     fields = {"manifest_sha256": "manifest_sha256", "artifact_sha512": "artifact_sha512",
-              "scripts": "lifecycle", "implicit_native": "implicit_node_gyp", "binding_sha256": "binding_gyp_sha256"}
+              "scripts": "lifecycle", "implicit_native": "implicit_node_gyp", "binding_sha256": "binding_gyp_sha256",
+              "source_manifest_version": "version"}
     for side, independent in facts.items():
         observed = {item["path"]: item for item in report.get(side, {}).get("execution_evidence") or []}
         for path, expected in independent["packages"].items():

@@ -17,7 +17,9 @@ import zlib
 
 
 MAX_FILE = 64 * 1024 * 1024
+MAX_EXPANDED = 256 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
+MAX_PAX = 4 * 1024
 MAX_NPM_RECORDS = 10_000
 MAX_NPM_REFERENCES = 50_000
 ROOT_EVENTS = ("preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare")
@@ -157,58 +159,197 @@ def tar_text(field):
         raise EvidenceError("non-UTF8 tar path") from exc
 
 
+class _GzipReader:
+    CHUNK = 64 * 1024
+
+    def __init__(self, archive, budget):
+        self.archive = archive
+        self.budget = budget
+        self.decoder = zlib.decompressobj(31)
+        self.offset = 0
+        self.pending = b""
+        self.expanded = 0
+
+    def read(self, size):
+        result = bytearray()
+        while len(result) < size and not self.decoder.eof:
+            if self.budget is not None and self.budget.exhausted is not None:
+                raise EvidenceError(self.budget.exhausted)
+            if not self.pending and self.offset < len(self.archive):
+                self.pending = self.archive[self.offset:self.offset + self.CHUNK]
+                self.offset += len(self.pending)
+            bound = min(size - len(result), self.CHUNK, MAX_EXPANDED - self.expanded + 1)
+            if self.budget is not None:
+                bound = min(bound, self.budget.expanded_remaining + 1)
+            try:
+                data = self.decoder.decompress(self.pending, bound)
+            except zlib.error as exc:
+                if self.budget is not None:
+                    # zlib can reject a chunk without reporting its expanded bytes.
+                    self.budget.charge("expanded_remaining", MAX_EXPANDED + 1 - self.expanded,
+                                       "snapshot expanded evidence exceeds 4 GiB")
+                raise EvidenceError(f"invalid gzip: {exc}") from exc
+            self.pending = self.decoder.unconsumed_tail
+            self.expanded += len(data)
+            if self.budget is not None:
+                self.budget.charge("expanded_remaining", len(data), "snapshot expanded evidence exceeds 4 GiB")
+            if self.expanded > MAX_EXPANDED:
+                raise EvidenceError("archive exceeds decompressed limit")
+            if self.decoder.eof:
+                if self.decoder.unused_data or self.offset < len(self.archive):
+                    raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
+            elif not data and not self.pending and self.offset == len(self.archive):
+                raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
+            result.extend(data)
+        return bytes(result)
+
+
+def parse_pax(data, target):
+    offset = 0
+    attributes = {}
+    while offset < len(data):
+        space = data.find(b" ", offset)
+        if space <= offset:
+            raise EvidenceError("invalid PAX record")
+        digits = data[offset:space]
+        if not digits.isdigit() or (len(digits) > 1 and digits[:1] == b"0"):
+            raise EvidenceError("invalid PAX record")
+        length = int(digits)
+        end = offset + length
+        if length <= space - offset + 2 or end > len(data) or data[end - 1:end] != b"\n":
+            raise EvidenceError("invalid PAX record")
+        body = data[space + 1:end - 1]
+        key_bytes, separator, value_bytes = body.partition(b"=")
+        if not separator:
+            raise EvidenceError("invalid PAX record")
+        try:
+            key = key_bytes.decode("ascii")
+            value = value_bytes.decode("utf-8")
+        except UnicodeError as exc:
+            raise EvidenceError("invalid PAX text") from exc
+        if key in attributes or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value):
+            raise EvidenceError("ambiguous PAX record")
+        if key in ("path", "size"):
+            attributes[key] = value
+        elif key in ("uid", "gid"):
+            if not re.fullmatch(r"[0-9]+", value) or int(value) > 0xffffffff:
+                raise EvidenceError("invalid PAX owner")
+            attributes[key] = value
+        elif key in ("SCHILY.dev", "SCHILY.nlink", "SCHILY.ino"):
+            if not re.fullmatch(r"[0-9]+", value) or int(value) > 0xffffffffffffffff:
+                raise EvidenceError("invalid PAX metadata")
+            attributes[key] = value
+        elif key.startswith("NODETAR.") and all(
+                re.fullmatch(r"[A-Za-z0-9_-]+", part) for part in key.split(".")[1:]):
+            attributes[key] = value
+        else:
+            raise EvidenceError("unsupported PAX key")
+        offset = end
+    if attributes.get("path") != target or not re.fullmatch(r"(?:0|[1-9][0-9]*)", attributes.get("size", "")):
+        raise EvidenceError("PAX path or size differs from regular header")
+    return {"path": target, "size": int(attributes["size"])}
+
+
+def parse_global_pax_comment(data):
+    space = data.find(b" ")
+    if (space <= 0 or not re.fullmatch(rb"[1-9][0-9]*", data[:space])
+            or int(data[:space]) != len(data) or not data.endswith(b"\n")
+            or not data[space + 1:].startswith(b"comment=")):
+        raise EvidenceError("invalid global PAX comment")
+    value = data[space + 9:-1]
+    if not value or any(not 32 <= byte <= 126 for byte in value):
+        raise EvidenceError("invalid global PAX comment")
+
+
 def archive_facts(archive, integrity, *, budget=None):
+    return _archive_facts(archive, integrity, budget=budget, capture=())[0:4]
+
+
+def archive_facts_nested(archive, integrity, capture, *, budget=None):
+    return _archive_facts(archive, integrity, budget=budget, capture=capture)
+
+
+def _archive_facts(archive, integrity, *, budget=None, capture=()):
     if budget is not None and budget.exhausted is not None:
         raise EvidenceError(budget.exhausted)
     if len(archive) > MAX_FILE:
         raise EvidenceError("archive exceeds compressed limit")
     if hashlib.sha512(archive).digest() != sri_digest(integrity):
         raise EvidenceError("archive SHA512 SRI mismatch")
-    try:
-        decoder = zlib.decompressobj(31)
-        tar_data = decoder.decompress(archive, MAX_FILE + 1)
-        if budget is not None:
-            budget.charge("expanded_remaining", len(tar_data), "snapshot expanded evidence exceeds 4 GiB")
-        if len(tar_data) > MAX_FILE or decoder.unconsumed_tail:
-            raise EvidenceError("archive exceeds decompressed limit")
-        if not decoder.eof or decoder.unused_data:
-            raise EvidenceError("truncated gzip, multiple members, or trailing bytes")
-    except zlib.error as exc:
-        if budget is not None:
-            budget.charge("expanded_remaining", MAX_FILE + 1, "snapshot expanded evidence exceeds 4 GiB")
-        raise EvidenceError(f"invalid gzip: {exc}") from exc
-    except (OSError, EOFError) as exc:
-        raise EvidenceError(f"invalid gzip: {exc}") from exc
+    stream = _GzipReader(archive, budget)
     offset = 0
     seen = {}
     entry_count = 0
     root_name = None
     manifest_bytes = None
     binding_hash = None
-    while offset + 512 <= len(tar_data):
-        header = tar_data[offset:offset + 512]
+    capture = set(capture)
+    nested = {}
+    pending_pax = None
+    global_pax_seen = False
+    while True:
+        header = stream.read(512)
+        if len(header) != 512:
+            raise EvidenceError("missing tar terminator")
         if not any(header):
-            if len(tar_data) - offset < 1024 or any(tar_data[offset:]):
+            if pending_pax is not None:
+                raise EvidenceError("unpaired PAX header")
+            second = stream.read(512)
+            if len(second) != 512 or any(second):
                 raise EvidenceError("invalid tar terminator")
+            while tail := stream.read(stream.CHUNK):
+                if any(tail):
+                    raise EvidenceError("invalid tar terminator")
+            if stream.expanded % 512:
+                raise EvidenceError("tar is not block aligned")
             break
         if entry_count == 10_000:
             raise EvidenceError("tar exceeds 10000 entries")
         entry_count += 1
         if budget is not None:
             budget.charge("headers_remaining", 1, "snapshot tar processing exceeds 250000 headers")
-        if header[257:265] != b"ustar\0" + b"00":
+        if header[257:265] not in (b"ustar\0" + b"00", b"ustar  \0"):
             raise EvidenceError("unsupported tar format; requires ustar")
         if any(header[157:257]) or any(header[500:]):
             raise EvidenceError("unsupported tar link or reserved metadata")
         for start, width in ((100, 8), (108, 8), (116, 8), (124, 12), (136, 12), (148, 8), (329, 8), (337, 8)):
-            numeric = header[start:start + width].strip(b" \0")
+            field = header[start:start + width]
+            if start in (108, 116) and (header[156:157] == b"x" or pending_pax is not None) and field[:1] == b"\x80":
+                if int.from_bytes(b"\0" + field[1:], "big") > 0xffffffff:
+                    raise EvidenceError("tar owner number overflow")
+                continue
+            numeric = field.strip(b" \0")
             if any(byte < ord("0") or byte > ord("7") for byte in numeric):
                 raise EvidenceError("unsupported tar numeric encoding; requires octal")
         try:
             info = tarfile.TarInfo.frombuf(header, "utf-8", "strict")
         except (tarfile.TarError, UnicodeError) as exc:
             raise EvidenceError(f"invalid tar header: {exc}") from exc
-        if info is None or info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
+        if info is None:
+            raise EvidenceError("unsupported tar entry type")
+        if info.type in (tarfile.XHDTYPE, tarfile.XGLTYPE) and pending_pax is None:
+            if info.size <= 0 or info.size > MAX_PAX or any(header[345:500]):
+                raise EvidenceError("unsupported PAX header")
+            name = tar_text(header[:100])
+            global_pax = info.type == tarfile.XGLTYPE
+            if global_pax:
+                if global_pax_seen or entry_count != 1 or name != "pax_global_header":
+                    raise EvidenceError("unsupported PAX header")
+                global_pax_seen = True
+            elif not name.startswith("PaxHeader/") or not name[len("PaxHeader/"):]:
+                raise EvidenceError("unsupported PAX header")
+            data = stream.read(info.size)
+            padding_size = -info.size % 512
+            padding = stream.read(padding_size)
+            if len(data) != info.size or len(padding) != padding_size or any(padding):
+                raise EvidenceError("invalid PAX entry padding")
+            if global_pax:
+                parse_global_pax_comment(data)
+            else:
+                pending_pax = parse_pax(data, name[len("PaxHeader/"):])
+            offset += 512 + info.size + padding_size
+            continue
+        if info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
             raise EvidenceError("unsupported tar entry type")
         if info.devmajor or info.devminor:
             raise EvidenceError("tar regular entry has device metadata")
@@ -223,6 +364,10 @@ def archive_facts(archive, integrity, *, budget=None):
             prefix = ""
         raw_name = tar_text(header[:100])
         joined = f"{prefix}/{raw_name}" if prefix else raw_name
+        if pending_pax is not None:
+            if info.isdir() or joined != pending_pax["path"] or info.size != pending_pax["size"] or "/./" in joined:
+                raise EvidenceError("PAX path or size differs from regular header")
+            pending_pax = None
         name = joined.removesuffix("/") if info.isdir() else joined
         raw_parts = name.split("/")
         dot_alias = len(raw_parts) >= 3 and raw_parts[1] == "."
@@ -252,35 +397,52 @@ def archive_facts(archive, integrity, *, budget=None):
             raise EvidenceError("dot aliases of directories or lifecycle evidence are unsupported")
         if any(seen.get("/".join(parts[:n]).lower(), {}).get("kind") == "file" for n in range(1, len(parts))) or (not info.isdir() and any(path.startswith(canonical + "/") for path in seen)):
             raise EvidenceError("tar file and parent path conflict")
-        if info.size < 0 or info.size > MAX_FILE or (info.isdir() and info.size) or offset + 512 + info.size > len(tar_data):
+        if info.size < 0 or info.size > MAX_EXPANDED or (info.isdir() and info.size) or offset + 512 + info.size > MAX_EXPANDED:
             raise EvidenceError("invalid tar size")
-        start = offset + 512
-        end = start + info.size
-        padded_end = start + ((info.size + 511) // 512) * 512
-        if padded_end > len(tar_data) or any(tar_data[end:padded_end]):
+        nested_manifest = relative.removesuffix("/package.json") if relative.endswith("/package.json") else None
+        nested_binding = relative.removesuffix("/binding.gyp") if relative.endswith("/binding.gyp") else None
+        if (relative == "package.json" or nested_manifest in capture) and info.size > MAX_MANIFEST:
+            raise EvidenceError("invalid archived package.json")
+        if (relative == "binding.gyp" or nested_binding in capture) and info.size > MAX_FILE:
+            raise EvidenceError("binding.gyp exceeds 64 MiB")
+        digest = hashlib.sha256()
+        manifest_data = bytearray() if relative == "package.json" or nested_manifest in capture else None
+        remaining = info.size
+        while remaining:
+            data = stream.read(min(remaining, stream.CHUNK))
+            if not data:
+                raise EvidenceError("invalid tar size")
+            digest.update(data)
+            if manifest_data is not None:
+                manifest_data.extend(data)
+            remaining -= len(data)
+        padding_size = -info.size % 512
+        padding = stream.read(padding_size)
+        if len(padding) != padding_size or any(padding):
             raise EvidenceError("invalid tar padding")
+        file_hash = digest.hexdigest()
         previous = seen.get(canonical)
         if previous is not None:
             if (previous["name"] != name or previous["kind"] != "file" or info.isdir()
                     or previous["paired"] or previous["dot_alias"] == dot_alias):
                 raise EvidenceError("duplicate tar path or excessive entry count")
             if (previous["before"] != header[100:148] or previous["after"] != header[156:512]
-                    or tar_data[previous["start"]:previous["end"]] != tar_data[start:end]):
+                    or previous["size"] != info.size or previous["sha256"] != file_hash):
                 raise EvidenceError("conflicting dot-alias tar path")
             previous["paired"] = True
         else:
             seen[canonical] = {"name": name, "kind": "directory" if info.isdir() else "file",
-                               "start": start, "end": end, "before": header[100:148], "after": header[156:512],
+                               "size": info.size, "sha256": file_hash, "before": header[100:148], "after": header[156:512],
                                "dot_alias": dot_alias, "paired": False}
         if relative == "package.json":
-            if info.size > MAX_MANIFEST:
-                raise EvidenceError("invalid archived package.json")
-            manifest_bytes = tar_data[start:end]
+            manifest_bytes = bytes(manifest_data)
         elif relative == "binding.gyp":
-            binding_hash = sha256(tar_data[start:end])
-        offset = padded_end
-    else:
-        raise EvidenceError("missing tar terminator")
+            binding_hash = file_hash
+        if nested_manifest in capture:
+            nested.setdefault(nested_manifest, {})["manifest"] = bytes(manifest_data)
+        if nested_binding in capture:
+            nested.setdefault(nested_binding, {})["binding_hash"] = file_hash
+        offset += 512 + info.size + padding_size
     if any(item["dot_alias"] and not item["paired"] for item in seen.values()):
         raise EvidenceError("unpaired dot-alias tar path")
     if manifest_bytes is None:
@@ -288,7 +450,33 @@ def archive_facts(archive, integrity, *, budget=None):
     manifest = strict_json(manifest_bytes)
     if not isinstance(manifest, dict):
         raise EvidenceError("manifest must be an object")
-    return manifest_bytes, manifest, binding_hash is not None, binding_hash
+    return manifest_bytes, manifest, binding_hash is not None, binding_hash, nested
+
+
+def direct_bundle_name(relative):
+    if not relative.startswith("node_modules/"):
+        return None
+    name = relative[len("node_modules/"):]
+    if name.startswith("@"):
+        parts = name.split("/")
+        return name if len(parts) == 2 and len(parts[0]) > 1 and bool(parts[1]) else None
+    return name if name and "/" not in name else None
+
+
+def declared_bundles(manifest):
+    if "bundleDependencies" in manifest and "bundledDependencies" in manifest:
+        return set()
+    dependencies = set()
+    for field in ("dependencies", "optionalDependencies"):
+        value = manifest.get(field)
+        if isinstance(value, dict):
+            dependencies.update(value)
+    declared = manifest.get("bundleDependencies", manifest.get("bundledDependencies"))
+    if declared is True:
+        return dependencies
+    if isinstance(declared, list):
+        return {name for name in declared if isinstance(name, str) and name in dependencies}
+    return set()
 
 
 def manifest_facts(data, binding_gyp, source_project=False, binding_hash=None):
@@ -346,7 +534,10 @@ def check_identity(path, record, manifest):
     expected = record.get("name") if not is_registry_path(path) else expected_name(path, record)
     if expected is not None and manifest.get("name") != expected:
         raise EvidenceError(f"manifest name does not match lock instance {path!r}")
-    if manifest.get("version") != record.get("version"):
+    root_version_metadata = (path == "" and isinstance(manifest.get("version"), str)
+                             and bool(manifest["version"]) and isinstance(record.get("version"), str)
+                             and bool(record["version"]))
+    if manifest.get("version") != record.get("version") and not root_version_metadata:
         raise EvidenceError(f"manifest version does not match lock instance {path!r}")
     if not is_registry_path(path):
         for key in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
@@ -366,28 +557,57 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
     if len(index["packages"]) > MAX_NPM_RECORDS:
         raise EvidenceError("locator index exceeds 10000 package records")
     expected = {path: record for path, record in lock["packages"].items() if not record.get("link", False)}
-    seen = set()
-    results = []
-    budget = WorkBudget()
+    locators = {}
     for item in index["packages"]:
         if not isinstance(item, dict) or set(item) not in ({"path", "artifact"}, {"path", "project_manifest"}):
             raise EvidenceError("locator entry requires path and one supported evidence source")
         path = item["path"]
-        if not isinstance(path, str) or path in seen or path not in expected:
+        if not isinstance(path, str) or path in locators or path not in expected:
             raise EvidenceError("duplicate or unknown index instance")
-        seen.add(path)
+        locators[path] = item
+    bundle_children = {}
+    capture_by_parent = {}
+    for path, record in expected.items():
+        if (record.get("inBundle") is not True or "resolved" in record or "integrity" in record
+                or path in locators):
+            continue
+        ancestor = path
+        while "/node_modules/" in ancestor:
+            parent = ancestor.rsplit("/node_modules/", 1)[0]
+            if "artifact" in locators.get(parent, {}):
+                relative = path[len(parent) + 1:]
+                capture_by_parent.setdefault(parent, set()).add(relative)
+                bundle_children[path] = (parent, relative)
+                break
+            ancestor = parent
+    for path in bundle_children:
+        expected.pop(path)
+    results = []
+    budget = WorkBudget()
+    observed_nested = {}
+    observed_sha512 = {}
+    observed_declared = {}
+    parent_conflicts = {}
+    for item in index["packages"]:
+        path = item["path"]
         record = expected[path]
         if "artifact" in item:
             if not is_registry_path(path):
                 raise EvidenceError("project instance cannot use registry artifact evidence")
             archive_source(record.get("resolved"))
             archive = read_limited(confined_file(Path(index_path).parent, item["artifact"]), budget=budget)
-            data, manifest, binding_gyp, binding_hash = archive_facts(archive, record.get("integrity"), budget=budget)
+            data, manifest, binding_gyp, binding_hash, nested = _archive_facts(
+                archive, record.get("integrity"), budget=budget,
+                capture=capture_by_parent.get(path, ()))
+            observed_nested[path] = nested
+            observed_sha512[path] = hashlib.sha512(archive).hexdigest()
+            observed_declared[path] = declared_bundles(manifest)
             facts = manifest_facts(data, binding_gyp, binding_hash=binding_hash)
             facts.update({"kind": "artifact", "artifact_sha256": sha256(archive), "artifact_sha512": hashlib.sha512(archive).hexdigest(), "source": record.get("resolved"), "integrity": record.get("integrity")})
             expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
             facts["locked_install_marker"] = record.get("hasInstallScript")
             facts["marker_conflict"] = record.get("hasInstallScript") is False and bool(expected_marker)
+            parent_conflicts[path] = facts["marker_conflict"]
         else:
             if is_registry_path(path):
                 raise EvidenceError("supplied manifest cannot establish registry artifact binding")
@@ -406,8 +626,32 @@ def validate_bundle(lock_path, index_path, root_manifest=None):
         check_identity(path, record, manifest)
         facts["path"] = path
         results.append(facts)
-    if seen != set(expected):
-        raise EvidenceError(f"missing evidence instances: {sorted(set(expected) - seen)}")
+    if set(locators) != set(expected):
+        raise EvidenceError(f"missing evidence instances: {sorted(set(expected) - set(locators))}")
+    for path, (parent, relative) in bundle_children.items():
+        if parent_conflicts.get(parent):
+            raise EvidenceError(f"bundle parent has conflicting install marker: {parent}")
+        name = direct_bundle_name(relative)
+        if name is None or name not in observed_declared.get(parent, set()):
+            raise EvidenceError(f"child is not a direct declared bundled dependency of its parent archive: {path}")
+        nested = observed_nested.get(parent, {}).get(relative, {})
+        data = nested.get("manifest")
+        if data is None:
+            raise EvidenceError(f"bundled package manifest absent from verified parent archive: {path}")
+        record = lock["packages"][path]
+        manifest = strict_json(data)
+        check_identity(path, record, manifest)
+        binding_hash = nested.get("binding_hash")
+        facts = manifest_facts(data, binding_hash is not None, binding_hash=binding_hash)
+        parent_record = lock["packages"][parent]
+        facts.update({"kind": "bundled_artifact", "artifact_sha512": observed_sha512[parent],
+                      "bundle_parent": parent, "bundle_parent_source": parent_record.get("resolved"),
+                      "bundle_parent_integrity": parent_record.get("integrity")})
+        expected_marker = facts["implicit_node_gyp"] or any(manifest.get("scripts", {}).get(event) for event in DEPENDENCY_EVENTS)
+        facts["locked_install_marker"] = record.get("hasInstallScript")
+        facts["marker_conflict"] = record.get("hasInstallScript") is False and bool(expected_marker)
+        facts["path"] = path
+        results.append(facts)
     return sorted(results, key=lambda item: item["path"])
 
 
@@ -456,40 +700,45 @@ def collect_evidence(lock_path, project_dir, output_dir, archive_cache=None, *, 
     archives = set()
     budget = WorkBudget()
     for path, record in sorted(lock["packages"].items()):
-        if record.get("link", False):
-            continue
-        if is_registry_path(path):
-            archive_source(record.get("resolved"))
-            digest = sri_digest(record.get("integrity"))
-            cache_name = digest.hex() + ".tgz"
-            if archive_cache is not None:
-                archive = read_limited(confined_file(archive_cache, cache_name), budget=budget)
+        try:
+            if record.get("link", False):
+                continue
+            if record.get("inBundle") is True and "resolved" not in record and "integrity" not in record:
+                continue
+            if is_registry_path(path):
+                archive_source(record.get("resolved"))
+                digest = sri_digest(record.get("integrity"))
+                cache_name = digest.hex() + ".tgz"
+                if archive_cache is not None:
+                    archive = read_limited(confined_file(archive_cache, cache_name), budget=budget)
+                else:
+                    archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback, budget=budget)
+                data, manifest, _, _ = archive_facts(archive, record.get("integrity"), budget=budget)
+                check_identity(path, record, manifest)
+                relative = "artifacts/" + sha256(archive) + ".tgz"
+                if relative not in archives:
+                    destination = output / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(archive)
+                    archives.add(relative)
+                entries.append({"path": path, "artifact": relative})
             else:
-                archive = fetch_archive(record.get("resolved"), allow_loopback=allow_loopback, budget=budget)
-            data, manifest, _, _ = archive_facts(archive, record.get("integrity"), budget=budget)
-            check_identity(path, record, manifest)
-            relative = "artifacts/" + sha256(archive) + ".tgz"
-            if relative not in archives:
+                relative_source = (path + "/" if path else "") + "package.json"
+                source = confined_file(project_dir, relative_source)
+                data = read_limited(source, MAX_MANIFEST, budget=budget)
+                check_identity(path, record, strict_json(data))
+                relative = "projects/" + (path + "/" if path else "") + "package.json"
                 destination = output / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes(archive)
-                archives.add(relative)
-            entries.append({"path": path, "artifact": relative})
-        else:
-            relative_source = (path + "/" if path else "") + "package.json"
-            source = confined_file(project_dir, relative_source)
-            data = read_limited(source, MAX_MANIFEST, budget=budget)
-            check_identity(path, record, strict_json(data))
-            relative = "projects/" + (path + "/" if path else "") + "package.json"
-            destination = output / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(data)
-            binding = source.parent / "binding.gyp"
-            if binding.is_symlink():
-                raise EvidenceError("symlink binding.gyp source")
-            if binding.exists():
-                (destination.parent / "binding.gyp").write_bytes(read_limited(binding, budget=budget))
-            entries.append({"path": path, "project_manifest": relative})
+                destination.write_bytes(data)
+                binding = source.parent / "binding.gyp"
+                if binding.is_symlink():
+                    raise EvidenceError("symlink binding.gyp source")
+                if binding.exists():
+                    (destination.parent / "binding.gyp").write_bytes(read_limited(binding, budget=budget))
+                entries.append({"path": path, "project_manifest": relative})
+        except (EvidenceError, OSError) as exc:
+            raise EvidenceError(f"locked instance {path or '<root>'!r}: {exc}") from exc
     index_path = output / "index.json"
     index_path.write_bytes(json_bytes({"schema_version": 1, "lock_sha256": sha256(lock_bytes), "packages": entries}))
     validate_bundle(lock_path, index_path, confined_file(project_dir, "package.json"))

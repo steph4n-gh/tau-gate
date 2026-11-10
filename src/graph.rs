@@ -5,6 +5,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+#[path = "npm_legacy.rs"]
+mod npm_legacy;
+
 pub(crate) const MAX_NPM_RECORDS: usize = 10_000;
 const MAX_NPM_REFERENCES: usize = 50_000;
 const DEPENDENCY_KINDS: [&str; 4] = [
@@ -13,6 +16,32 @@ const DEPENDENCY_KINDS: [&str; 4] = [
     "optionalDependencies",
     "peerDependencies",
 ];
+
+fn npm_target(path: &str, name: &str, indices: &BTreeMap<String, usize>) -> Option<usize> {
+    let mut search = path;
+    loop {
+        let candidate = if search.is_empty() {
+            format!("node_modules/{name}")
+        } else {
+            format!("{search}/node_modules/{name}")
+        };
+        if search.rsplit('/').next() != Some("node_modules") {
+            if let Some(&idx) = indices.get(&candidate) {
+                return Some(idx);
+            }
+        }
+        if search.is_empty() {
+            return None;
+        }
+        search = search
+            .rsplit_once('/')
+            .map(|(parent, _)| parent)
+            .unwrap_or("");
+    }
+}
+
+/// Explicitly supplied project-relative manifests and package-manager configuration.
+pub type ProjectInputs = BTreeMap<String, Vec<u8>>;
 
 pub(crate) fn npm_limits(packages: &BTreeMap<String, JsonNode>) -> Result<()> {
     if packages.len() > MAX_NPM_RECORDS {
@@ -69,6 +98,7 @@ pub struct DepGraph {
     pub issues: Vec<String>,
     pub optional_omissions: Vec<String>,
     pub edge_kinds: BTreeMap<(usize, usize), BTreeSet<String>>,
+    pub resolution_metadata: BTreeMap<String, JsonNode>,
 }
 
 impl DepGraph {
@@ -106,10 +136,21 @@ impl DepGraph {
 
     /// Internal logic for npm parsing to allow unit testing without disk IO
     pub fn parse_npm_lockfile(content: &str) -> Result<Self> {
+        Self::parse_npm_lockfile_with_manifest(content, None)
+    }
+
+    pub fn parse_npm_lockfile_with_manifest(
+        content: &str,
+        manifest: Option<&JsonNode>,
+    ) -> Result<Self> {
         let root = MiniParser::parse_json(content)?;
-        if root.get("lockfileVersion") != Some(&JsonNode::Number(3.0)) {
+        let version = root.get("lockfileVersion");
+        if version == Some(&JsonNode::Number(1.0)) {
+            return npm_legacy::parse(&root, manifest);
+        }
+        if !matches!(version, Some(JsonNode::Number(2.0 | 3.0))) {
             return Err(GateError::Graph(
-                "INCOMPLETE: only npm lockfileVersion 3 is supported for exact review".into(),
+                "INCOMPLETE: supported npm lockfileVersion values are 1, 2 and 3".into(),
             ));
         }
         let packages = root
@@ -122,12 +163,27 @@ impl DepGraph {
             ));
         }
         npm_limits(packages)?;
+        let linked_local_targets: BTreeSet<&str> = packages
+            .values()
+            .filter(|record| record.get("link").and_then(JsonNode::as_bool) == Some(true))
+            .filter_map(|record| record.get("resolved").and_then(JsonNode::as_str))
+            .filter(|target| {
+                !target.is_empty()
+                    && !target.starts_with('/')
+                    && !target
+                        .split('/')
+                        .any(|part| matches!(part, "." | ".." | "node_modules"))
+            })
+            .collect();
         let mut graph = DiGraph::new();
         let mut indices = BTreeMap::new();
         let mut identities = BTreeMap::new();
         let mut execution_packages = BTreeSet::new();
         let mut suspicious_packages = BTreeSet::new();
         let mut issues = Vec::new();
+        if version == Some(&JsonNode::Number(2.0)) {
+            issues.push("Execution capabilities unknown: npm v2 lock markers are diagnostic; archive lifecycle evidence is qualified only for npm v3".into());
+        }
         let mut optional_omissions = Vec::new();
         let mut edge_kinds = BTreeMap::<(usize, usize), BTreeSet<String>>::new();
         for (path, details) in packages {
@@ -185,6 +241,11 @@ impl DepGraph {
             if !path.is_empty()
                 && details.get("link").and_then(JsonNode::as_bool) != Some(true)
                 && details.get("version").and_then(JsonNode::as_str).is_none()
+                && !(linked_local_targets.contains(path.as_str())
+                    && details
+                        .get("resolved")
+                        .and_then(JsonNode::as_str)
+                        .is_none_or(|source| source.starts_with("file:")))
             {
                 issues.push(format!("missing version: {path}"));
             }
@@ -239,28 +300,7 @@ impl DepGraph {
                         if req.as_str().is_none() {
                             return Err(GateError::Graph("Invalid dependency requirement".into()));
                         }
-                        let mut search = path.as_str();
-                        let mut target = None;
-                        loop {
-                            let candidate = if search.is_empty() {
-                                format!("node_modules/{name}")
-                            } else {
-                                format!("{search}/node_modules/{name}")
-                            };
-                            if search.rsplit('/').next() != Some("node_modules") {
-                                if let Some(&idx) = indices.get(&candidate) {
-                                    target = Some(idx);
-                                    break;
-                                }
-                            }
-                            if search.is_empty() {
-                                break;
-                            }
-                            search = search
-                                .rsplit_once('/')
-                                .map(|(parent, _)| parent)
-                                .unwrap_or("");
-                        }
+                        let target = npm_target(path, name, &indices);
                         if let Some(target) = target {
                             edge_kinds
                                 .entry((source, target))
@@ -295,6 +335,7 @@ impl DepGraph {
             issues,
             optional_omissions,
             edge_kinds,
+            resolution_metadata: BTreeMap::new(),
         })
     }
 
@@ -379,6 +420,7 @@ impl DepGraph {
             ],
             optional_omissions: Vec::new(),
             edge_kinds: BTreeMap::new(),
+            resolution_metadata: BTreeMap::new(),
         })
     }
 }

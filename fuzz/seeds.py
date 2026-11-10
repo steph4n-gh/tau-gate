@@ -64,6 +64,13 @@ for root, label in (("package", "ordinary"), ("json5", "named-root")):
     if root == "package":
         put("tar", "repair-checksum", b"\x01" + tar_bytes)
         put("artifact", "repair-tar-and-repack", b"\x01" + tar_bytes)
+        gnu = bytearray(tar_bytes)
+        gnu[257:265] = b"ustar  \0"
+        gnu[148:156] = b" " * 8
+        checksum = sum(gnu[:512])
+        gnu[148:156] = f"{checksum:06o}\0 ".encode()
+        put("tar", "gnu-magic", bytes(gnu))
+        put("artifact", "gnu-magic", gzip.compress(gnu, mtime=0))
 
 with io.BytesIO() as stream:
     with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as archive:
@@ -77,6 +84,8 @@ with io.BytesIO() as stream:
     alias_tar = stream.getvalue()
 put("tar", "identical-dot-alias", alias_tar)
 put("artifact", "identical-dot-alias", gzip.compress(alias_tar, mtime=0))
+put("tar", "zero-manifest-nul-size", (Path(__file__).parent / "fixtures/zero-manifest-nul-size.tar").read_bytes())
+put("tar", "reference-view-fallback", (Path(__file__).parent / "fixtures/reference-view-fallback.tar").read_bytes())
 
 put("lockfiles", "npm-v3", json.dumps(lock, separators=(",", ":")).encode())
 put("lockfiles", "pnpm-v9", b"lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies: {}\nsnapshots: {}\n")

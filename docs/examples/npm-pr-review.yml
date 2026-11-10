@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   review:
@@ -16,6 +18,7 @@ jobs:
       BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
       HEAD_COMMIT: ${{ github.event.pull_request.head.sha }}
       REPOSITORY: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
       TAU_GATE_ARCHIVE_URL: ${{ vars.TAU_GATE_ARCHIVE_URL }}
       TAU_GATE_ARCHIVE_SHA256: ${{ vars.TAU_GATE_ARCHIVE_SHA256 }}
     steps:
@@ -47,23 +50,70 @@ jobs:
           tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" --no-same-owner --no-same-permissions ./tau-gate
           chmod +x "$checker"
 
-      - name: Review exact snapshots with base approvals
+      - name: Review exact snapshots and trusted maintainer comments
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           repository="$RUNNER_TEMP/npm-review-repository"
+          store="$RUNNER_TEMP/tau-gate-approvals"
+          pre="$RUNNER_TEMP/npm-review-pre"
           output="$RUNNER_TEMP/npm-review-report"
-          PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+          install -d -m 0700 "$store"
+          if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
             --repo "$repository" \
             --base "$BASE_COMMIT" \
             --head "$HEAD_COMMIT" \
             --tau-gate "$RUNNER_TEMP/tau-gate" \
-            --output "$output" > "$RUNNER_TEMP/npm-review.json"
-          result=$?
+            --approval-store "$store" \
+            --output "$pre" > "$RUNNER_TEMP/npm-review-pre.json"; then
+            result=0
+          else
+            result=$?
+          fi
+          if [ "$result" -eq 1 ] && python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("approval_request") else 1)' "$pre/report.json"; then
+            if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/github_pr_approval.py" check \
+              --report "$pre/report.json" --repository "$REPOSITORY" --pr-number "$PR_NUMBER"; then
+              lookup=0
+            else
+              lookup=$?
+            fi
+            if [ "$lookup" -eq 0 ]; then
+              subject=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["approval_request"]["subject_sha256"])' "$pre/report.json")
+              if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+                --repo "$repository" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" \
+                --tau-gate "$RUNNER_TEMP/tau-gate" --approval-store "$store" \
+                --approve-subject "$subject" --output "$RUNNER_TEMP/npm-review-approval" \
+                > "$RUNNER_TEMP/npm-review-approval.json"; then
+                recorded=0
+              else
+                recorded=$?
+              fi
+              if [ "$recorded" -eq 0 ]; then
+                if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+                  --repo "$repository" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" \
+                  --tau-gate "$RUNNER_TEMP/tau-gate" --approval-store "$store" \
+                  --output "$output" > "$RUNNER_TEMP/npm-review.json"; then
+                  result=0
+                else
+                  result=$?
+                fi
+              else
+                result=2
+              fi
+            elif [ "$lookup" -eq 2 ]; then
+              result=2
+              echo 'Trusted approval lookup failed; this check is incomplete.' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          if [ ! -d "$output" ] && [ -d "$pre" ]; then
+            mv "$pre" "$output"
+          fi
           if [ -f "$output/summary.md" ]; then
             cat "$output/summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            cat "$RUNNER_TEMP/npm-review.json"
+            cat "$RUNNER_TEMP/npm-review-pre.json"
           fi
           exit "$result"
 

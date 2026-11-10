@@ -1,0 +1,28 @@
+name: Rerun npm review after approval comment
+
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  rerun:
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default-branch helper
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Rerun the exact PR check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/github_pr_approval.py rerun \
+            --event "$GITHUB_EVENT_PATH" --repository "$GITHUB_REPOSITORY"

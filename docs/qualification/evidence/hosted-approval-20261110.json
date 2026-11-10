@@ -1,0 +1,106 @@
+{
+  "actions_pr_creation_permission_final": "read_only",
+  "approval_comment": {
+    "author": "steph4n-gh",
+    "body": "tau-gate approve 3b9fa2536383a0c8cc86942df72365deb7042457498d59a26b8d1062c10bfb38",
+    "url": "https://github.com/steph4n-gh/earthquake-lab-publication/pull/15#issuecomment-6779239202"
+  },
+  "checker_archive_sha256": "bb108bd1cb5e6d2f80849ab3e29ef5524ec1b7ea1e63417e15dd28b96ff2072e",
+  "checker_release": "v4.2.1",
+  "facts_unchanged_between_blocked_and_approved": true,
+  "limitations": [
+    "This controlled canary is not a safety judgment about a real install command.",
+    "This pilot does not measure maintainer review advantage or broad input coverage."
+  ],
+  "pilot_pr": "https://github.com/steph4n-gh/earthquake-lab-publication/pull/15",
+  "pilot_pr_author": "app/github-actions",
+  "pilot_pr_final_state": "closed_unmerged",
+  "schema_version": 1,
+  "stale_head_ordinary_ci": {
+    "conclusion": "cancelled",
+    "install_steps": "skipped",
+    "run_id": 42902007369
+  },
+  "states": [
+    {
+      "attempt": 1,
+      "base_commit": "afdfac836b09ba9f9be3a830a63868be43d787db",
+      "base_qualified_execution_records": 45,
+      "conclusion": "failure",
+      "errors": [],
+      "execution_evidence_changes": 1,
+      "exit_code": 1,
+      "head_commit": "f8faa381c7b623932d18c625ed7751146deb1ac9",
+      "head_qualified_execution_records": 45,
+      "local_evidence_dir": "/Volumes/Storage/taugate-hosted-approval-20261110/blocked",
+      "outcome": "blocked",
+      "report_sha256": "914bed6f3eb62e1760767922532ad4838b21415496333e99ddc8f5e72e51ad4c",
+      "review_unknowns": 0,
+      "run_id": 42901312332,
+      "run_url": "https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/42901312332/attempts/1",
+      "source_approval_status": "blocked",
+      "source_tree_sha256": "10ab828c4d4cc35638e7ec9a40ec4f9940c6f190d35adb1735c4923bc1dcc64d",
+      "state": "blocked",
+      "subject_sha256": "3b9fa2536383a0c8cc86942df72365deb7042457498d59a26b8d1062c10bfb38",
+      "summary_sha256": "fbf6f96fc2f707873c7c363d8ba7fb281788ad4a88f629e995c4b360b598ca2b"
+    },
+    {
+      "attempt": 2,
+      "base_commit": "afdfac836b09ba9f9be3a830a63868be43d787db",
+      "base_qualified_execution_records": 45,
+      "conclusion": "success",
+      "errors": [],
+      "execution_evidence_changes": 1,
+      "exit_code": 0,
+      "head_commit": "f8faa381c7b623932d18c625ed7751146deb1ac9",
+      "head_qualified_execution_records": 45,
+      "local_evidence_dir": "/Volumes/Storage/taugate-hosted-approval-20261110/approved",
+      "outcome": "allowed",
+      "report_sha256": "054a3d84e7274cdcf951d8c2eb0b6de21d62aed199e048662b1725f4f6c6f434",
+      "review_unknowns": 0,
+      "run_id": 42901312332,
+      "run_url": "https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/42901312332/attempts/2",
+      "source_approval_status": "allowed",
+      "source_tree_sha256": "10ab828c4d4cc35638e7ec9a40ec4f9940c6f190d35adb1735c4923bc1dcc64d",
+      "state": "approved",
+      "subject_sha256": "3b9fa2536383a0c8cc86942df72365deb7042457498d59a26b8d1062c10bfb38",
+      "summary_sha256": "c002dc83c037a49f9e0552816146f6ed67838352b1540511380ad1c225f31138"
+    },
+    {
+      "attempt": 1,
+      "base_commit": "afdfac836b09ba9f9be3a830a63868be43d787db",
+      "base_qualified_execution_records": 45,
+      "conclusion": "failure",
+      "errors": [],
+      "execution_evidence_changes": 1,
+      "exit_code": 1,
+      "head_commit": "c7e2e255cfbe8ac162316f1d0e1bdd188d64c4ea",
+      "head_qualified_execution_records": 45,
+      "local_evidence_dir": "/Volumes/Storage/taugate-hosted-approval-20261110/stale",
+      "outcome": "blocked",
+      "report_sha256": "50a1f4b8775860ad91984d63dabd75b4e60b4530ede61c5e3814667d46baad3f",
+      "review_unknowns": 0,
+      "run_id": 42902002897,
+      "run_url": "https://github.com/steph4n-gh/earthquake-lab-publication/actions/runs/42902002897/attempts/1",
+      "source_approval_status": "blocked",
+      "source_tree_sha256": "02a685c3c78ce3107d76c77e1f9e8502e0e2f16ca13c4ca1e0c650c609a5dadd",
+      "state": "stale",
+      "subject_sha256": "e27ddf50b47bcde04c8dff686d9b70e4470538d15d44474807937cfdefac2cb7",
+      "summary_sha256": "0b49b4926edfa8b58a9c15f7ea754855947502a681ec6e5f08a7722af2f9180c"
+    }
+  ],
+  "temporary_branches_deleted": [
+    "pilot/tau-gate-approval-base",
+    "pilot/tau-gate-approval-canary",
+    "pilot/tau-gate-approval-launcher",
+    "pilot/tau-gate-source-policy"
+  ],
+  "trusted_base_merge_commit": "afdfac836b09ba9f9be3a830a63868be43d787db",
+  "trusted_base_pr": "https://github.com/steph4n-gh/earthquake-lab-publication/pull/16",
+  "trusted_tool_sha256": {
+    "github_pr_approval_sha256": "2ded113d6a196bfea2f58e94dd5083d7db059830da1f083c243e26b9ca73881d",
+    "npm_evidence_sha256": "bde2373b1f8922a68f419db57667ff249571466caab52c2de416de0668610dce",
+    "pr_review_sha256": "2bb87bf7e2acd0b425d6ca7cadaea96b33df79eefb5bb559cd879bd0de8e0b4a",
+    "tau_gate_sha256": "95e2a5b2b8ef277c08c9157bb3bac716f5112eca7bffa921917be51b9a5a3675"
+  }
+}

@@ -67,6 +67,61 @@ class OracleTests(unittest.TestCase):
             facts, _ = self.snapshot(missing=missing)
             self.assertEqual(oracle.events(facts, facts), [])
 
+    def test_bundled_child_facts_come_from_parent_archive(self):
+        child = {"name": "child", "version": "1", "scripts": {"install": "echo child"}}
+        parent = {"name": "pkg", "version": "1.0.0", "dependencies": {"child": "1"},
+                  "bundleDependencies": ["child"]}
+        _, directory = self.snapshot(manifest=parent, extra=[("package/node_modules/child/package.json", encoded(child))])
+        lock_path = directory / "package-lock.json"
+        index_path = directory / "index.json"
+        lock = json.loads(lock_path.read_text())
+        lock["packages"]["node_modules/pkg/node_modules/child"] = {
+            "version": "1", "inBundle": True, "hasInstallScript": True}
+        lock_path.write_bytes(encoded(lock))
+        index = json.loads(index_path.read_text())
+        index["lock_sha256"] = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        index_path.write_bytes(encoded(index))
+        facts = oracle.snapshot_facts(lock_path, index_path, directory / "package.json")
+        self.assertEqual(facts["status"], "complete")
+        bundled = facts["packages"]["node_modules/pkg/node_modules/child"]
+        self.assertEqual(bundled["scripts"]["install"], "echo child")
+        self.assertEqual(bundled["artifact_sha512"], facts["packages"]["node_modules/pkg"]["artifact_sha512"])
+        self.assertEqual(bundled["bundle_parent"], "node_modules/pkg")
+        lock["packages"]["node_modules/pkg/node_modules/child"]["version"] = "2"
+        lock_path.write_bytes(encoded(lock))
+        index["lock_sha256"] = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        index_path.write_bytes(encoded(index))
+        facts = oracle.snapshot_facts(lock_path, index_path, directory / "package.json")
+        self.assertEqual(facts["packages"]["node_modules/pkg/node_modules/child"]["status"], "unknown")
+        for fields in ({"dependencies": {"child": "1"}},
+                       {"dependencies": {"child": "1"}, "bundleDependencies": ["other"]},
+                       {"bundleDependencies": ["child"]}):
+            _, negative = self.snapshot(
+                manifest={"name": "pkg", "version": "1.0.0", **fields},
+                extra=[("package/node_modules/child/package.json", encoded(child))])
+            negative_lock = negative / "package-lock.json"
+            negative_index = negative / "index.json"
+            negative_data = json.loads(negative_lock.read_text())
+            negative_data["packages"]["node_modules/pkg/node_modules/child"] = {
+                "version": "1", "inBundle": True, "hasInstallScript": True}
+            negative_lock.write_bytes(encoded(negative_data))
+            negative_index_data = json.loads(negative_index.read_text())
+            negative_index_data["lock_sha256"] = hashlib.sha256(negative_lock.read_bytes()).hexdigest()
+            negative_index.write_bytes(encoded(negative_index_data))
+            negative_facts = oracle.snapshot_facts(negative_lock, negative_index, negative / "package.json")
+            self.assertEqual(negative_facts["packages"]["node_modules/pkg/node_modules/child"]["status"], "unknown")
+            self.assertIn("direct declared", negative_facts["packages"]["node_modules/pkg/node_modules/child"]["reason"])
+
+    def test_dot_alias_needs_identical_regular_partner(self):
+        manifest = {"name": "pkg", "version": "1.0.0"}
+        for entries, expected in [
+            ([("package/./file", b"same"), ("package/file", b"same")], "known"),
+            ([("package/./file", b"same")], "unknown"),
+            ([("package/./file", b"left"), ("package/file", b"right")], "unknown"),
+        ]:
+            facts, _ = self.snapshot(manifest, extra=entries)
+            self.assertEqual(facts["packages"]["node_modules/pkg"]["status"], expected)
+
     def test_hook_changes_have_execution_obligation(self):
         before, _ = self.snapshot({"name": "pkg", "version": "1.0.0", "scripts": {"install": "old", "postinstall": "remove"}})
         after, _ = self.snapshot({"name": "pkg", "version": "1.0.0", "scripts": {"install": "new", "preinstall": "add"}})
@@ -230,11 +285,26 @@ class OracleTests(unittest.TestCase):
 
     def test_resource_limits_and_deep_json_become_unknown(self):
         facts, directory = self.snapshot(extra=[("package/huge", b"x" * 30000)])
-        with patch.object(oracle, "MAX_FILE", 20000):
+        with patch.object(oracle, "MAX_EXPANDED", 20000):
             facts = oracle.snapshot_facts(directory / "package-lock.json", directory / "index.json")
         self.assertIn("expanded limit", facts["packages"]["node_modules/pkg"]["reason"])
         with self.assertRaises(oracle.OracleError):
             oracle._json(b"[" * 129 + b"0" + b"]" * 129)
+
+    def test_large_archive_profile_retains_full_stream_validation(self):
+        data = (Path(__file__).parent / "fixtures/archive/large-nonlifecycle.tgz").read_bytes()
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode()
+        manifest, binding, _, _ = oracle._archive(data, integrity)
+        self.assertEqual(json.loads(manifest)["name"], "large")
+        self.assertIsNone(binding)
+        with patch.object(oracle, "MAX_EXPANDED", 64 * 1024 * 1024):
+            with self.assertRaisesRegex(oracle.OracleError, "expanded limit"):
+                oracle._archive(data, integrity)
+        corrupt = bytearray(data)
+        corrupt[-8] ^= 1
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(corrupt).digest()).decode()
+        with self.assertRaises(oracle.OracleError):
+            oracle._archive(corrupt, integrity)
 
     def test_duplicate_json_and_locator_paths_are_unknown(self):
         _, directory = self.snapshot()

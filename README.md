@@ -2,9 +2,9 @@
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15795/badge)](https://www.bestpractices.dev/projects/15795)
 
-Tau-Gate reviews frozen **npm v3, pnpm v9 and Yarn Classic v1 lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
+Tau-Gate reviews frozen **npm v1/v2/v3, pnpm v6/v9, Yarn Classic v1 and Yarn Berry lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-The latest published release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). See [installation](docs/setup.md) for the verified Debian 12 x86_64 archive and source-build instructions.
+The latest stable release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). This source tree builds v4.3.0-beta.1, which packages the npm v3 PR reviewer and its trusted workflow examples. See [installation](docs/setup.md) for Debian 12 x86_64 archives and source-build instructions.
 
 A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.2 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
@@ -26,24 +26,35 @@ For a project with an existing npm lockfile:
 
 Capture base/head lockfiles and their root manifests from the revisions you intend to review. Providing both manifests also detects root lifecycle script body changes; omitting manifests is explicitly a format-specific `*_lock_snapshot_only` scope. Reports contain SHA-256 hashes of every consumed lockfile and manifest, full package identities, dependency edge kinds, declared execution candidates and shortest introducer paths. Changed packages also show their before/after introducing paths. JSON output is deterministic for the same bytes and options.
 
-Audit is read-only: it never resolves, installs, deletes inputs or writes logs. `--dry-run` remains a compatibility alias. Missing inputs, malformed data, manifest disagreement, unresolved required dependencies and unqualified formats produce an incomplete report and exit 2. Network resolution and the old daemon are retired. Bun, Go, Cargo CLI and Yarn Berry are unsupported. Cargo metadata parsing remains an incomplete library preview. Multiple detected lockfiles require an explicit --lock.
+Audit is read-only: it never resolves, installs, deletes inputs or writes logs. `--dry-run` remains a compatibility alias. Missing inputs, malformed data, manifest disagreement, unresolved required dependencies and unqualified formats produce an incomplete report and exit 2. Network resolution and the old daemon are retired. Bun, Go and Cargo CLI are unsupported. Yarn Berry metadata versions 6, 8 and 10 are supported within the emitted subset documented below. Cargo metadata parsing remains an incomplete library preview. Multiple detected lockfiles require an explicit --lock.
 
-## pnpm and Yarn coverage
+## Lockfile coverage
 
 | Format | Identity and supported topology | Execution metadata |
 | --- | --- | --- |
+| npm v1 | Recursive installed hierarchy and exact nearest targets; supplied manifest gives root edges; transitive `requires` kinds remain unknown | Unqualified |
+| npm v2 | Authoritative `packages` instances, nearest targets and local links | Unqualified |
 | npm v3 | Installed lockfile instances, nearest node_modules targets, workspace links | Original archive and source-snapshot evidence when supplied; otherwise advisory markers |
-| pnpm v9 | Namespaced environment/project documents, importer/workspace links, exact snapshot versions, aliases, peer/patch contexts and observed resolution metadata | Transitive scripts unknown; positive build markers retained |
-| Yarn Classic v1 | Exact descriptor groups, aliases, version/resolved/integrity and dependency/optional maps; supplied root manifest gives root edges | Transitive scripts unknown |
+| pnpm v6/v9 | Namespaced environment/project documents, importer/workspace links, exact snapshot versions, aliases, peer/patch contexts and observed resolution metadata | Transitive scripts unknown; positive build markers retained |
+| Yarn Classic v1 | Exact descriptor groups, aliases, version/resolved/integrity and dependency/optional maps; supplied manifests give root/workspace/local-link edges | Transitive scripts unknown |
+| Yarn Berry | Exact grouped descriptors and resolution locators, source-derived workspace kinds, aliases, optional maps, patches and peer constraints; cache checksums kept separate from npm SRI | Transitive scripts and installed peer placement unknown |
 
-pnpm/Yarn snapshots are resolution records, not an installed node_modules tree; `installed_path` is null. Yarn root attribution is incomplete without a manifest, and workspace manifests/peer placement are not inferred. Classic records with rarer unsupported fields (including permissions/prebuiltVariants/uid/registry) are rejected visibly. See [supported contract](docs/review.md).
+pnpm/Yarn snapshots are resolution records; `installed_path` is null. Explicit source context supplies workspace manifests and manager configuration. Peer constraints are retained without guessing installed peer placement. Classic supports the observed `uid` field; rarer unrecognized fields remain visibly unsupported. See the [supported contract](docs/review.md) and [frozen 200-project parser replay](docs/parser-coverage.md).
+
+For workspace links, source catalogs, or override rules, supply a project-input index:
+
+```json
+{"schema_version":1,"files":[{"path":"package.json","file":"files/root.json"},{"path":"pnpm-workspace.yaml","file":"files/workspace.yaml"},{"path":"packages/child/package.json","file":"files/child.json"}]}
+```
+
+Pass `--project-inputs index.json` to audit, or `--base-project-inputs` / `--head-project-inputs` to review. Logical paths are project-relative; file locators are relative to the index directory. Files must be regular, confined paths without symlinks or parent traversal. The report hashes every supplied source file and the index. The core reads only these explicit files and never discovers or downloads missing workspace context. Source inputs provide resolution context; execution qualification still requires the separate npm v3 evidence bundle.
 
 ```sh
 ./target/release/tau-gate review --base base-pnpm.yaml --head head-pnpm.yaml --json
 ./target/release/tau-gate audit --lock yarn.lock --manifest package.json --json
 ```
 
-These emit useful graphs/diffs but **exit 2** because dependency execution metadata is unknown, including with --enforce. A topology-complete pnpm/Yarn report explicitly contains:
+Legacy npm, pnpm and Yarn emit useful graphs/diffs but **exit 2** because dependency execution metadata is unknown, including with --enforce. A topology-complete pnpm/Yarn report explicitly contains:
 
 ```json
 {"status":"incomplete","topology_status":"complete","execution_metadata_status":"unknown_transitive_scripts"}
@@ -91,13 +102,19 @@ The separate [PR helper](docs/pr-review.md) captures lockfiles, source manifests
 
 The helper writes deterministic `report.json` and `summary.md` into an explicit output directory outside the repository. It preserves allowed, blocked, and incomplete outcomes. [The CI example](docs/examples/npm-pr-review.yml) uses read-only permissions and trusted base tools. It requires a supplied checker binary with a pinned hash and a trusted workflow configuration. It is an example for npm applications, not an active npm job in this Rust repository.
 
+The beta helper presents exact qualified command text, typed dependency routes, package-specific evidence gaps, and next actions. It supports a single trusted approval action through an external store or a [GitHub maintainer comment](docs/pr-review.md#use-a-github-maintainer-comment-as-the-approval-record). An [owned hosted pilot](docs/qualification/product-pr-review.md#hosted-approval-pilot) verified blocked, approved, and stale-head-blocked states. The supported beta path is an npm v3 PR with original SHA512-bound package archives and portable source paths; missing or unsupported evidence stays incomplete. The [frozen product decision](docs/qualification/product-release-decision-20261110.md) preserves the failed broad-coverage gates, and the outside-maintainer study remains unrun.
+
 ## Topology and native interface
 
-The sparse solver returns a bounded **Rayleigh estimate**, residual, convergence flag and iteration count. Residual convergence does not certify the second eigenpair. A disconnected graph's zero connectivity is handled exactly. Topology cannot distinguish benign and malicious code with the same dependency shape and is never used to hide execution candidates or certify safety.
+The sparse solver uses bounded, diagonally preconditioned block iteration and returns a **Rayleigh estimate**, residual, convergence flag and iteration count. Residual convergence does not certify the second eigenpair. A disconnected graph's zero connectivity is handled exactly. Topology cannot distinguish benign and malicious code with the same dependency shape and is never used to hide execution candidates or certify safety. The [original math evaluation](docs/math-evaluation.md) records the solver repair. The [expanded comparison across all 152 lockfiles](docs/math-evaluation-152.md) tests structural grouping and historical review facts against basic graph methods. The [cut-selection improvement](docs/math-cut-improvement.md) replaces largest-gap rounding with a ratio-cut sweep. The [remaining-loss study](docs/math-remaining-losses.md) adds four fixed projections of the existing Ritz search directions and a separately reported conductance alternative. The [fresh-repository study](docs/math-fresh-validation.md) combines spectral and exact bridge cuts, reports their origins separately, and tests the frozen candidate on 200 new repository identities.
 
 The C ABI is documented in [include/tau_gate.h](include/tau_gate.h). NULL names and invalid endpoints/counts are rejected; a NULL edge pointer is accepted for zero edges. Result ownership is explicit. The existing four-field result prefix and appended diagnostics are retained. v4.1 does not change this interface or the solver. Valid pointers remain the caller's responsibility. The former index-based daemon pruning policy is retired; no TSP/MLX workload benefit is claimed or validated by these tests.
 
 ## Validation and scope
+
+The [npm v3 comparison scorecard](docs/qualification/npm3-sprint-scorecard.md) records the exact-evidence approval addition against strict current native controls, alongside the failed 80% completed-review gate: 13 of 30 real update pairs completed.
+
+The [archive and byte-reporting repair](docs/qualification/npm3-archive-repair.md) reruns those same 30 pairs five times: 22 complete, all 4,311 assessable events reported, and existing qualified fingerprints unchanged. The remaining eight incomplete pairs keep the 80% completion gate unmet.
 
 ```sh
 cargo test --release --offline --all-targets

@@ -6,6 +6,25 @@ The archive target includes the production `src/artifact.rs` verbatim so that
 private gzip, DEFLATE, tar, and artifact functions are exercised without a
 new production API.
 
+The tar target borrows normal inputs. Its checksum-repair mode reuses one
+64 KiB scratch buffer per thread, replaces its contents for every input, and
+runs the same production inspector and independent reference on current bytes.
+A corrupt-checksum control verifies that the eight-byte USTAR magic/version
+actually reaches checksum repair; invalid magic remains rejected.
+The tar reference view normalizes only blank USTAR size fields on a copy after
+the production inspector accepts the original archive. Python tarfile, system
+tar, and npm's tar reader accept that zero-size spelling, while the Rust tar
+reference rejects it. Original archive bytes and all production evidence stay
+unchanged. An invalid octal size remains a rejection control.
+Checksum repair recognizes the exact POSIX and GNU USTAR header spellings that
+the production inspector accepts. A generated GNU seed checks the independent
+tar reader against the production facts.
+The optional reference view and the reference manifest use separate bounded
+scratch buffers across inputs. If the optional view cannot parse a tar field,
+the reference reader still sees the original bytes. A saved fuzz input checks
+that fallback. The independent tar reader still runs on every archive accepted
+by the production inspector.
+
 The eight targets cover JSON and digests, gzip, raw DEFLATE, tar, full artifact
 integrity, npm/pnpm/Yarn/config parsing, bounded valid FFI callers, and
 evidence/approval review. Accepted JSON values are checked against serde_json;
@@ -48,3 +67,15 @@ clean campaign is evidence about exercised inputs, not a proof of parser or
 archive correctness. The fixed snapshot work limits also have exact boundary,
 repeated-work, and failed-inspection tests in the production suite; ordinary
 mutation capped at 64 KiB cannot reach the multi-GiB limits.
+
+For a separately labelled bounded-process operational campaign, run
+`python3 tools/fuzz_bounded_campaign.py --binary /absolute/path/to/asan/target --seeds /absolute/path/to/seeds --output /absolute/path/to/new-output`.
+It schedules twelve five-second windows with the same 64 KiB input limit,
+two-second input timeout, 512 MiB process cap and default ASan quarantine.
+Each child reads the evolving saved corpus. A child failure stops the campaign
+and retains its artifacts; an exit without recorded mutation work is a failure.
+Fresh processes reset allocator retention, mutation history and unsaved
+dictionaries. Scheduled time includes process startup and corpus replay.
+This profile does not qualify a continuous sixty-second process or temporal
+behavior across child boundaries. Preserve continuous-process failures as
+separate results.

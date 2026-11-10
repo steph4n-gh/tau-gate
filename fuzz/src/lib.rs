@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::io::{Read, Write};
 
@@ -10,7 +11,8 @@ use tau_gate::{
     review::Snapshot,
 };
 
-pub use tau_gate::digest;
+#[path = "../../src/digest.rs"]
+pub mod digest;
 
 #[allow(dead_code)]
 mod archive {
@@ -18,24 +20,41 @@ mod archive {
 
     pub(super) fn gzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
         let mut out = Vec::new();
-        gunzip(bytes, &mut out, &mut Budget::new())?;
+        gunzip_stream(
+            bytes,
+            &mut |chunk, _| {
+                out.extend_from_slice(chunk);
+                Ok(())
+            },
+            &mut Budget::new(),
+        )?;
         Ok(out)
     }
     pub(super) fn deflate(bytes: &[u8]) -> Result<Vec<u8>, String> {
         let mut out = Vec::new();
-        inflate(bytes, &mut out, &mut Budget::new())?;
+        inflate_stream(
+            bytes,
+            &mut |chunk, _| {
+                out.extend_from_slice(chunk);
+                Ok(())
+            },
+            &mut Budget::new(),
+        )?;
         Ok(out)
     }
-    pub(super) fn tar(bytes: &[u8]) -> Result<(Vec<u8>, Option<String>), String> {
-        inspect_tar(bytes, &mut Budget::new())
+    pub(super) fn tar(bytes: &[u8]) -> Result<(Vec<u8>, Option<String>), &'static str> {
+        let mut tar = TarInspector::with_capture(&BTreeSet::new());
+        tar.write(bytes, &mut Budget::new())?;
+        tar.finish()
+            .map(|contents| (contents.manifest, contents.binding_gyp_sha256))
     }
     pub(super) fn artifact(bytes: &[u8], sri: &str) -> Result<Artifact, String> {
-        inspect(bytes, sri, &mut Vec::new(), &mut Budget::new())
+        inspect_verified_nested(verify(bytes, sri)?, &mut Budget::new(), &BTreeSet::new())
     }
 }
 
 const INPUT: usize = 64 * 1024;
-const OUTPUT: usize = 64 * 1024 * 1024;
+const OUTPUT: usize = 128 * 1024 * 1024;
 
 fn hex_digest(bytes: impl IntoIterator<Item = u8>) -> String {
     let mut hex = String::new();
@@ -123,50 +142,124 @@ pub fn deflate(data: &[u8]) {
     }
 }
 
-fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
-    let mut reader = tar::Archive::new(data);
-    let mut manifest = None;
-    let mut binding = None;
-    for entry in reader.entries().ok()? {
-        let mut entry = entry.ok()?;
-        let path = entry.path().ok()?.to_string_lossy().to_string();
-        let relative = path.split_once('/').map(|(_, relative)| relative);
-        if relative == Some("package.json") {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).ok()?;
-            manifest = Some(bytes);
-        } else if relative == Some("binding.gyp") {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).ok()?;
-            binding = Some(hex_digest(Sha256::digest(&bytes)));
+fn reference_tar_view(data: &[u8], normalized: &mut Vec<u8>) -> Option<bool> {
+    normalized.clear();
+    let mut copied = false;
+    let mut offset = 0usize;
+    while offset.checked_add(512)? <= data.len() {
+        let header = &data[offset..offset + 512];
+        if header.iter().all(|byte| *byte == 0) {
+            break;
         }
+        let field = &header[124..136];
+        let blank = field.iter().all(|byte| matches!(byte, 0 | b' '));
+        let size = if blank {
+            if &header[257..265] != b"ustar\x0000" && &header[257..265] != b"ustar  \0" {
+                return None;
+            }
+            if !copied {
+                normalized.extend_from_slice(data);
+                copied = true;
+            }
+            let repaired = &mut normalized[offset..offset + 512];
+            repaired[124..136].copy_from_slice(b"00000000000\0");
+            repaired[148..156].fill(b' ');
+            let checksum: usize = repaired.iter().map(|byte| *byte as usize).sum();
+            repaired[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
+            0
+        } else {
+            let end = field
+                .iter()
+                .position(|byte| *byte == 0 || *byte == b' ')
+                .unwrap_or(field.len());
+            usize::from_str_radix(std::str::from_utf8(&field[..end]).ok()?, 8).ok()?
+        };
+        offset = offset
+            .checked_add(512)?
+            .checked_add(size.checked_add(511)? / 512 * 512)?;
     }
-    Some((manifest?, binding))
+    Some(copied)
 }
 
-fn repaired_tar(data: &[u8]) -> Vec<u8> {
-    let mut bytes = data.to_vec();
+thread_local! {
+    static TAR_REFERENCE_VIEW: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(INPUT));
+    static TAR_REFERENCE_MANIFEST: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(INPUT));
+}
+
+fn external_tar_into(data: &[u8], manifest: &mut Vec<u8>) -> Option<Option<String>> {
+    manifest.clear();
+    TAR_REFERENCE_VIEW.with_borrow_mut(|view| {
+        let copied = reference_tar_view(data, view).unwrap_or(false);
+        let mut reader = tar::Archive::new(if copied { view.as_slice() } else { data });
+        let mut found_manifest = false;
+        let mut binding = None;
+        for entry in reader.entries().ok()? {
+            let mut entry = entry.ok()?;
+            let path = entry.path_bytes();
+            let relative = path.iter().position(|byte| *byte == b'/').map(|i| &path[i + 1..]);
+            if relative == Some(b"package.json".as_slice()) {
+                manifest.clear();
+                entry.read_to_end(manifest).ok()?;
+                found_manifest = true;
+            } else if relative == Some(b"binding.gyp".as_slice()) {
+                let mut digest = Sha256::new();
+                let mut chunk = [0; 4096];
+                loop {
+                    let count = entry.read(&mut chunk).ok()?;
+                    if count == 0 {
+                        break;
+                    }
+                    digest.update(&chunk[..count]);
+                }
+                binding = Some(hex_digest(digest.finalize()));
+            }
+        }
+        found_manifest.then_some(binding)
+    })
+}
+
+fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
+    let mut manifest = Vec::new();
+    let binding = external_tar_into(data, &mut manifest)?;
+    Some((manifest, binding))
+}
+
+fn repaired_tar(data: &[u8], bytes: &mut Vec<u8>) {
+    bytes.clear();
+    bytes.extend_from_slice(data);
     for header in bytes.chunks_exact_mut(512) {
-        if &header[257..265] == b"ustar\0\0" {
+        if &header[257..265] == b"ustar\x0000" || &header[257..265] == b"ustar  \0" {
             header[148..156].fill(b' ');
             let checksum: usize = header.iter().map(|b| *b as usize).sum();
             header[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
         }
     }
-    bytes
+}
+
+thread_local! {
+    static TAR_REPAIR: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(INPUT));
 }
 
 pub fn tar(data: &[u8]) {
     if data.len() > INPUT {
         return;
     }
-    let bytes = if data.first() == Some(&1) {
-        repaired_tar(&data[1..])
-    } else {
-        data.to_vec()
+    let check = |bytes: &[u8]| {
+        if let Ok(actual) = archive::tar(bytes) {
+            TAR_REFERENCE_MANIFEST.with_borrow_mut(|manifest| {
+                let reference = external_tar_into(bytes, manifest)
+                    .map(|binding| (manifest.as_slice(), binding));
+                assert_eq!(Some((actual.0.as_slice(), actual.1)), reference);
+            });
+        }
     };
-    if let Ok(actual) = archive::tar(&bytes) {
-        assert_eq!(Some(actual), external_tar(&bytes));
+    if data.first() == Some(&1) {
+        TAR_REPAIR.with_borrow_mut(|bytes| {
+            repaired_tar(&data[1..], bytes);
+            check(bytes);
+        });
+    } else {
+        check(data);
     }
 }
 
@@ -176,7 +269,9 @@ pub fn artifact(data: &[u8]) {
     }
     let bytes = if data.first() == Some(&1) {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&repaired_tar(&data[1..])).unwrap();
+        let mut repaired = Vec::new();
+        repaired_tar(&data[1..], &mut repaired);
+        encoder.write_all(&repaired).unwrap();
         encoder.finish().unwrap()
     } else {
         data.to_vec()
@@ -323,6 +418,104 @@ pub fn review(data: &[u8]) {
 #[cfg(test)]
 mod seed_checks {
     use super::*;
+
+    #[test]
+    fn checksum_repair_restores_corrupted_ustar_and_keeps_invalid_magic_rejected() {
+        let valid = std::fs::read("corpus/tar/ordinary").unwrap();
+        let expected = archive::tar(&valid).unwrap();
+        let mut corrupt = valid.clone();
+        corrupt[148] = if corrupt[148] == b'0' { b'1' } else { b'0' };
+        assert!(archive::tar(&corrupt).is_err());
+        let mut repaired = Vec::new();
+        repaired_tar(&corrupt, &mut repaired);
+        assert_eq!(archive::tar(&repaired).unwrap(), expected);
+        assert_eq!(repaired, valid);
+        let mut prefixed = vec![1];
+        prefixed.extend_from_slice(&corrupt);
+        tar(&prefixed);
+        TAR_REPAIR.with_borrow(|bytes| assert_eq!(archive::tar(bytes).unwrap(), expected));
+        let mut invalid = corrupt;
+        invalid[257] = b'x';
+        repaired_tar(&invalid, &mut repaired);
+        assert_eq!(repaired, invalid);
+        assert!(archive::tar(&repaired).is_err());
+    }
+
+    #[test]
+    fn tar_repair_reuse_scans_only_the_current_bounded_input() {
+        let valid = std::fs::read("corpus/tar/ordinary").unwrap();
+        let expected = archive::tar(&valid).unwrap();
+        let mut repair = vec![1];
+        repair.extend_from_slice(&valid);
+        for input in [repair.as_slice(), b"\x01bad", &[1], repair.as_slice()] {
+            tar(input);
+            TAR_REPAIR.with_borrow(|bytes| {
+                assert_eq!(bytes.len(), input.len() - 1);
+                assert!(bytes.capacity() <= INPUT);
+                if input.len() == repair.len() {
+                    assert_eq!(archive::tar(bytes).unwrap(), expected);
+                } else {
+                    assert_eq!(bytes, &input[1..]);
+                    assert!(archive::tar(bytes).is_err());
+                }
+            });
+            tar(&valid);
+            tar(b"bad");
+        }
+        let mut largest = vec![0; INPUT];
+        largest[0] = 1;
+        tar(&largest);
+        TAR_REPAIR.with_borrow(|bytes| {
+            assert_eq!(bytes.len(), INPUT - 1);
+            assert!(bytes.capacity() <= INPUT);
+            assert!(archive::tar(bytes).is_err());
+        });
+        tar(&repair);
+        TAR_REPAIR.with_borrow(|bytes| assert_eq!(archive::tar(bytes).unwrap(), expected));
+    }
+
+    #[test]
+    fn blank_ustar_size_reference_matches_core_but_invalid_octal_rejects() {
+        let mut bytes = include_bytes!("../fixtures/zero-manifest-nul-size.tar").to_vec();
+        assert_eq!(archive::tar(&bytes).unwrap().0, b"");
+        assert_eq!(external_tar(&bytes).unwrap().0, b"");
+        tar(&bytes);
+        for fill in [b' ', 0] {
+            bytes[124..136].fill(fill);
+            let mut repaired = Vec::new();
+            repaired_tar(&bytes, &mut repaired);
+            bytes = repaired;
+            assert_eq!(external_tar(&bytes).unwrap().0, b"");
+        }
+        bytes[124] = b'8';
+        let mut repaired = Vec::new();
+        repaired_tar(&bytes, &mut repaired);
+        assert!(archive::tar(&repaired).is_err());
+        assert!(external_tar(&repaired).is_none());
+    }
+
+    #[test]
+    fn gnu_ustar_seed_matches_core_and_reference() {
+        let bytes = std::fs::read("corpus/tar/gnu-magic").unwrap();
+        assert_eq!(Some(archive::tar(&bytes).unwrap()), external_tar(&bytes));
+        tar(&bytes);
+        let mut corrupt = bytes.clone();
+        corrupt[148] ^= 1;
+        assert!(archive::tar(&corrupt).is_err());
+        let mut repaired = Vec::new();
+        repaired_tar(&corrupt, &mut repaired);
+        assert_eq!(archive::tar(&repaired), archive::tar(&bytes));
+        tar(&repaired);
+    }
+
+    #[test]
+    fn reference_normalization_failure_uses_the_original_archive() {
+        let input = include_bytes!("../fixtures/reference-view-fallback.tar");
+        let mut repaired = Vec::new();
+        repaired_tar(&input[1..], &mut repaired);
+        assert_eq!(Some(archive::tar(&repaired).unwrap()), external_tar(&repaired));
+        tar(input);
+    }
 
     #[test]
     fn digest_bytes_have_stable_lowercase_hex() {
