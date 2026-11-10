@@ -683,6 +683,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn verified_bytes_survive_current_content_budget_failure_but_not_subsequent_reads() {
+        let root =
+            std::env::temp_dir().join(format!("tau-current-byte-budget-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let bytes = include_bytes!("../tests/fixtures/archive/large-nonlifecycle.tgz");
+        fs::write(root.join("pkg.tgz"), bytes).unwrap();
+        let record = parse(br#"{"version":"1","resolved":"https://registry.npmjs.org/large/-/large-1.tgz","integrity":"sha512-2YOZUZnWe3iTo0e7YE4YDKgpjH5xdeCUAegxELEtteXQF+AxiUhr6Aht/0j53bledir/8AYdOuLAeCiUj6Pegg=="}"#).unwrap();
+        let entry = parse(br#"{"artifact":"pkg.tgz"}"#).unwrap();
+        for (expanded, headers, reason) in [
+            (1, 250_000, "expanded evidence"),
+            (128 * 1024 * 1024, 1, "tar processing"),
+        ] {
+            let mut work = Work {
+                compressed: Vec::new(),
+                budget: artifact::Budget::with_work_limits(expanded, headers),
+            };
+            let current = read_facts(
+                &root,
+                "node_modules/large",
+                &record,
+                &entry,
+                None,
+                &mut work,
+            );
+            assert!(current.facts.unwrap_err().contains(reason));
+            assert_eq!(
+                current.verified_artifact_sha512,
+                Some(crate::digest::sha512(bytes))
+            );
+            let subsequent = read_facts(
+                &root,
+                "node_modules/large",
+                &record,
+                &entry,
+                None,
+                &mut work,
+            );
+            assert!(subsequent.facts.unwrap_err().contains(reason));
+            assert!(subsequent.verified_artifact_sha512.is_none());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn repeated_regular_reads_recover_after_size_and_file_errors() {
         let root = std::env::temp_dir().join(format!(
             "tau-gate-regular-read-{}-{}",

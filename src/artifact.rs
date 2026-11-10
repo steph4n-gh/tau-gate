@@ -30,6 +30,15 @@ impl Budget {
         self.exhausted.map_or(Ok(()), |reason| Err(reason.into()))
     }
 
+    #[cfg(test)]
+    pub(crate) fn with_work_limits(expanded_remaining: u64, entries_remaining: u64) -> Self {
+        Self {
+            expanded_remaining,
+            entries_remaining,
+            ..Self::new()
+        }
+    }
+
     pub(crate) fn read(&mut self, count: usize) -> Result<(), String> {
         self.check()?;
         let result = Self::charge(

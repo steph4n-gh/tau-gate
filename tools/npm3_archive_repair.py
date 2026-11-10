@@ -40,6 +40,7 @@ def summarize(args):
     assert profile["acquisition_sha256"] == q.digest(q.read(original / "acquisition.json"))
     assert profile["original_labels_sha256"] == q.digest(q.read(original / "labels.json"))
     labels = {case["id"]: case for case in q.load(output / "labels.json")["cases"]}
+    original_labels = {case["id"]: case for case in q.load(original / "labels.json")["cases"]}
     compatibility = collections.Counter()
     old_events, old_matches, old_misses, old_mismatches = 0, 0, 0, 0
     remaining = collections.Counter()
@@ -47,7 +48,9 @@ def summarize(args):
     for pair in selection["pairs"]:
         case = pair["id"]
         facts = pairs.verified_labels(output, pair, labels[case])
-        old_facts = {side: q.load(original / "labels" / case / (side + ".json")) for side in ("base", "head")}
+        old_facts = pairs.verified_labels(original, pair, original_labels[case])
+        for side in ("base", "head"):
+            assert labels[case]["inputs"][side]["hashes"] == original_labels[case]["inputs"][side]["hashes"], (case, side)
         before = q.load(original / "replay/round-1" / case / "stdout.bin")
         after = q.load(output / "replay/round-1" / case / "stdout.bin")
         _, score = q.score_case(old_facts, after)
