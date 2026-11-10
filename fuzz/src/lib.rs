@@ -141,8 +141,44 @@ pub fn deflate(data: &[u8]) {
     }
 }
 
+fn reference_tar_view(data: &[u8]) -> Option<Vec<u8>> {
+    let mut normalized = None;
+    let mut offset = 0usize;
+    while offset.checked_add(512)? <= data.len() {
+        let header = &data[offset..offset + 512];
+        if header.iter().all(|byte| *byte == 0) {
+            break;
+        }
+        let field = &header[124..136];
+        let blank = field.iter().all(|byte| matches!(byte, 0 | b' '));
+        let size = if blank {
+            if &header[257..265] != b"ustar\x0000" {
+                return None;
+            }
+            let view = normalized.get_or_insert_with(|| data.to_vec());
+            let repaired = &mut view[offset..offset + 512];
+            repaired[124..136].copy_from_slice(b"00000000000\0");
+            repaired[148..156].fill(b' ');
+            let checksum: usize = repaired.iter().map(|byte| *byte as usize).sum();
+            repaired[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
+            0
+        } else {
+            let end = field
+                .iter()
+                .position(|byte| *byte == 0 || *byte == b' ')
+                .unwrap_or(field.len());
+            usize::from_str_radix(std::str::from_utf8(&field[..end]).ok()?, 8).ok()?
+        };
+        offset = offset
+            .checked_add(512)?
+            .checked_add(size.checked_add(511)? / 512 * 512)?;
+    }
+    normalized
+}
+
 fn external_tar(data: &[u8]) -> Option<(Vec<u8>, Option<String>)> {
-    let mut reader = tar::Archive::new(data);
+    let view = reference_tar_view(data);
+    let mut reader = tar::Archive::new(view.as_deref().unwrap_or(data));
     let mut manifest = None;
     let mut binding = None;
     for entry in reader.entries().ok()? {
@@ -406,6 +442,26 @@ mod seed_checks {
         });
         tar(&repair);
         TAR_REPAIR.with_borrow(|bytes| assert_eq!(archive::tar(bytes).unwrap(), expected));
+    }
+
+    #[test]
+    fn blank_ustar_size_reference_matches_core_but_invalid_octal_rejects() {
+        let mut bytes = include_bytes!("../fixtures/zero-manifest-nul-size.tar").to_vec();
+        assert_eq!(archive::tar(&bytes).unwrap().0, b"");
+        assert_eq!(external_tar(&bytes).unwrap().0, b"");
+        tar(&bytes);
+        for fill in [b' ', 0] {
+            bytes[124..136].fill(fill);
+            let mut repaired = Vec::new();
+            repaired_tar(&bytes, &mut repaired);
+            bytes = repaired;
+            assert_eq!(external_tar(&bytes).unwrap().0, b"");
+        }
+        bytes[124] = b'8';
+        let mut repaired = Vec::new();
+        repaired_tar(&bytes, &mut repaired);
+        assert!(archive::tar(&repaired).is_err());
+        assert!(external_tar(&repaired).is_none());
     }
 
     #[test]

@@ -77,6 +77,7 @@ with io.BytesIO() as stream:
     alias_tar = stream.getvalue()
 put("tar", "identical-dot-alias", alias_tar)
 put("artifact", "identical-dot-alias", gzip.compress(alias_tar, mtime=0))
+put("tar", "zero-manifest-nul-size", (Path(__file__).parent / "fixtures/zero-manifest-nul-size.tar").read_bytes())
 
 put("lockfiles", "npm-v3", json.dumps(lock, separators=(",", ":")).encode())
 put("lockfiles", "pnpm-v9", b"lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies: {}\nsnapshots: {}\n")

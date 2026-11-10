@@ -11,6 +11,11 @@ The tar target borrows normal inputs. Its checksum-repair mode reuses one
 runs the same production inspector and independent reference on current bytes.
 A corrupt-checksum control verifies that the eight-byte USTAR magic/version
 actually reaches checksum repair; invalid magic remains rejected.
+The tar reference view normalizes only blank USTAR size fields on a copy after
+the production inspector accepts the original archive. Python tarfile, system
+tar, and npm's tar reader accept that zero-size spelling, while the Rust tar
+reference rejects it. Original archive bytes and all production evidence stay
+unchanged. An invalid octal size remains a rejection control.
 
 The eight targets cover JSON and digests, gzip, raw DEFLATE, tar, full artifact
 integrity, npm/pnpm/Yarn/config parsing, bounded valid FFI callers, and
