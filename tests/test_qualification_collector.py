@@ -30,8 +30,41 @@ def archive(entries):
 
 def check(raw):
     zipped = gzip.compress(raw, mtime=0)
+    return check_zipped(zipped)
+
+
+def check_zipped(zipped, *, budget=None):
     sri = "sha512-" + base64.b64encode(hashlib.sha512(zipped).digest()).decode()
-    return npm_evidence.archive_facts(zipped, sri)
+    return npm_evidence.archive_facts(zipped, sri, budget=budget)
+
+
+def large_archive(*, extra=(), expanded_size=None, payload_name="package/blob.bin"):
+    output = io.BytesIO()
+    expanded = 0
+    with gzip.GzipFile(fileobj=output, mode="wb", mtime=0) as zipped:
+        def write(data):
+            nonlocal expanded
+            zipped.write(data)
+            expanded += len(data)
+
+        def entry(name, size):
+            info = tarfile.TarInfo(name)
+            info.size = size
+            write(info.tobuf(format=tarfile.USTAR_FORMAT))
+
+        entry("package/package.json", len(MANIFEST))
+        write(MANIFEST + bytes(-len(MANIFEST) % 512))
+        entry(payload_name, 65 * 1024 ** 2)
+        for _ in range(65 * 16):
+            write(bytes(64 * 1024))
+        for name, data in extra:
+            entry(name, len(data))
+            write(data + bytes(-len(data) % 512))
+        write(bytes(1024))
+        if expanded_size is not None:
+            while expanded < expanded_size:
+                write(bytes(min(64 * 1024, expanded_size - expanded)))
+    return output.getvalue(), expanded
 
 
 def checksum(header):
@@ -40,6 +73,43 @@ def checksum(header):
 
 
 class CollectorCompatibility(unittest.TestCase):
+    def test_large_archive_and_exact_expanded_limit_qualify(self):
+        zipped, expanded = large_archive(extra=[("package/binding.gyp", b"native")])
+        budget = npm_evidence.WorkBudget(expanded=expanded, headers=3)
+        manifest_bytes, manifest, native, binding = check_zipped(zipped, budget=budget)
+        self.assertEqual(manifest_bytes, MANIFEST)
+        self.assertEqual(manifest, {"name": "pkg", "version": "1"})
+        self.assertTrue(native)
+        self.assertEqual(binding, hashlib.sha256(b"native").hexdigest())
+        self.assertEqual(budget.expanded_remaining, 0)
+        self.assertEqual(budget.headers_remaining, 0)
+        zipped, _ = large_archive(expanded_size=128 * 1024 ** 2)
+        self.assertEqual(check_zipped(zipped)[0], MANIFEST)
+
+    def test_large_archive_tail_and_work_limits_remain_fail_closed(self):
+        zipped, expanded = large_archive()
+        bad_crc = bytearray(zipped)
+        bad_crc[-8] ^= 1
+        bad_size = bytearray(zipped)
+        bad_size[-4] ^= 1
+        malformed = [bad_crc, bad_size, zipped[:-1], zipped + b"x",
+                     zipped + gzip.compress(b"", mtime=0),
+                     large_archive(extra=[("package/package.json", MANIFEST)])[0]]
+        for data in malformed:
+            with self.subTest(tail=hashlib.sha256(data).hexdigest()):
+                with self.assertRaises(npm_evidence.EvidenceError):
+                    check_zipped(data)
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "snapshot expanded evidence"):
+            check_zipped(zipped, budget=npm_evidence.WorkBudget(expanded=expanded - 1))
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "snapshot tar processing"):
+            check_zipped(zipped, budget=npm_evidence.WorkBudget(headers=1))
+        oversized, _ = large_archive(expanded_size=128 * 1024 ** 2 + 512)
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "decompressed limit"):
+            check_zipped(oversized)
+        binding, _ = large_archive(payload_name="package/binding.gyp")
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "binding.gyp"):
+            check_zipped(binding)
+
     def test_single_nonpackage_root_and_printable_paths(self):
         raw = archive([
             ("node v24.12/package.json", MANIFEST),
