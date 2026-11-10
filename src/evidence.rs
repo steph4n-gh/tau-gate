@@ -649,9 +649,6 @@ fn read_facts(
             install_candidate,
         })
     })();
-    if work.budget.check().is_err() {
-        verified_artifact_sha512 = None;
-    }
     ReadFacts {
         facts,
         verified_artifact_sha512,

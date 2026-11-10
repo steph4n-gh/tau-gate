@@ -228,6 +228,8 @@ def archive_facts(archive, integrity, *, budget=None):
             while tail := stream.read(stream.CHUNK):
                 if any(tail):
                     raise EvidenceError("invalid tar terminator")
+            if stream.expanded % 512:
+                raise EvidenceError("tar is not block aligned")
             break
         if entry_count == 10_000:
             raise EvidenceError("tar exceeds 10000 entries")

@@ -14,6 +14,7 @@ import urllib.parse
 
 
 MAX_FILE = 64 * 1024 * 1024
+MAX_EXPANDED = 128 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
 MAX_MEMBERS = 10000
 MAX_DEPTH = 128
@@ -127,12 +128,12 @@ class _ExpandedStream:
         self.count = 0
 
     def read(self, size=-1):
-        remaining = MAX_FILE - self.count
+        remaining = MAX_EXPANDED - self.count
         if size < 0 or size > remaining + 1:
             size = remaining + 1
         data = self.source.read(size)
         self.count += len(data)
-        if self.count > MAX_FILE:
+        if self.count > MAX_EXPANDED:
             raise OracleError("archive exceeds expanded limit")
         return data
 

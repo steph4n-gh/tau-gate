@@ -230,11 +230,26 @@ class OracleTests(unittest.TestCase):
 
     def test_resource_limits_and_deep_json_become_unknown(self):
         facts, directory = self.snapshot(extra=[("package/huge", b"x" * 30000)])
-        with patch.object(oracle, "MAX_FILE", 20000):
+        with patch.object(oracle, "MAX_EXPANDED", 20000):
             facts = oracle.snapshot_facts(directory / "package-lock.json", directory / "index.json")
         self.assertIn("expanded limit", facts["packages"]["node_modules/pkg"]["reason"])
         with self.assertRaises(oracle.OracleError):
             oracle._json(b"[" * 129 + b"0" + b"]" * 129)
+
+    def test_large_archive_profile_retains_full_stream_validation(self):
+        data = (Path(__file__).parent / "fixtures/archive/large-nonlifecycle.tgz").read_bytes()
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode()
+        manifest, binding, _, _ = oracle._archive(data, integrity)
+        self.assertEqual(json.loads(manifest)["name"], "large")
+        self.assertIsNone(binding)
+        with patch.object(oracle, "MAX_EXPANDED", 64 * 1024 * 1024):
+            with self.assertRaisesRegex(oracle.OracleError, "expanded limit"):
+                oracle._archive(data, integrity)
+        corrupt = bytearray(data)
+        corrupt[-8] ^= 1
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(corrupt).digest()).decode()
+        with self.assertRaises(oracle.OracleError):
+            oracle._archive(corrupt, integrity)
 
     def test_duplicate_json_and_locator_paths_are_unknown(self):
         _, directory = self.snapshot()

@@ -78,6 +78,12 @@ def checksum(header):
 
 
 class CollectorCompatibility(unittest.TestCase):
+    def test_zero_tar_tail_must_be_block_aligned(self):
+        raw = archive([("package/package.json", MANIFEST)])
+        self.assertEqual(check(raw + bytes(512))[0], MANIFEST)
+        with self.assertRaisesRegex(npm_evidence.EvidenceError, "block aligned"):
+            check(raw + b"\0")
+
     def test_large_dot_alias_requires_complete_file_identity(self):
         for first, second in [("package/./blob.bin", "package/blob.bin"),
                               ("package/blob.bin", "package/./blob.bin")]:
