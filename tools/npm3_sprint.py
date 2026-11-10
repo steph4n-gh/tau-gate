@@ -39,10 +39,12 @@ def select(output):
     previous=Path(frozen['protocol']['previous_fresh_corpus'])
     first=read(old/'cohort.json')
     second=read(previous/'cohort.json')
-    assert digest(old/'critical-source.json')==first['source_sha256']==second['source_sha256']
-    excluded={identity(r['resolution']) for r in first['repositories']}
-    excluded.update(r['identity'] for r in second['repositories'])
-    assert len(excluded)==400
+    extra=[read(Path(path)/'cohort.json') for path in frozen['protocol'].get('additional_excluded_corpora',[])]
+    cohorts=[first,second,*extra]
+    assert all(item['source_sha256']==digest(old/'critical-source.json') for item in cohorts)
+    excluded={identity(row['resolution']) for item in cohorts for row in item['repositories']}
+    assert len(excluded)==sum(len(item['repositories']) for item in cohorts)
+    assert len(excluded)==frozen['protocol'].get('excluded_repository_count',400)
     packages=sorted((p for p in read(old/'critical-source.json')['projects'] if p['ecosystem']=='npm'),key=lambda p:(p['rankings_average'],p['name']))
     seen_urls=set();ranked=[]
     for rank,package in enumerate(packages,1):
