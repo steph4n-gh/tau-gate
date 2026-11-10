@@ -214,7 +214,10 @@ def _manifest(data, binding, scope, record, path):
         expected_name = path.rsplit("node_modules/", 1)[-1]
     if expected_name is not None and value.get("name") != expected_name:
         raise OracleError("manifest name differs from lock identity")
-    if value.get("version") != record.get("version"):
+    root_version_metadata = (path == "" and scope == "root" and isinstance(value.get("version"), str)
+                             and bool(value["version"]) and isinstance(record.get("version"), str)
+                             and bool(record["version"]))
+    if value.get("version") != record.get("version") and not root_version_metadata:
         raise OracleError("manifest version differs from lock identity")
     if scope != "archive":
         for key in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
@@ -327,7 +330,12 @@ def snapshot_facts(lock_path: Path, index_path: Path, manifest: Path | None = No
                 conditions = []
                 if any(child.name.casefold() in ("package.json", "binding.gyp") and child.name not in ("package.json", "binding.gyp") for child in source_path.parent.iterdir()):
                     raise OracleError("case alias of source lifecycle input")
-            facts.update(_manifest(data, binding, scope, record, path))
+            observed = _manifest(data, binding, scope, record, path)
+            if scope == "root" and observed["version"] != record.get("version"):
+                observed["source_manifest_version"] = observed["version"]
+                observed["version"] = record.get("version")
+                conditions.append("root_version_metadata_disagreement")
+            facts.update(observed)
             facts.update({"status": "known", "profile_conditions": conditions})
         except (OracleError, OSError) as exc:
             facts["reason"] = str(exc)

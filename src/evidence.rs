@@ -433,6 +433,21 @@ pub(crate) fn load(
 }
 fn qualify(path: &str, record: &J, marker: Option<bool>, facts: Facts) -> ExecutionEvidence {
     let conflict = marker == Some(false) && facts.install_candidate;
+    let reason = if conflict {
+        Some("locked hasInstallScript contradicts inspected install lifecycle/native facts".into())
+    } else {
+        match (
+            record.get("version").and_then(J::as_str),
+            facts.version.as_deref(),
+        ) {
+            (Some(locked), Some(source))
+                if path.is_empty() && matches!(facts.kind, Kind::SourceProject) && source != locked =>
+            {
+                Some(format!("root source version {source:?} differs from locked version {locked:?}; exact source and locked metadata remain approval-bound"))
+            }
+            _ => None,
+        }
+    };
     let fingerprint = if conflict {
         None
     } else {
@@ -461,9 +476,7 @@ fn qualify(path: &str, record: &J, marker: Option<bool>, facts: Facts) -> Execut
         facts: Some(facts),
         verified_artifact_sha512: None,
         marker,
-        reason: conflict.then(|| {
-            "locked hasInstallScript contradicts inspected install lifecycle/native facts".into()
-        }),
+        reason,
         fingerprint,
     }
 }
@@ -567,7 +580,17 @@ fn read_facts(
                 "manifest name does not match lock instance {path:?}"
             ));
         }
-        if manifest.get("version") != record.get("version") {
+        let root_version_metadata = path.is_empty()
+            && matches!(kind, Kind::SourceProject)
+            && manifest
+                .get("version")
+                .and_then(J::as_str)
+                .is_some_and(|v| !v.is_empty())
+            && record
+                .get("version")
+                .and_then(J::as_str)
+                .is_some_and(|v| !v.is_empty());
+        if manifest.get("version") != record.get("version") && !root_version_metadata {
             return Err(format!(
                 "manifest version does not match lock instance {path:?}"
             ));

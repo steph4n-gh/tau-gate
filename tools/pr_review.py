@@ -297,6 +297,8 @@ def summary(report):
         for evidence in snapshot.get("execution_evidence") or []:
             if evidence.get("state") != "qualified":
                 reasons.append({"stage": label, "message": {"path": evidence.get("path"), "state": evidence.get("state"), "reason": evidence.get("reason")}})
+            elif evidence.get("reason"):
+                lines.append(f"- Note {label} evidence `{markdown_text(evidence.get('path') or '<root>')}`: {markdown_text(evidence['reason'])}")
     for issue in policy.get("issues", []):
         reasons.append({"stage": "policy", "message": issue})
     if "error" in core:

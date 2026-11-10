@@ -119,6 +119,148 @@ fn root_fixture() -> Fixture {
     f.index(LOCATORS);
     f
 }
+#[test]
+fn root_source_version_metadata_retains_exact_source_and_lock_approval_binding() {
+    let f = root_fixture();
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "bundle/projects/package.json",
+        ROOT.replace("\"version\":\"1\"", "\"version\":\"2\""),
+    );
+    outcome(&f.audit(true), 1, "blocked");
+    let report = json(&f.audit(false));
+    let evidence = &report
+        .get("execution_evidence")
+        .and_then(J::as_array)
+        .unwrap()[0];
+    assert_eq!(
+        evidence
+            .get("facts")
+            .unwrap()
+            .get("version")
+            .and_then(J::as_str),
+        Some("2")
+    );
+    let reason = evidence.get("reason").and_then(J::as_str).unwrap();
+    assert!(reason.contains("source version \"2\"") && reason.contains("locked version \"1\""));
+    let human = f.run(&[
+        "audit",
+        "--lock",
+        "lock.json",
+        "--evidence",
+        "bundle/index.json",
+    ]);
+    assert!(human.status.success());
+    let human = String::from_utf8(human.stdout).unwrap();
+    assert!(human.contains("NOTE snapshot evidence") && human.contains(reason));
+    f.put("supplied.json", ROOT);
+    let substituted = f.run(&[
+        "audit",
+        "--lock",
+        "lock.json",
+        "--manifest",
+        "supplied.json",
+        "--evidence",
+        "bundle/index.json",
+        "--json",
+    ]);
+    assert_eq!(substituted.status.code(), Some(2));
+    assert!(String::from_utf8(substituted.stdout)
+        .unwrap()
+        .contains("index root manifest differs"));
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "lock.json",
+        r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":"3"}}}"#,
+    );
+    f.index(LOCATORS);
+    outcome(&f.audit(true), 1, "blocked");
+    f.approve();
+    outcome(&f.audit(true), 0, "allowed");
+    f.put(
+        "bundle/projects/package.json",
+        ROOT.replace("\"version\":\"1\"", "\"version\":\"4\""),
+    );
+    outcome(&f.audit(true), 1, "blocked");
+}
+
+#[test]
+fn root_version_metadata_does_not_waive_other_identity_or_dependency_checks() {
+    for manifest in [
+        r#"{"name":"other","version":"2"}"#,
+        r#"{"name":"app"}"#,
+        r#"{"name":"app","version":""}"#,
+        r#"{"name":"app","version":2}"#,
+        r#"{"name":"app","version":null}"#,
+        r#"{"name":"app","version":true}"#,
+    ] {
+        let f = root_fixture();
+        f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+        f.put("bundle/projects/package.json", manifest);
+        outcome(&f.audit(true), 2, "incomplete");
+    }
+    for field in [
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+    ] {
+        let f = root_fixture();
+        f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+        f.put(
+            "bundle/projects/package.json",
+            format!(r#"{{"name":"app","version":"2","{field}":{{"dep":"1"}}}}"#),
+        );
+        outcome(&f.audit(true), 2, "incomplete");
+    }
+    let f = root_fixture();
+    f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+    f.put(
+        "bundle/projects/package.json",
+        r#"{"name":"app","version":"2"}"#,
+    );
+    f.put(
+        "lock.json",
+        r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":""}}}"#,
+    );
+    f.index(LOCATORS);
+    outcome(&f.audit(true), 2, "incomplete");
+    f.put("lock.json", r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":"1","hasInstallScript":false}}}"#);
+    f.put(
+        "bundle/projects/package.json",
+        ROOT.replace("\"version\":\"1\"", "\"version\":\"2\""),
+    );
+    f.index(LOCATORS);
+    outcome(&f.audit(true), 2, "incomplete");
+}
+
+#[test]
+fn workspace_and_archive_versions_still_require_lock_identity() {
+    let f = root_fixture();
+    f.put("approvals.json", r#"{"schema_version":1,"approvals":[]}"#);
+    f.put(
+        "bundle/projects/package.json",
+        r#"{"name":"app","version":"1"}"#,
+    );
+    f.put(
+        "bundle/projects/local/package.json",
+        r#"{"name":"local","version":"2"}"#,
+    );
+    f.put("lock.json", r#"{"lockfileVersion":3,"packages":{"":{"name":"app","version":"1"},"packages/local":{"name":"local","version":"1"}}}"#);
+    f.index(r#"[{"path":"","project_manifest":"projects/package.json"},{"path":"packages/local","project_manifest":"projects/local/package.json"}]"#);
+    outcome(&f.audit(true), 2, "incomplete");
+    let f = artifact_fixture(
+        &[("package/package.json", br#"{"name":"pkg","version":"2"}"#)],
+        "https://registry.npmjs.org/pkg/-/pkg-1.tgz",
+    );
+    unsupported_artifact(
+        &f,
+        "manifest version does not match lock instance \"node_modules/pkg\"",
+    );
+}
+
 fn artifact_fixture(entries: &[(&str, &[u8])], source: &str) -> Fixture {
     let f = Fixture::new();
     let mut tar = Vec::new();

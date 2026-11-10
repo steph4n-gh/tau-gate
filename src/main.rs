@@ -310,6 +310,18 @@ fn human_issues(r: &J, label: &str) {
             );
         }
     }
+    if let Some(items) = r.get("execution_evidence").and_then(J::as_array) {
+        for item in items {
+            if item.get("state").and_then(J::as_str) == Some("qualified") {
+                if let Some(reason) = item.get("reason").and_then(J::as_str) {
+                    println!(
+                        "NOTE {label} evidence {}: {reason}",
+                        item.get("path").and_then(J::as_str).unwrap_or("")
+                    );
+                }
+            }
+        }
+    }
     if let Some(omissions) = r.get("optional_omissions").and_then(J::as_array) {
         for omission in omissions {
             println!(

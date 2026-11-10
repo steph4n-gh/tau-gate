@@ -397,7 +397,10 @@ def check_identity(path, record, manifest):
     expected = record.get("name") if not is_registry_path(path) else expected_name(path, record)
     if expected is not None and manifest.get("name") != expected:
         raise EvidenceError(f"manifest name does not match lock instance {path!r}")
-    if manifest.get("version") != record.get("version"):
+    root_version_metadata = (path == "" and isinstance(manifest.get("version"), str)
+                             and bool(manifest["version"]) and isinstance(record.get("version"), str)
+                             and bool(record["version"]))
+    if manifest.get("version") != record.get("version") and not root_version_metadata:
         raise EvidenceError(f"manifest version does not match lock instance {path!r}")
     if not is_registry_path(path):
         for key in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
