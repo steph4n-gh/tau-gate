@@ -4,7 +4,7 @@
 
 Tau-Gate reviews frozen **npm v1/v2/v3, pnpm v6/v9, Yarn Classic v1 and Yarn Berry lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-The latest published release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). See [installation](docs/setup.md) for the verified Debian 12 x86_64 archive and source-build instructions. The expanded parsers below require this source branch; the published v4.2.1 release predates them.
+The latest stable release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). This source tree builds v4.3.0-beta.1, which packages the npm v3 PR reviewer and its trusted workflow examples. See [installation](docs/setup.md) for Debian 12 x86_64 archives and source-build instructions.
 
 A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.2 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
@@ -102,7 +102,7 @@ The separate [PR helper](docs/pr-review.md) captures lockfiles, source manifests
 
 The helper writes deterministic `report.json` and `summary.md` into an explicit output directory outside the repository. It preserves allowed, blocked, and incomplete outcomes. [The CI example](docs/examples/npm-pr-review.yml) uses read-only permissions and trusted base tools. It requires a supplied checker binary with a pinned hash and a trusted workflow configuration. It is an example for npm applications, not an active npm job in this Rust repository.
 
-The current development helper also presents exact qualified command text and typed dependency routes, and supports a single trusted approval action through an external store. A GitHub comment-backed approval workflow is available as a [pilot example](docs/pr-review.md#use-a-github-maintainer-comment-as-the-approval-record); it still needs a live pilot. The [local product milestone](docs/qualification/product-pr-review.md) verifies an exact real update and the five-run tar memory gate. New prospective PR qualification and an outside-maintainer study remain required before a product release.
+The beta helper presents exact qualified command text, typed dependency routes, package-specific evidence gaps, and next actions. It supports a single trusted approval action through an external store or a [GitHub maintainer comment](docs/pr-review.md#use-a-github-maintainer-comment-as-the-approval-record). An [owned hosted pilot](docs/qualification/product-pr-review.md#hosted-approval-pilot) verified blocked, approved, and stale-head-blocked states. The supported beta path is an npm v3 PR with original SHA512-bound package archives and portable source paths; missing or unsupported evidence stays incomplete. The [frozen product decision](docs/qualification/product-release-decision-20261110.md) preserves the failed broad-coverage gates, and the outside-maintainer study remains unrun.
 
 ## Topology and native interface
 

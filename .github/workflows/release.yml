@@ -82,6 +82,23 @@ jobs:
             debian@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 \
             sh -ceu 'mkdir /tmp/tau-gate; tar -xzf /input/release.tar.gz -C /tmp/tau-gate; /tmp/tau-gate/tau-gate --verify'
 
+      - name: Check packaged PR reviewer from extracted archive
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.build.outputs.archive }}
+        run: |
+          set -euo pipefail
+          installed="$RUNNER_TEMP/installed-pr-review"
+          mkdir "$installed"
+          tar -xzf "$ARCHIVE" -C "$installed"
+          for helper in pr_review.py npm_evidence.py github_pr_approval.py; do
+            cmp "tools/$helper" "$installed/tools/$helper"
+            PYTHONDONTWRITEBYTECODE=1 python3 "$installed/tools/$helper" --help > /dev/null
+          done
+          cmp docs/pr-review.md "$installed/PR-REVIEW.md"
+          cmp docs/examples/npm-pr-review.yml "$installed/examples/npm-pr-review.yml"
+          cmp docs/examples/npm-pr-approval-rerun.yml "$installed/examples/npm-pr-approval-rerun.yml"
+
       - name: Sign build provenance
         id: provenance
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0

@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.0-beta.1
+
+- Package the trusted npm v3 PR-review helpers, GitHub workflow examples, and review guide with the Debian 12 x86_64 binary. The beta reports exact locked changes, verified archive and manifest bytes, lifecycle command text, dependency routes, and bound approvals without executing package scripts.
+- Make incomplete reports identify affected locked instances and give concrete next actions for missing integrity, unavailable archives, unsupported sources and tar layouts, and manifest disagreements. Keep those inputs incomplete and ineligible for approval.
+- Verify the GitHub comment workflow on an owned bot-authored PR: blocked, exact-subject approved, then blocked again after a head change. The shell step now preserves blocked reports under GitHub's `bash -e` behavior.
+- Preserve the failed historical broad-coverage studies. This beta applies to the supported, verified-byte npm v3 path; it does not claim general package safety, host installation behavior, or measured reviewer advantage.
+
 ## 4.2.1
 
 - Resolve a stale positive npm `hasInstallScript` hint against the complete, integrity-verified archive. A verified package without an install hook or implicit native build is no longer an execution candidate. A false marker with observed execution, missing evidence, and unsupported archives still return incomplete. The marker remains visible in reports.

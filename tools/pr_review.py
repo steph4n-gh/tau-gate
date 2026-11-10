@@ -552,6 +552,23 @@ def summary(report):
             qualified = sum(item.get("state") == "qualified" for item in snapshot.get("execution_evidence", []))
             lines.append(f"{title}: {len(snapshot.get('packages', []))} locked instances; {qualified} qualified execution-evidence records.")
     lines.extend(["", f"{len(packages)} package changes. {len(changes)} execution evidence changes. {len(unknowns)} unqualified package sides."])
+    lifecycle_changes = sum(((change.get("before") or {}).get("facts") or {}).get("lifecycle")
+                            != ((change.get("after") or {}).get("facts") or {}).get("lifecycle")
+                            for change in changes)
+    candidate_changes = sum(bool((change.get("before") or {}).get("candidate")
+                                 or (change.get("after") or {}).get("candidate")) for change in changes)
+    lines.append(f"{lifecycle_changes} changed lifecycle command sets; {candidate_changes} changed evidence rows with automatic install execution potential.")
+    direct = [change for change in packages
+              if len(change.get("after_introducer_path") or change.get("before_introducer_path") or []) == 2]
+    if direct:
+        lines.extend(["", "## Direct dependency changes", ""])
+        for change in direct[:8]:
+            before, after = change.get("before") or {}, change.get("after") or {}
+            old = f"{before.get('name', '?')}@{before.get('version', '?')}" if before else "absent"
+            new = f"{after.get('name', '?')}@{after.get('version', '?')}" if after else "absent"
+            lines.append(f"- `{markdown_text(change['path'])}`: `{markdown_text(old)}` to `{markdown_text(new)}`.")
+        if len(direct) > 8:
+            lines.append(f"- {len(direct) - 8} more direct changes are in `report.json`.")
     if view.get("execution_changes"):
         lines.extend(["", "## Execution evidence, current to proposed", ""])
     for row in view.get("execution_changes", []):

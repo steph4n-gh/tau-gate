@@ -25,8 +25,8 @@ SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$TAU_GATE_SOURCE_COMMIT")
 export SOURCE_DATE_EPOCH
 RUSTFLAGS="--remap-path-prefix=$PWD=/source --remap-path-prefix=$CARGO_TARGET_DIR=/build"
 export RUSTFLAGS
-version=$(sed -n '/^\[package\]/,/^\[/s/^version = "\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"/\1/p' Cargo.toml | head -1)
-test -n "$version"
+version=$(sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'
 test "$(rustc --version)" = 'rustc 1.85.0 (4d91de4e4 2025-02-17)'
 
 cargo test --frozen --release --all-targets --target x86_64-unknown-linux-gnu --jobs 2
@@ -41,6 +41,13 @@ dist="$RELEASE_OUTPUT_DIR/dist"
 install -m 0755 "$binary" "$stage/tau-gate"
 install -m 0644 LICENSE "$stage/LICENSE"
 install -m 0644 README.md "$stage/README.md"
+mkdir "$stage/tools" "$stage/examples"
+for helper in pr_review.py npm_evidence.py github_pr_approval.py; do
+  install -m 0755 "tools/$helper" "$stage/tools/$helper"
+done
+install -m 0644 docs/pr-review.md "$stage/PR-REVIEW.md"
+install -m 0644 docs/examples/npm-pr-review.yml "$stage/examples/npm-pr-review.yml"
+install -m 0644 docs/examples/npm-pr-approval-rerun.yml "$stage/examples/npm-pr-approval-rerun.yml"
 readelf -dW "$binary" | sed -n 's/.*Shared library: \[\([^]]*\)\].*/\1/p' | sort -u > "$stage/runtime-libraries.txt"
 test -s "$stage/runtime-libraries.txt"
 if grep -Ev '^[A-Za-z0-9_.-]+$' "$stage/runtime-libraries.txt"; then
