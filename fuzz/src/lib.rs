@@ -43,12 +43,13 @@ mod archive {
         Ok(out)
     }
     pub(super) fn tar(bytes: &[u8]) -> Result<(Vec<u8>, Option<String>), &'static str> {
-        let mut tar = TarInspector::new();
+        let mut tar = TarInspector::with_capture(&BTreeSet::new());
         tar.write(bytes, &mut Budget::new())?;
         tar.finish()
+            .map(|contents| (contents.manifest, contents.binding_gyp_sha256))
     }
     pub(super) fn artifact(bytes: &[u8], sri: &str) -> Result<Artifact, String> {
-        inspect_verified(verify(bytes, sri)?, &mut Budget::new())
+        inspect_verified_nested(verify(bytes, sri)?, &mut Budget::new(), &BTreeSet::new())
     }
 }
 
