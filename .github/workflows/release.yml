@@ -98,6 +98,10 @@ jobs:
           cmp docs/pr-review.md "$installed/PR-REVIEW.md"
           cmp docs/examples/npm-pr-review.yml "$installed/examples/npm-pr-review.yml"
           cmp docs/examples/npm-pr-approval-rerun.yml "$installed/examples/npm-pr-approval-rerun.yml"
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/verify_pr_review.py \
+            --wrapper "$installed/tools/pr_review.py" \
+            --binary "$installed/tau-gate" \
+            --output "$RUNNER_TEMP/installed-pr-controls"
 
       - name: Sign build provenance
         id: provenance
