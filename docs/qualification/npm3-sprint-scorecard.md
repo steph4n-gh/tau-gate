@@ -1,5 +1,7 @@
 # npm v3 qualification comparison scorecard
 
+The [archive and byte-reporting repair](npm3-archive-repair.md) reruns the same 30 pairs: 22/30 complete and zero event misses, with previous qualified fingerprints preserved. The 80% floor still fails. The original sprint results below remain the baseline.
+
 The candidate demonstrates additional exact-evidence approval binding, but **fails the ordinary completed-review gate: 13/30 (43.3%), against the frozen 80% floor**. Human advantage remains unmeasured.
 
 | Area | Measured result | Conclusion |
