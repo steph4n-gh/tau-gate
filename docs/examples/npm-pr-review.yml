@@ -55,38 +55,50 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           repository="$RUNNER_TEMP/npm-review-repository"
           store="$RUNNER_TEMP/tau-gate-approvals"
           pre="$RUNNER_TEMP/npm-review-pre"
           output="$RUNNER_TEMP/npm-review-report"
           install -d -m 0700 "$store"
-          PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+          if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
             --repo "$repository" \
             --base "$BASE_COMMIT" \
             --head "$HEAD_COMMIT" \
             --tau-gate "$RUNNER_TEMP/tau-gate" \
             --approval-store "$store" \
-            --output "$pre" > "$RUNNER_TEMP/npm-review-pre.json"
-          result=$?
+            --output "$pre" > "$RUNNER_TEMP/npm-review-pre.json"; then
+            result=0
+          else
+            result=$?
+          fi
           if [ "$result" -eq 1 ] && python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("approval_request") else 1)' "$pre/report.json"; then
-            PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/github_pr_approval.py" check \
-              --report "$pre/report.json" --repository "$REPOSITORY" --pr-number "$PR_NUMBER"
-            lookup=$?
+            if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/github_pr_approval.py" check \
+              --report "$pre/report.json" --repository "$REPOSITORY" --pr-number "$PR_NUMBER"; then
+              lookup=0
+            else
+              lookup=$?
+            fi
             if [ "$lookup" -eq 0 ]; then
               subject=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["approval_request"]["subject_sha256"])' "$pre/report.json")
-              PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+              if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
                 --repo "$repository" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" \
                 --tau-gate "$RUNNER_TEMP/tau-gate" --approval-store "$store" \
                 --approve-subject "$subject" --output "$RUNNER_TEMP/npm-review-approval" \
-                > "$RUNNER_TEMP/npm-review-approval.json"
-              recorded=$?
+                > "$RUNNER_TEMP/npm-review-approval.json"; then
+                recorded=0
+              else
+                recorded=$?
+              fi
               if [ "$recorded" -eq 0 ]; then
-                PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+                if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
                   --repo "$repository" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" \
                   --tau-gate "$RUNNER_TEMP/tau-gate" --approval-store "$store" \
-                  --output "$output" > "$RUNNER_TEMP/npm-review.json"
-                result=$?
+                  --output "$output" > "$RUNNER_TEMP/npm-review.json"; then
+                  result=0
+                else
+                  result=$?
+                fi
               else
                 result=2
               fi
