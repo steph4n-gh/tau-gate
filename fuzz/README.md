@@ -16,6 +16,9 @@ the production inspector accepts the original archive. Python tarfile, system
 tar, and npm's tar reader accept that zero-size spelling, while the Rust tar
 reference rejects it. Original archive bytes and all production evidence stay
 unchanged. An invalid octal size remains a rejection control.
+Checksum repair recognizes the exact POSIX and GNU USTAR header spellings that
+the production inspector accepts. A generated GNU seed checks the independent
+tar reader against the production facts.
 
 The eight targets cover JSON and digests, gzip, raw DEFLATE, tar, full artifact
 integrity, npm/pnpm/Yarn/config parsing, bounded valid FFI callers, and

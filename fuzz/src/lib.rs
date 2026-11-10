@@ -152,7 +152,7 @@ fn reference_tar_view(data: &[u8]) -> Option<Vec<u8>> {
         let field = &header[124..136];
         let blank = field.iter().all(|byte| matches!(byte, 0 | b' '));
         let size = if blank {
-            if &header[257..265] != b"ustar\x0000" {
+            if &header[257..265] != b"ustar\x0000" && &header[257..265] != b"ustar  \0" {
                 return None;
             }
             let view = normalized.get_or_insert_with(|| data.to_vec());
@@ -202,7 +202,7 @@ fn repaired_tar(data: &[u8], bytes: &mut Vec<u8>) {
     bytes.clear();
     bytes.extend_from_slice(data);
     for header in bytes.chunks_exact_mut(512) {
-        if &header[257..265] == b"ustar\x0000" {
+        if &header[257..265] == b"ustar\x0000" || &header[257..265] == b"ustar  \0" {
             header[148..156].fill(b' ');
             let checksum: usize = header.iter().map(|b| *b as usize).sum();
             header[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
@@ -462,6 +462,20 @@ mod seed_checks {
         repaired_tar(&bytes, &mut repaired);
         assert!(archive::tar(&repaired).is_err());
         assert!(external_tar(&repaired).is_none());
+    }
+
+    #[test]
+    fn gnu_ustar_seed_matches_core_and_reference() {
+        let bytes = std::fs::read("corpus/tar/gnu-magic").unwrap();
+        assert_eq!(Some(archive::tar(&bytes).unwrap()), external_tar(&bytes));
+        tar(&bytes);
+        let mut corrupt = bytes.clone();
+        corrupt[148] ^= 1;
+        assert!(archive::tar(&corrupt).is_err());
+        let mut repaired = Vec::new();
+        repaired_tar(&corrupt, &mut repaired);
+        assert_eq!(archive::tar(&repaired), archive::tar(&bytes));
+        tar(&repaired);
     }
 
     #[test]

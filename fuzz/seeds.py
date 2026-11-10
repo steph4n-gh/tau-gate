@@ -64,6 +64,13 @@ for root, label in (("package", "ordinary"), ("json5", "named-root")):
     if root == "package":
         put("tar", "repair-checksum", b"\x01" + tar_bytes)
         put("artifact", "repair-tar-and-repack", b"\x01" + tar_bytes)
+        gnu = bytearray(tar_bytes)
+        gnu[257:265] = b"ustar  \0"
+        gnu[148:156] = b" " * 8
+        checksum = sum(gnu[:512])
+        gnu[148:156] = f"{checksum:06o}\0 ".encode()
+        put("tar", "gnu-magic", bytes(gnu))
+        put("artifact", "gnu-magic", gzip.compress(gnu, mtime=0))
 
 with io.BytesIO() as stream:
     with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as archive:
