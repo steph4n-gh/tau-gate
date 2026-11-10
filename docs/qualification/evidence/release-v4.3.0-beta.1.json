@@ -1,0 +1,72 @@
+{
+  "release": "v4.3.0-beta.1",
+  "scope": "Bounded npm lockfileVersion 3 PR reviewer on verified original archives; Debian 12 x86_64 release platform",
+  "tag_commit": "70d21b51454fecd6d37bf4fffa21ed0a70e9220d",
+  "merged_pr": "https://github.com/steph4n-gh/tau-gate/pull/34",
+  "pr_head_commit": "d1e47ad485bf6754d63da049b62755b4be143268",
+  "merged_tree_equals_pr_head_tree": true,
+  "pr_review_limitation": "The owner used the configured ruleset bypass; there was no separate human approving review.",
+  "merged_main_ci": "https://github.com/steph4n-gh/tau-gate/actions/runs/42908195745",
+  "merged_main_codeql": "https://github.com/steph4n-gh/tau-gate/actions/runs/42908195584",
+  "release_candidate_run": "https://github.com/steph4n-gh/tau-gate/actions/runs/42908253634",
+  "release_url": "https://github.com/steph4n-gh/tau-gate/releases/tag/v4.3.0-beta.1",
+  "published_at_utc": "2026-11-10T21:50:25Z",
+  "prerelease": true,
+  "latest": false,
+  "release_candidate_two_builds_byte_identical": true,
+  "separate_local_clean_rebuild_matches_archive_sbom_and_checksums": true,
+  "independent_operator_rebuild": false,
+  "published_assets_match_candidate": true,
+  "anonymous_public_archive_download_matches_candidate": true,
+  "public_archive_clean_debian_12_x86_64_install_passed": true,
+  "published_provenance_and_sbom_attestations_verified": true,
+  "attestation_source_digest_and_workflow_pinned": true,
+  "public_package_lifecycle_scripts_executed": false,
+  "assets": {
+    "SHA256SUMS": "21dc9ec21aa72633456247525cc81eb5db96f7c1d174abc760464ce864e5ce29",
+    "provenance.sigstore.json": "4201cb5c1b0769d291bf5b50a2d819c59176cc3cc8bbdcfacdeb31a8d0d5eb5d",
+    "sbom.sigstore.json": "e25b87ded938897227f23e85ee2f32f550696c117609953a7f59ffc494a38e4e",
+    "tau-gate-v4.3.0-beta.1-linux-x86_64.cdx.json": "17b609b47ca83132329b2f5c59981c8d23476e4f9532d31d44c3522c369338d1",
+    "tau-gate-v4.3.0-beta.1-linux-x86_64.intoto.jsonl": "4201cb5c1b0769d291bf5b50a2d819c59176cc3cc8bbdcfacdeb31a8d0d5eb5d",
+    "tau-gate-v4.3.0-beta.1-linux-x86_64.tar.gz": "9b42c00212fe4e652e73e99a005186cdbe1066551f1859436405eb6e60f958d5"
+  },
+  "owned_pr_observations_before_publication": [
+    {
+      "pr": "https://github.com/steph4n-gh/earthquake-lab-publication/pull/12",
+      "base": "afdfac836b09ba9f9be3a830a63868be43d787db",
+      "head": "67d3884639091b4f04db1b9d2cc6c754d63a75e7",
+      "clean_source_candidate_local_outcome": "allowed",
+      "qualified_packages_each_side": 45,
+      "unknowns": 0,
+      "package_changes": 17,
+      "evidence_changes": 18,
+      "report_sha256": "1a1ad70004be0e13c6bdfe0cec76c249e47ca03a5389373a759b131cb801950e",
+      "hosted_tau_gate_check": "passed"
+    },
+    {
+      "pr": "https://github.com/steph4n-gh/rea/pull/9",
+      "base": "5e97e042a66d88064cbec623c4e8b0f3ecb184e6",
+      "head": "702f882bcb360140936a2ec1c7be1cacbda44ed2",
+      "clean_source_candidate_local_outcome": "blocked",
+      "qualified_packages_each_side": 561,
+      "unknowns": 0,
+      "package_changes": 1,
+      "evidence_changes": 2,
+      "report_sha256": "ba56d307bd8d2e7947d95cfc54cbc8e1de7669ce58846403ae3ccb76fa682481",
+      "hosted_tau_gate_check": "not observed",
+      "approval": "not granted; owner-authored PR cannot self-approve through GitHub comment flow"
+    }
+  ],
+  "frozen_broad_coverage_gates": {
+    "third_cohort_completed_all": "17/30 below 80% floor",
+    "third_cohort_completed_label_complete": "17/18 below 95% floor",
+    "fourth_cohort_completed_all": "18/30 below 80% floor",
+    "fourth_cohort_completed_label_complete": "18/21 below 95% floor"
+  },
+  "unmeasured": [
+    "general package safety",
+    "host installation behavior for public updates",
+    "human reviewer time or advantage",
+    "independent external maintainer use"
+  ]
+}
