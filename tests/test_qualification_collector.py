@@ -77,7 +77,36 @@ def checksum(header):
     header[148:156] = f"{sum(header):06o}\0 ".encode()
 
 
+def pax_record(key, value):
+    body = f" {key}={value}\n".encode()
+    length = len(body) + 1
+    while len(str(length)) + len(body) != length:
+        length = len(str(length)) + len(body)
+    return str(length).encode() + body
+
+
+def pax_archive(path="package/package.json", size=len(MANIFEST), key="NODETAR.package.name"):
+    body = b"".join((pax_record("path", path), pax_record("size", str(size)),
+                     pax_record("uid", "718322462"), pax_record(key, "pkg")))
+    pax = tarfile.TarInfo("PaxHeader/package/package.json")
+    pax.type = tarfile.XHDTYPE
+    pax.size = len(body)
+    regular = tarfile.TarInfo("package/package.json")
+    regular.size = len(MANIFEST)
+    return (pax.tobuf(format=tarfile.USTAR_FORMAT) + body + bytes(-len(body) % 512)
+            + regular.tobuf(format=tarfile.USTAR_FORMAT) + MANIFEST
+            + bytes(-len(MANIFEST) % 512) + bytes(1024))
+
+
 class CollectorCompatibility(unittest.TestCase):
+    def test_narrow_pax_metadata_preserves_manifest_bytes(self):
+        self.assertEqual(check(pax_archive())[0], MANIFEST)
+        for changed in (pax_archive(path="package/other.json"),
+                        pax_archive(size=0), pax_archive(key="linkpath"),
+                        pax_archive(key="SCHILY.xattr.user.test")):
+            with self.assertRaises(npm_evidence.EvidenceError):
+                check(changed)
+
     def test_exact_gnu_ustar_magic_keeps_header_and_type_checks(self):
         raw = bytearray(archive([("package/package.json", MANIFEST)]))
         raw[257:265] = b"ustar  \0"
@@ -148,7 +177,7 @@ class CollectorCompatibility(unittest.TestCase):
             check_zipped(zipped, budget=npm_evidence.WorkBudget(expanded=expanded - 1))
         with self.assertRaisesRegex(npm_evidence.EvidenceError, "snapshot tar processing"):
             check_zipped(zipped, budget=npm_evidence.WorkBudget(headers=1))
-        oversized, _ = large_archive(expanded_size=128 * 1024 ** 2 + 512)
+        oversized, _ = large_archive(expanded_size=256 * 1024 ** 2 + 512)
         with self.assertRaisesRegex(npm_evidence.EvidenceError, "decompressed limit"):
             check_zipped(oversized)
         binding, _ = large_archive(payload_name="package/binding.gyp")

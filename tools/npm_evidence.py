@@ -17,8 +17,9 @@ import zlib
 
 
 MAX_FILE = 64 * 1024 * 1024
-MAX_EXPANDED = 128 * 1024 * 1024
+MAX_EXPANDED = 256 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
+MAX_PAX = 4 * 1024
 MAX_NPM_RECORDS = 10_000
 MAX_NPM_REFERENCES = 50_000
 ROOT_EVENTS = ("preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare")
@@ -203,6 +204,52 @@ class _GzipReader:
         return bytes(result)
 
 
+def parse_pax(data, target):
+    offset = 0
+    attributes = {}
+    while offset < len(data):
+        space = data.find(b" ", offset)
+        if space <= offset:
+            raise EvidenceError("invalid PAX record")
+        digits = data[offset:space]
+        if not digits.isdigit() or (len(digits) > 1 and digits[:1] == b"0"):
+            raise EvidenceError("invalid PAX record")
+        length = int(digits)
+        end = offset + length
+        if length <= space - offset + 2 or end > len(data) or data[end - 1:end] != b"\n":
+            raise EvidenceError("invalid PAX record")
+        body = data[space + 1:end - 1]
+        key_bytes, separator, value_bytes = body.partition(b"=")
+        if not separator:
+            raise EvidenceError("invalid PAX record")
+        try:
+            key = key_bytes.decode("ascii")
+            value = value_bytes.decode("ascii")
+        except UnicodeError as exc:
+            raise EvidenceError("invalid PAX text") from exc
+        if key in attributes or any(not 32 <= ord(char) <= 126 for char in value):
+            raise EvidenceError("ambiguous PAX record")
+        if key in ("path", "size"):
+            attributes[key] = value
+        elif key in ("uid", "gid"):
+            if not value.isdecimal() or int(value) > 0xffffffff:
+                raise EvidenceError("invalid PAX owner")
+            attributes[key] = value
+        elif key in ("SCHILY.dev", "SCHILY.nlink", "SCHILY.ino"):
+            if not value.isdecimal() or int(value) > 0xffffffffffffffff:
+                raise EvidenceError("invalid PAX metadata")
+            attributes[key] = value
+        elif key.startswith("NODETAR.") and all(
+                re.fullmatch(r"[A-Za-z0-9_-]+", part) for part in key.split(".")[1:]):
+            attributes[key] = value
+        else:
+            raise EvidenceError("unsupported PAX key")
+        offset = end
+    if attributes.get("path") != target or not re.fullmatch(r"(?:0|[1-9][0-9]*)", attributes.get("size", "")):
+        raise EvidenceError("PAX path or size differs from regular header")
+    return {"path": target, "size": int(attributes["size"])}
+
+
 def archive_facts(archive, integrity, *, budget=None):
     if budget is not None and budget.exhausted is not None:
         raise EvidenceError(budget.exhausted)
@@ -217,11 +264,14 @@ def archive_facts(archive, integrity, *, budget=None):
     root_name = None
     manifest_bytes = None
     binding_hash = None
+    pending_pax = None
     while True:
         header = stream.read(512)
         if len(header) != 512:
             raise EvidenceError("missing tar terminator")
         if not any(header):
+            if pending_pax is not None:
+                raise EvidenceError("unpaired PAX header")
             second = stream.read(512)
             if len(second) != 512 or any(second):
                 raise EvidenceError("invalid tar terminator")
@@ -241,14 +291,35 @@ def archive_facts(archive, integrity, *, budget=None):
         if any(header[157:257]) or any(header[500:]):
             raise EvidenceError("unsupported tar link or reserved metadata")
         for start, width in ((100, 8), (108, 8), (116, 8), (124, 12), (136, 12), (148, 8), (329, 8), (337, 8)):
-            numeric = header[start:start + width].strip(b" \0")
+            field = header[start:start + width]
+            if start in (108, 116) and (header[156:157] == b"x" or pending_pax is not None) and field[:1] == b"\x80":
+                if int.from_bytes(b"\0" + field[1:], "big") > 0xffffffff:
+                    raise EvidenceError("tar owner number overflow")
+                continue
+            numeric = field.strip(b" \0")
             if any(byte < ord("0") or byte > ord("7") for byte in numeric):
                 raise EvidenceError("unsupported tar numeric encoding; requires octal")
         try:
             info = tarfile.TarInfo.frombuf(header, "utf-8", "strict")
         except (tarfile.TarError, UnicodeError) as exc:
             raise EvidenceError(f"invalid tar header: {exc}") from exc
-        if info is None or info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
+        if info is None:
+            raise EvidenceError("unsupported tar entry type")
+        if info.type == tarfile.XHDTYPE and pending_pax is None:
+            if info.size <= 0 or info.size > MAX_PAX or any(header[345:500]):
+                raise EvidenceError("unsupported PAX header")
+            name = tar_text(header[:100])
+            if not name.startswith("PaxHeader/") or not name[len("PaxHeader/"):]:
+                raise EvidenceError("unsupported PAX header")
+            data = stream.read(info.size)
+            padding_size = -info.size % 512
+            padding = stream.read(padding_size)
+            if len(data) != info.size or len(padding) != padding_size or any(padding):
+                raise EvidenceError("invalid PAX entry padding")
+            pending_pax = parse_pax(data, name[len("PaxHeader/"):])
+            offset += 512 + info.size + padding_size
+            continue
+        if info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
             raise EvidenceError("unsupported tar entry type")
         if info.devmajor or info.devminor:
             raise EvidenceError("tar regular entry has device metadata")
@@ -263,6 +334,10 @@ def archive_facts(archive, integrity, *, budget=None):
             prefix = ""
         raw_name = tar_text(header[:100])
         joined = f"{prefix}/{raw_name}" if prefix else raw_name
+        if pending_pax is not None:
+            if info.isdir() or joined != pending_pax["path"] or info.size != pending_pax["size"] or "/./" in joined:
+                raise EvidenceError("PAX path or size differs from regular header")
+            pending_pax = None
         name = joined.removesuffix("/") if info.isdir() else joined
         raw_parts = name.split("/")
         dot_alias = len(raw_parts) >= 3 and raw_parts[1] == "."

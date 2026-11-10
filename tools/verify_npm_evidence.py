@@ -54,6 +54,14 @@ def regular(name, data):
     return name, data, tarfile.REGTYPE, ''
 
 
+def pax_record(key, value):
+    body = f' {key}={value}\n'.encode()
+    length = len(body) + 1
+    while len(str(length)) + len(body) != length:
+        length = len(str(length)) + len(body)
+    return str(length).encode() + body
+
+
 def tar_for(manifest=None, payload=b'', extra=()):
     return archive([regular('package/package.json', encoded(manifest or MANIFEST)),
                     regular('package/blob.bin', payload), *extra])
@@ -481,6 +489,19 @@ def cases():
         result.append(Case(f'tar_path_{name}', 'Extra manifest entry tests strict path and duplicate interpretation.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(MANIFEST)), regular(path, encoded(MANIFEST))]))))
     for name, kind in [('symlink', tarfile.SYMTYPE), ('hardlink', tarfile.LNKTYPE), ('fifo', tarfile.FIFOTYPE), ('character', tarfile.CHRTYPE), ('block', tarfile.BLKTYPE), ('pax', tarfile.XHDTYPE), ('pax_global', tarfile.XGLTYPE), ('gnu_longname', tarfile.GNUTYPE_LONGNAME), ('gnu_longlink', tarfile.GNUTYPE_LONGLINK), ('unknown_type', b'Z')]:
         result.append(Case(f'tar_type_{name}', f'Unsupported archive entry type {kind!r} with a valid manifest also present.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(MANIFEST)), ('package/unsupported', b'', kind, 'package/package.json')]))))
+    pax_payload = b''.join((pax_record('path', 'package/package.json'),
+                            pax_record('size', str(len(encoded(MANIFEST)))),
+                            pax_record('uid', '718322462'),
+                            pax_record('NODETAR.package.name', 'pkg')))
+    result.append(Case('valid_narrow_pax', 'Per-file PAX metadata repeats the regular manifest path and size.',
+                       artifact=zipped(archive([('PaxHeader/package/package.json', pax_payload, tarfile.XHDTYPE, ''),
+                                                regular('package/package.json', encoded(MANIFEST))]))))
+    bad_pax = b''.join((pax_record('path', 'package/package.json'),
+                        pax_record('size', str(len(encoded(MANIFEST)))),
+                        pax_record('linkpath', 'pkg')))
+    result.append(Case('pax_unknown_key', 'An unrecognized PAX key cannot change extraction meaning.',
+                       'incomplete', artifact=zipped(archive([('PaxHeader/package/package.json', bad_pax, tarfile.XHDTYPE, ''),
+                                                              regular('package/package.json', encoded(MANIFEST))]))))
     result.append(Case('tar_duplicate_prefix_path', 'Duplicate manifest encoded once in name and once with USTAR prefix.', 'incomplete', artifact=zipped(archive([regular('package/package.json', encoded(MANIFEST))])[:manifest_end] + changed(archive([regular('package.json', encoded(MANIFEST))]), 345, b'package', True))))
     result.append(Case('tar_missing_manifest', 'Archive has no package/package.json.', 'incomplete', artifact=zipped(archive([regular('package/README', b'x')]))))
     result.append(Case('manifest_invalid_json', 'Archive manifest is not valid JSON.', 'incomplete', artifact=zipped(archive([regular('package/package.json', b'{')]))))
@@ -602,7 +623,9 @@ def resource_cases():
     result.append(Case('valid_large_expanded_64', 'Expanded tar exceeds the former 64MiB limit and remains within the bounded archive profile.', artifact=zipped(tar)))
     tar += bytes(128 * MIB - len(tar))
     result.append(Case('valid_expanded_128', 'Expanded tar is exactly the declared 128MiB limit.', artifact=zipped(tar)))
-    result.append(Case('limit_expanded', 'Expanded tar exceeds 128MiB while compressed bytes remain below the compressed limit.', 'incomplete', artifact=zipped(tar + bytes(512)), expected_reason='expanded artifact exceeds 128 MiB'))
+    tar += bytes(256 * MIB - len(tar))
+    result.append(Case('valid_expanded_256', 'Expanded tar is exactly the declared 256MiB limit.', artifact=zipped(tar)))
+    result.append(Case('limit_expanded', 'Expanded tar exceeds 256MiB while compressed bytes remain below the compressed limit.', 'incomplete', artifact=zipped(tar + bytes(512)), expected_reason='expanded artifact exceeds 256 MiB'))
     large = tar_for(payload=bytes(65 * MIB))
     valid = zipped(large)
     result.append(Case('valid_large_payload', 'A 65MiB regular file is streamed before the archive qualifies.', artifact=valid))
