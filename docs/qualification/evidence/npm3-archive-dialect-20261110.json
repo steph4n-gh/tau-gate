@@ -1,0 +1,103 @@
+{
+  "candidate_sha256": "95d9cfbaf0c629ef82be856b25bbdc5341a22b1b2b156861decc1379e0e425ce",
+  "controls": {
+    "evidence": {
+      "cases": 322,
+      "receipt": "ecosystem_audit/npm3-archive-dialect-20261110/evidence-controls/receipt.json",
+      "result": "pass",
+      "sha256": "bf044d998324f540723e4b489369e573fa0ffa5567614e851f61166da576a6a3"
+    },
+    "native_npm": {
+      "cases": 17,
+      "receipt": "ecosystem_audit/npm3-archive-dialect-20261110/native-controls/receipt.json",
+      "result": "pass",
+      "sha256": "28f3559c965078e0f2eb5f72f0dca1530fe999929dac6797cb72ff1671e48ae5"
+    },
+    "wrapper": {
+      "cases": 20,
+      "receipt": "ecosystem_audit/npm3-archive-dialect-20261110/wrapper-controls/receipt.json",
+      "result": "pass",
+      "sha256": "83153afcf8d57727fc7d2bd7d37a5f8e155709c8a6f39d04f0154084bc1ea725"
+    }
+  },
+  "core_source_commit": "b830b275a006260f8bce0340751929bac00d1a7a",
+  "fuzz_source_commit": "d1d6bd74772cc3dadec5a0d9985eaa897aead95d",
+  "missing_locator_classification": {
+    "integrity_present": 0,
+    "receipt_sha256": "745241ffa83cd33f1e70b6d640a83c88a1083c0a633d41d02e3e4938f32b366f",
+    "records": 4096,
+    "repositories": {
+      "octokit/request.js": 96,
+      "webpack/schema-utils": 4000
+    },
+    "resolved_present": 0
+  },
+  "qualification": "not qualified: formerly unseen cases are regression-only, 22/30 completion on those cases, 512 MiB continuous tar gate inconsistent; fresh cohort and human benefit remain open",
+  "real_archive_check": {
+    "collector_and_independent_tarfile_match": true,
+    "receipt_sha256": "601c3de5ae1516c7bf0b457fa6d9a5f0f3beb0391a769d75cd96d44a8311770d",
+    "regular_entries": 1117,
+    "repeated_records": 43,
+    "unique_archives": 11
+  },
+  "regressions": {
+    "formerly_unseen": {
+      "assessable_events": 2447,
+      "classification": "known-case regression",
+      "compatibility_sha256": "8f3c712f9d512757c5c93dc1e779f4afd54d3336ec239816df12dccd6ba58ed4",
+      "fact_mismatches": 0,
+      "labels_sha256": "ce5abb9520974f75068330fc541c45aeb3085a70e1ff1f719c4eba85d2a57b40",
+      "matched_events": 2447,
+      "new_processing_complete": 22,
+      "newly_qualified_records": 43,
+      "original_processing_complete": 20,
+      "original_summary_sha256": "bad33d25e1c43f6527f673c86acc1278b12cf4d2764c374680dcc46d8a5163d1",
+      "pairs": 30,
+      "previously_qualified_records_unchanged": 12982,
+      "remaining_unknown_reasons": {
+        "missing locator for locked instance": 4096,
+        "source manifest dependencies does not match lock instance \"\"": 1,
+        "tar links, extensions and special records are unsupported": 2
+      },
+      "summary_sha256": "433dfbf57fa41f3f4b03ca3fac301b60215b8517f480b4293b56a3352a2ad7cf",
+      "unexpected_allowed_outcomes": 0
+    },
+    "prior": {
+      "assessable_events": 4312,
+      "classification": "known-case regression",
+      "compatibility_sha256": "6abc58b7d8292450f7a6e1fbdd1db2c15c99e6b9536e33b93c4da276a3ba0477",
+      "fact_mismatches": 0,
+      "labels_sha256": "e6b843679042f60353711d2660ab09aa11f909f43e3426624c3ba171ba4de151",
+      "matched_events": 4312,
+      "new_processing_complete": 25,
+      "newly_qualified_records": 0,
+      "original_processing_complete": 25,
+      "original_summary_sha256": "14063ef5eedbd8b6f4da35524b70b21c54fc5a98cfcda8fbf867429cc08a07af",
+      "pairs": 30,
+      "previously_qualified_records_unchanged": 21277,
+      "remaining_unknown_reasons": {
+        "missing locator for locked instance": 7,
+        "source manifest devDependencies does not match lock instance \"\"": 1
+      },
+      "summary_sha256": "a79e37c4221ea460c3a83ade180e9afa6f0cbe29e6f6049640003e560c5c3249",
+      "unexpected_allowed_outcomes": 0
+    }
+  },
+  "schema_version": 1,
+  "scope": "experimental exact-GNU-USTAR coverage; original holdout results remain frozen",
+  "source_sha256": {
+    "src/artifact.rs": "981854ecb067fb7f48761a3973cdd9681450211f73cdb6bf68ebc2b689f419b7",
+    "tests/test_qualification_collector.py": "bd5f1d2b6de5c661f1cdec2c79e3e60223192bb009377e249d95ca1344d51c8b",
+    "tools/npm_evidence.py": "bde2373b1f8922a68f419db57667ff249571466caab52c2de416de0668610dce",
+    "tools/verify_npm_evidence.py": "553a4b556fb96381c7d410b31679eab600717560a160f65e0f86e897f86f96dd"
+  },
+  "tar_fuzz": {
+    "asan_binary_sha256": "874447399967561dc21d1fb93f01d56efb57387a68708a155f433287e9563d00",
+    "continuous_gate_passed": false,
+    "continuous_passed": 2,
+    "continuous_runs": 5,
+    "receipt_sha256": "b137f2c285136049f5d279866ab3206dc76d9c39522b17d4aae46db9fd5c9ca8",
+    "rss_limit_mib": 512,
+    "seed_tests_passed": 29
+  }
+}
