@@ -87,6 +87,8 @@ Approvals bind the exact instance, source, integrity, original archive, manifest
 
 For pull requests containing root or workspace install scripts, use the [trusted Git PR helper](docs/pr-review.md). It additionally binds the entire tracked source tree because an unchanged lifecycle command can run changed local script files.
 
+For a first look at an npm v3 PR, the packaged helper can produce a read-only preview from fetched Git revisions without approval files: `python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch`. It writes a Markdown summary and JSON report outside the repository. A complete preview is informational; it does not allow the PR. See the [PR review guide](docs/pr-review.md#preview-a-pr-before-setting-up-approvals).
+
 The qualified archive profile is deliberately narrow. It requires SHA512 SRI, direct HTTP(S) archive sources, a single gzip member, and portable ASCII ustar paths. Unsupported source kinds, archive extensions, or ambiguous paths remain incomplete. Source manifests retain caller trust. Integrity does not authenticate a publisher or establish artifact safety. See the [execution contract](docs/execution-evidence.md) and [collection and independent checks](docs/npm-reference.md).
 
 | Exit | Meaning |

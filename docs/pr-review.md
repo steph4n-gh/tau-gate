@@ -2,6 +2,18 @@
 
 Use the caller-trusted Python helpers and checker binary to review two commits. The helper captures the root manifest, every locked workspace manifest, sibling `binding.gyp` files, and the npm v3 lock directly from Git objects. A dirty working tree does not change those inputs. No package manager, package script, or head-side helper runs.
 
+## Preview a PR before setting up approvals
+
+From the npm repository, with the base and head commits fetched locally, run the helper from a verified Tau-Gate archive:
+
+```sh
+python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch
+```
+
+The helper uses the current directory as the repository and the checker beside its packaged `tools` directory. It writes `summary.md` and `report.json` to a new temporary directory and prints the summary path. Use `--project apps/web` for a workspace project, `--repo` for a different repository, or `--output` to choose a new or empty directory outside the repository. Without `--archive-cache`, the evidence collector may fetch exact SHA512-bound original archives from the constrained npm registry endpoint described below. The preview uses no approval files or store. Exit 0 means the available evidence produced a complete preview; exit 2 means an input or evidence gap. **A preview never approves a PR or authorizes a merge.** When the review is useful, set up the enforced check below.
+
+## Enforce an approval decision
+
 1. Put an explicit [bound approval file](execution-evidence.md#approval-schema-and-outcomes) in the trusted base commit. An empty approval list is valid policy; a missing file is incomplete input. If a root or workspace has a lifecycle candidate, also put a source-tree approval file in the trusted base. Its digest list may be empty when using the external trusted approval store below.
 2. Fetch the exact base and head commits before the review. Use Git with support for `GIT_NO_LAZY_FETCH`. Object reads disable replacement objects and lazy fetching. Unavailable objects return incomplete instead of accessing the network.
 3. Run the helper from a trusted checkout outside the target repository. Use an absolute path to the trusted checker binary.

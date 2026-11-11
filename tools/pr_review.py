@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Review exact npm Git snapshots against approvals from the base commit."""
+"""Preview or enforce an npm PR review from exact Git snapshots."""
 
 import argparse
 from dataclasses import dataclass, field
@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 from npm_evidence import (
     EvidenceError, MAX_FILE, MAX_MANIFEST, archive_facts, archive_facts_nested, collect_evidence,
@@ -395,6 +396,10 @@ def route_text(route, path):
 
 
 def decision_text(report):
+    if report.get("mode") == "preview":
+        if report["outcome"] == "incomplete":
+            return "Preview incomplete. Resolve the listed input or evidence gaps before relying on this review."
+        return "Preview complete. Inspect the changes below; this preview is not an approval or merge gate."
     if report["outcome"] == "incomplete":
         return "Review incomplete. Resolve the listed input or evidence gaps and rerun this exact head."
     core_policy = (report.get("core") or {}).get("policy") or {}
@@ -495,11 +500,13 @@ def effective_approvals(base_data, additions):
         {"path": path, "fingerprints": sorted(values)} for path, values in sorted(by_path.items())]})
 
 
-def core_review(binary, output, approvals):
+def core_review(binary, output, approvals=None):
     command = [str(binary), "review", "--base", "base/project/package-lock.json",
                "--head", "head/project/package-lock.json", "--base-manifest", "base/project/package.json",
                "--head-manifest", "head/project/package.json", "--base-evidence", "base/evidence/index.json",
-               "--head-evidence", "head/evidence/index.json", "--approvals", approvals, "--enforce", "--json"]
+               "--head-evidence", "head/evidence/index.json", "--json"]
+    if approvals is not None:
+        command.extend(("--approvals", approvals, "--enforce"))
     result = subprocess.run(command, cwd=output, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if len(result.stdout) > MAX_FILE:
         raise EvidenceError("core report exceeds 64 MiB")
@@ -507,13 +514,20 @@ def core_review(binary, output, approvals):
     if not isinstance(core, dict):
         raise EvidenceError("core report must be a JSON object")
     outcome = core.get("policy", {}).get("outcome", "incomplete")
-    if outcome not in ("allowed", "blocked", "incomplete") or result.returncode != {"allowed": 0, "blocked": 1, "incomplete": 2}[outcome]:
+    expected = {"allowed": 0, "blocked": 1, "incomplete": 2}
+    if approvals is None:
+        expected = {"advisory": 2 if core.get("status") == "incomplete" else 0}
+    if outcome not in expected or result.returncode != expected[outcome]:
         raise EvidenceError(f"core outcome or exit code is inconsistent: {result.returncode}")
     return core, outcome
 
 
 def summary(report):
-    lines = [f"# Tau-Gate PR review: {report['outcome']}", "", decision_text(report), ""]
+    if report.get("mode") == "preview":
+        title = "# Tau-Gate PR preview: " + ("incomplete" if report["outcome"] == "incomplete" else "complete")
+    else:
+        title = f"# Tau-Gate PR review: {report['outcome']}"
+    lines = [title, "", decision_text(report), ""]
     if report.get("approval_request"):
         request = report["approval_request"]
         if report.get("trusted_approval", {}).get("matched"):
@@ -681,6 +695,8 @@ def prepare_output(path, repository, cache):
 def review(args):
     report = {"schema_version": 1, "outcome": "incomplete", "exit_code": 2,
               "base": None, "head": None, "policy": None, "source_approval": None, "core": None, "errors": []}
+    if args.preview:
+        report["mode"] = "preview"
     output = None
     replacements = []
     stage = "inputs"
@@ -696,10 +712,11 @@ def review(args):
             store = approval_store(args.approval_store, git.repository, output, args.archive_cache)
             replacements.append((str(store), "<approval-store>"))
         project = "" if args.project == "." else portable_path(args.project)
-        approval_path = portable_path(args.approvals)
-        source_approval_path = portable_path(args.source_approvals)
-        if approval_path == source_approval_path:
-            raise EvidenceError("approval paths must be distinct")
+        if not args.preview:
+            approval_path = portable_path(args.approvals)
+            source_approval_path = portable_path(args.source_approvals)
+            if approval_path == source_approval_path:
+                raise EvidenceError("approval paths must be distinct")
         binary = args.tau_gate.resolve(strict=True)
         report["trusted_tools"] = {
             "tau_gate_sha256": sha256(read_limited(binary)),
@@ -718,6 +735,19 @@ def review(args):
             source = capture(git, snapshot, output / label)
             stage = label + "_evidence"
             collect_evidence(source / "package-lock.json", source, output / label / "evidence", args.archive_cache)
+        if args.preview:
+            stage = "core_preview"
+            core, _ = core_review(binary, output)
+            outcome = "incomplete" if core.get("status") == "incomplete" else "preview"
+            core.pop("policy", None)
+            report["core"] = core
+            report["review"] = review_view(report, output)
+            report.update(outcome=outcome, exit_code={"preview": 0, "incomplete": 2}[outcome])
+            for label, snapshot in snapshots.items():
+                report[label] = snapshot.report()
+            (output / "report.json").write_bytes(json_bytes(report))
+            (output / "summary.md").write_text(summary(report), encoding="utf-8")
+            return report
         stage = "base_policy"
         data, metadata = git.blob(snapshots["base"].commit, approval_path)
         base_policy_data = data
@@ -814,18 +844,30 @@ def review(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, required=True)
+    parser.add_argument("--preview", action="store_true", help="show exact PR changes without approval policy or an allow decision")
+    parser.add_argument("--repo", type=Path, default=Path.cwd(), help="Git repository (default: current directory)")
     parser.add_argument("--base", required=True)
     parser.add_argument("--head", required=True)
     parser.add_argument("--project", default=".", help="portable repository-relative npm project directory")
-    parser.add_argument("--approvals", default="tau-gate.approvals.json", help="repository-relative approval file read from base only")
-    parser.add_argument("--source-approvals", default="tau-gate.source-approvals.json", help="repository-relative source-tree approval file read from base only")
-    parser.add_argument("--tau-gate", type=Path, required=True, help="caller-trusted executable")
+    parser.add_argument("--approvals", help="repository-relative approval file read from base only")
+    parser.add_argument("--source-approvals", help="repository-relative source-tree approval file read from base only")
+    parser.add_argument("--tau-gate", type=Path, default=Path(__file__).resolve().parents[1] / "tau-gate",
+                        help="caller-trusted executable (default: checker beside packaged tools)")
     parser.add_argument("--archive-cache", type=Path, help="offline SHA512-hex.tgz cache; omission permits constrained downloads")
     parser.add_argument("--approval-store", type=Path, help="administrator-controlled approval records outside the PR repository")
     parser.add_argument("--approve-subject", help="record this exact reviewed subject in the trusted approval store")
-    parser.add_argument("--output", type=Path, required=True, help="new or empty directory outside repository and cache")
+    parser.add_argument("--output", type=Path, help="new or empty directory outside repository and cache")
     args = parser.parse_args(argv)
+    if args.preview:
+        if any(value is not None for value in (args.approvals, args.source_approvals, args.approval_store, args.approve_subject)):
+            parser.error("--preview cannot use approval options")
+        if args.output is None:
+            args.output = Path(tempfile.mkdtemp(prefix="tau-gate-preview-"))
+    else:
+        if args.output is None:
+            parser.error("--output is required for an enforced review")
+        args.approvals = args.approvals or "tau-gate.approvals.json"
+        args.source_approvals = args.source_approvals or "tau-gate.source-approvals.json"
     report = review(args)
     if args.approve_subject is not None:
         try:
@@ -843,6 +885,23 @@ def main(argv=None):
         print(json.dumps({"approval_recorded": True, "created": created,
                           "subject_sha256": request["subject_sha256"]}, sort_keys=True))
         return 0
+    if args.preview:
+        state = "complete" if report["outcome"] == "preview" else "incomplete"
+        print(f"Tau-Gate PR preview: {state}")
+        print("Informational only; no approval decision.")
+        if (args.output / "summary.md").is_file():
+            print(f"Summary: {args.output.resolve() / 'summary.md'}")
+            print(f"JSON report: {args.output.resolve() / 'report.json'}")
+            core = report.get("core") or {}
+            view = report.get("review") or {}
+            print(f"{len(core.get('package_changes', []))} package changes; "
+                  f"{len(core.get('execution_evidence_changes', []))} evidence changes; "
+                  f"{len(view.get('unknowns', []))} evidence gaps.")
+            if report["errors"]:
+                print(f"Reason: {report['errors'][0]['message']}")
+        elif report["errors"]:
+            print(report["errors"][0]["message"])
+        return report["exit_code"]
     print(json.dumps(report, sort_keys=True, ensure_ascii=False))
     return report["exit_code"]
 
