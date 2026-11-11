@@ -4,7 +4,7 @@ Use the caller-trusted Python helpers and checker binary to review two commits. 
 
 ## Preview a PR before setting up approvals
 
-From the npm repository, with the base and head commits fetched locally, run the helper from a verified Tau-Gate archive:
+From the npm repository, with the base and head commits fetched locally, run the helper from a verified Tau-Gate archive containing this preview change (the published beta.2 predates it):
 
 ```sh
 python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch
