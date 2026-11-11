@@ -46,6 +46,14 @@ python3 -B tools/pr_review.py --help
 
 The [PR review guide](pr-review.md) shows the exact-base/head command and approval workflow. The beta supports npm v3 PRs whose original package archives can be verified within the documented bounds. Unsupported or missing evidence stays incomplete; approval cannot waive it. The helper never runs package lifecycle scripts.
 
+The preview command below is in this source tree; the published beta.2 archive predates it. Build this tree or use an archive that includes the preview change, fetch the npm repository's base and head commits, and run the helper from that repository:
+
+```sh
+python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch
+```
+
+It prints the path to a Markdown summary. A complete preview is informational; use the [enforced PR workflow](pr-review.md#enforce-an-approval-decision) for an approval decision. When running directly from this source tree, pass `--tau-gate /path/to/target/release/tau-gate` because the binary is not beside `tools/` until it is packaged.
+
 ## Build from source
 
 Use Rust 1.85.0 and the checked-in `Cargo.lock`. The core has no third-party Rust dependencies.

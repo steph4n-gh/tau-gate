@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -163,6 +164,48 @@ class PullRequestReview(unittest.TestCase):
         self.assertEqual(first["policy"]["origin"], "base")
         self.assertEqual(first["source_approval"]["status"], "allowed")
         self.assertEqual(self.git("status", "--porcelain"), before)
+
+    def test_first_review_preview_needs_no_policy_files_or_output_setup(self):
+        self.policy_path.unlink()
+        self.source_policy_path.unlink()
+        base = self.commit("remove approval policy")
+        self.manifest["scripts"]["prepare"] = "echo changed-root-canary > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        head = self.commit("change lifecycle command")
+        bundle = self.root / "bundle"
+        (bundle / "tools").mkdir(parents=True)
+        shutil.copy2(BINARY, bundle / "tau-gate")
+        for name in ("pr_review.py", "npm_evidence.py", "github_pr_approval.py"):
+            shutil.copy2(ROOT / "tools" / name, bundle / "tools" / name)
+        command = [sys.executable, str(bundle / "tools/pr_review.py"), "--preview", "--base", base, "--head", head,
+                   "--project", "apps/example", "--archive-cache", str(self.cache)]
+        result = subprocess.run(command, cwd=self.repo, capture_output=True,
+                                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        lines = result.stdout.decode().splitlines()
+        self.assertEqual(lines[0], "Tau-Gate PR preview: complete")
+        self.assertEqual(lines[1], "Informational only; no approval decision.")
+        summary_path = Path(lines[2].removeprefix("Summary: "))
+        report = json.loads(Path(lines[3].removeprefix("JSON report: ")).read_bytes())
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report["outcome"], "preview")
+        self.assertIsNone(report["policy"])
+        self.assertNotIn("policy", report["core"])
+        self.assertEqual(report["review"]["execution_changes"][0]["after"]["commands"]["prepare"],
+                         "echo changed-root-canary > CANARY_EXECUTED")
+        self.assertTrue(summary_path.is_file())
+        self.assertIn("not an approval or merge gate", summary_path.read_text())
+        self.assertFalse(list(self.repo.rglob("CANARY_EXECUTED")))
+
+        archive = next(self.cache.glob("*.tgz"))
+        archive.unlink()
+        incomplete = subprocess.run(command, cwd=self.repo, capture_output=True,
+                                    env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        lines = incomplete.stdout.decode().splitlines()
+        self.assertEqual(lines[0], "Tau-Gate PR preview: incomplete")
+        gap = json.loads(Path(lines[3].removeprefix("JSON report: ")).read_bytes())
+        self.assertEqual(incomplete.returncode, 2, gap)
+        self.assertEqual(gap["outcome"], "incomplete")
+        self.assertIn("Preview incomplete", Path(lines[2].removeprefix("Summary: ")).read_text())
 
     def test_changed_lifecycle_and_forged_head_approval_remain_blocked(self):
         self.manifest["scripts"]["prepare"] = "echo changed-root-canary > CANARY_EXECUTED"
