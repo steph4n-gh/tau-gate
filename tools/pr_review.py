@@ -44,7 +44,7 @@ class GitObjects:
         self.source_trees = {}
 
     def run(self, *args):
-        result = subprocess.run(["git", "--no-lazy-fetch", "--no-replace-objects", "--literal-pathspecs", "-C", str(self.repository), *args],
+        result = subprocess.run(["git", "--no-replace-objects", "--literal-pathspecs", "-C", str(self.repository), *args],
                                 env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode:
             raise EvidenceError("Git object lookup failed: " + result.stderr.decode("utf-8", "replace").strip())
