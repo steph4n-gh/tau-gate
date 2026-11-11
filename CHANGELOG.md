@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (4.3.0)
+
+- Preview an npm v3 PR from fetched Git revisions without approval files or an allow decision.
+- Derive existing qualified execution approvals from the protected base commit. The single GitHub workflow runs pinned release tools and accepts an exact maintainer comment for new evidence; repository approval JSON and the separate comment workflow are no longer needed for this path.
+
 ## 4.3.0-beta.2
 
 - Run the packaged npm PR reviewer with Debian 12's Git 2.39. The helper uses `GIT_NO_LAZY_FETCH` to keep missing objects incomplete without passing a Git option that this version rejects.

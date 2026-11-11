@@ -23,7 +23,7 @@ class GitHubWorkflowTests(unittest.TestCase):
     def run_review(self, approved):
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
-            scripts = temp / "npm-review-repository/tools"
+            scripts = temp / "tau-gate-install/tools"
             scripts.mkdir(parents=True)
             (scripts / "pr_review.py").write_text(textwrap.dedent("""\
                 import json
@@ -31,6 +31,7 @@ class GitHubWorkflowTests(unittest.TestCase):
                 import sys
 
                 args = sys.argv
+                assert '--baseline-from-base' in args
                 output = Path(args[args.index('--output') + 1])
                 output.mkdir()
                 allowed = output.name == 'npm-review-report'

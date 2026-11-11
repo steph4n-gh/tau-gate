@@ -3,6 +3,8 @@ name: Review npm execution evidence
 on:
   pull_request_target:
     branches: [main]
+  issue_comment:
+    types: [created, edited, deleted]
 
 permissions:
   contents: read
@@ -11,6 +13,7 @@ permissions:
 
 jobs:
   review:
+    if: github.event_name == 'pull_request_target'
     name: tau-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -44,11 +47,13 @@ jobs:
           [[ "$TAU_GATE_ARCHIVE_URL" == https://* ]]
           [[ "$TAU_GATE_ARCHIVE_SHA256" =~ ^[0-9a-f]{64}$ ]]
           archive="$RUNNER_TEMP/tau-gate.tar.gz"
-          checker="$RUNNER_TEMP/tau-gate"
+          install_dir="$RUNNER_TEMP/tau-gate-install"
+          mkdir "$install_dir"
           curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 "$TAU_GATE_ARCHIVE_URL" --output "$archive"
           printf '%s  %s\n' "$TAU_GATE_ARCHIVE_SHA256" "$archive" | sha256sum --check -
-          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" --no-same-owner --no-same-permissions ./tau-gate
-          chmod +x "$checker"
+          tar --extract --gzip --file "$archive" --directory "$install_dir" --no-same-owner --no-same-permissions \
+            ./tau-gate ./tools/pr_review.py ./tools/npm_evidence.py ./tools/github_pr_approval.py
+          chmod +x "$install_dir/tau-gate"
 
       - name: Review exact snapshots and trusted maintainer comments
         env:
@@ -57,15 +62,17 @@ jobs:
         run: |
           set -euo pipefail
           repository="$RUNNER_TEMP/npm-review-repository"
+          trusted="$RUNNER_TEMP/tau-gate-install"
           store="$RUNNER_TEMP/tau-gate-approvals"
           pre="$RUNNER_TEMP/npm-review-pre"
           output="$RUNNER_TEMP/npm-review-report"
           install -d -m 0700 "$store"
-          if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+          if PYTHONDONTWRITEBYTECODE=1 python3 "$trusted/tools/pr_review.py" \
             --repo "$repository" \
             --base "$BASE_COMMIT" \
             --head "$HEAD_COMMIT" \
-            --tau-gate "$RUNNER_TEMP/tau-gate" \
+            --baseline-from-base \
+            --tau-gate "$trusted/tau-gate" \
             --approval-store "$store" \
             --output "$pre" > "$RUNNER_TEMP/npm-review-pre.json"; then
             result=0
@@ -73,7 +80,7 @@ jobs:
             result=$?
           fi
           if [ "$result" -eq 1 ] && python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("approval_request") else 1)' "$pre/report.json"; then
-            if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/github_pr_approval.py" check \
+            if PYTHONDONTWRITEBYTECODE=1 python3 "$trusted/tools/github_pr_approval.py" check \
               --report "$pre/report.json" --repository "$REPOSITORY" --pr-number "$PR_NUMBER"; then
               lookup=0
             else
@@ -81,9 +88,9 @@ jobs:
             fi
             if [ "$lookup" -eq 0 ]; then
               subject=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["approval_request"]["subject_sha256"])' "$pre/report.json")
-              if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+              if PYTHONDONTWRITEBYTECODE=1 python3 "$trusted/tools/pr_review.py" \
                 --repo "$repository" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" \
-                --tau-gate "$RUNNER_TEMP/tau-gate" --approval-store "$store" \
+                --baseline-from-base --tau-gate "$trusted/tau-gate" --approval-store "$store" \
                 --approve-subject "$subject" --output "$RUNNER_TEMP/npm-review-approval" \
                 > "$RUNNER_TEMP/npm-review-approval.json"; then
                 recorded=0
@@ -91,9 +98,9 @@ jobs:
                 recorded=$?
               fi
               if [ "$recorded" -eq 0 ]; then
-                if PYTHONDONTWRITEBYTECODE=1 python3 "$repository/tools/pr_review.py" \
+                if PYTHONDONTWRITEBYTECODE=1 python3 "$trusted/tools/pr_review.py" \
                   --repo "$repository" --base "$BASE_COMMIT" --head "$HEAD_COMMIT" \
-                  --tau-gate "$RUNNER_TEMP/tau-gate" --approval-store "$store" \
+                  --baseline-from-base --tau-gate "$trusted/tau-gate" --approval-store "$store" \
                   --output "$output" > "$RUNNER_TEMP/npm-review.json"; then
                   result=0
                 else
@@ -127,3 +134,33 @@ jobs:
             ${{ runner.temp }}/npm-review-report/summary.md
           retention-days: 7
           if-no-files-found: warn
+
+  rerun:
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      TAU_GATE_ARCHIVE_URL: ${{ vars.TAU_GATE_ARCHIVE_URL }}
+      TAU_GATE_ARCHIVE_SHA256: ${{ vars.TAU_GATE_ARCHIVE_SHA256 }}
+    steps:
+      - name: Verify and run the trusted approval helper
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TAU_GATE_ARCHIVE_URL" == https://* ]]
+          [[ "$TAU_GATE_ARCHIVE_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          archive="$RUNNER_TEMP/tau-gate.tar.gz"
+          trusted="$RUNNER_TEMP/tau-gate-install"
+          mkdir "$trusted"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 "$TAU_GATE_ARCHIVE_URL" --output "$archive"
+          printf '%s  %s\n' "$TAU_GATE_ARCHIVE_SHA256" "$archive" | sha256sum --check -
+          tar --extract --gzip --file "$archive" --directory "$trusted" --no-same-owner --no-same-permissions \
+            ./tools/github_pr_approval.py
+          PYTHONDONTWRITEBYTECODE=1 python3 "$trusted/tools/github_pr_approval.py" rerun \
+            --event "$GITHUB_EVENT_PATH" --repository "$GITHUB_REPOSITORY"
