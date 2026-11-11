@@ -98,10 +98,33 @@ jobs:
           cmp docs/pr-review.md "$installed/PR-REVIEW.md"
           cmp docs/examples/npm-pr-review.yml "$installed/examples/npm-pr-review.yml"
           cmp docs/examples/npm-pr-approval-rerun.yml "$installed/examples/npm-pr-approval-rerun.yml"
-          PYTHONDONTWRITEBYTECODE=1 python3 tools/verify_pr_review.py \
-            --wrapper "$installed/tools/pr_review.py" \
-            --binary "$installed/tau-gate" \
-            --output "$RUNNER_TEMP/installed-pr-controls"
+
+      - name: Check packaged PR reviewer with Debian 12 Git
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.build.outputs.archive }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 --network none --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,size=256m --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --mount "type=bind,src=$ARCHIVE,dst=/input/release.tar.gz,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/source,readonly" \
+            --workdir /source \
+            --env PYTHONDONTWRITEBYTECODE=1 \
+            --env TAU_GATE=/tmp/tau-gate/tau-gate \
+            rust@sha256:16a7f242108de02f10fe4a392991679bafa7694e59f5b40a54d5af1be9b40d03 \
+            sh -ceu '
+              test "$(git --version)" = "git version 2.39.5"
+              mkdir /tmp/tau-gate
+              tar --no-same-owner -xzf /input/release.tar.gz -C /tmp/tau-gate
+              python3 -B tools/verify_pr_review.py \
+                --wrapper /tmp/tau-gate/tools/pr_review.py \
+                --binary /tmp/tau-gate/tau-gate \
+                --output /tmp/pr-controls
+              python3 -B -m unittest \
+                tests.test_pr_review.PullRequestReview.test_missing_promised_blob_does_not_fetch
+            '
 
       - name: Sign build provenance
         id: provenance

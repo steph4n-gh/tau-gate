@@ -1,7 +1,7 @@
 # Verify a Linux release independently
 
 The declared release platform is Debian 12 x86_64. The commands below show
-v4.2.1 filenames; for v4.3.0-beta.1 substitute the beta filenames and its
+v4.2.1 filenames; for v4.3.0-beta.2 substitute the beta filenames and its
 exact tagged commit. The build uses Rust 1.85.0
 inside the pinned Linux amd64 image
 `rust@sha256:16a7f242108de02f10fe4a392991679bafa7694e59f5b40a54d5af1be9b40d03`.
