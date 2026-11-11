@@ -4,7 +4,7 @@
 
 Tau-Gate reviews frozen **npm v1/v2/v3, pnpm v6/v9, Yarn Classic v1 and Yarn Berry lockfiles** before dependency changes are accepted. It shows which dependency records changed version, source, integrity metadata or execution markers, and the dependency paths that introduced them. Its Rust core uses only the standard library.
 
-The latest stable release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). This source tree builds v4.3.0-beta.1, which packages the npm v3 PR reviewer and its trusted workflow examples. See [installation](docs/setup.md) for Debian 12 x86_64 archives and source-build instructions.
+The latest stable release is [v4.2.1](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.2.1). This source tree builds v4.3.0-beta.2, which packages the npm v3 PR reviewer and its trusted workflow examples. See [installation](docs/setup.md) for Debian 12 x86_64 archives and source-build instructions.
 
 A completed report means extraction completed within the stated snapshot scope. It does **not** mean code is safe. With explicit npm evidence, v4.2 verifies original archive bytes and inventories lifecycle bodies and native-build inputs. Without that evidence, dependency install markers remain advisory and an absent marker leaves execution unknown. All lockfile records are included, including dev and optional packages. Host installation selection and runtime behavior are not simulated.
 
