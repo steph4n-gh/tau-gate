@@ -128,10 +128,10 @@ class PullRequestReview(unittest.TestCase):
         return {"schema_version": 1, "approvals": [{"path": item["path"], "fingerprint": item["approval_fingerprint"]}
                                                     for item in report["execution_evidence"] if item["candidate"]]}
 
-    def run_review(self, head=None, base=None, expected=0, extra=()):
+    def run_review(self, head=None, base=None, expected=0, extra=(), repository=None):
         self.sequence += 1
         output = self.root / f"review-{self.sequence}"
-        command = [sys.executable, str(WRAPPER), "--repo", str(self.repo), "--base", base or self.base,
+        command = [sys.executable, str(WRAPPER), "--repo", str(repository or self.repo), "--base", base or self.base,
                    "--head", head or self.base, "--project", "apps/example", "--approvals", "apps/example/.tau-gate-approvals.json",
                    "--source-approvals", "apps/example/.tau-gate-source-approvals.json",
                    "--tau-gate", str(BINARY), "--archive-cache", str(self.cache), "--output", str(output), *extra]
@@ -461,6 +461,20 @@ class PullRequestReview(unittest.TestCase):
             with self.subTest(ref=ref):
                 report, _ = self.run_review(head=ref, expected=2)
                 self.assertEqual(report["errors"][0]["stage"], "head_revision")
+
+    def test_missing_promised_blob_does_not_fetch(self):
+        self.git("config", "uploadpack.allowFilter", "true")
+        partial = self.root / "partial"
+        subprocess.run(["git", "clone", "--quiet", "--no-checkout", "--filter=blob:none",
+                        self.repo.as_uri(), str(partial)], check=True, capture_output=True)
+        blob = self.git("rev-parse", self.base + ":apps/example/package.json")
+        report, _ = self.run_review(repository=partial, expected=2)
+        self.assertEqual(report["errors"][0]["stage"], "base_capture")
+        self.assertIn("Git object lookup failed", report["errors"][0]["message"])
+        missing = subprocess.run(["git", "-C", str(partial), "cat-file", "-e", blob],
+                                 env={**os.environ, "GIT_NO_LAZY_FETCH": "1"}, capture_output=True)
+        self.assertNotEqual(missing.returncode, 0)
+        subprocess.run(["git", "-C", str(partial), "cat-file", "-e", blob], check=True, capture_output=True)
 
     def test_revision_option_and_project_traversal_rejected(self):
         report, _ = self.run_review(head="HEAD~1", expected=2)

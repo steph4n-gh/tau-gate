@@ -3,7 +3,7 @@
 Use the caller-trusted Python helpers and checker binary to review two commits. The helper captures the root manifest, every locked workspace manifest, sibling `binding.gyp` files, and the npm v3 lock directly from Git objects. A dirty working tree does not change those inputs. No package manager, package script, or head-side helper runs.
 
 1. Put an explicit [bound approval file](execution-evidence.md#approval-schema-and-outcomes) in the trusted base commit. An empty approval list is valid policy; a missing file is incomplete input. If a root or workspace has a lifecycle candidate, also put a source-tree approval file in the trusted base. Its digest list may be empty when using the external trusted approval store below.
-2. Fetch the exact base and head commits before the review. Use Git with support for `--no-lazy-fetch`. Object reads disable replacement objects and lazy fetching. Unavailable objects return incomplete instead of accessing the network.
+2. Fetch the exact base and head commits before the review. Use Git with support for `GIT_NO_LAZY_FETCH`. Object reads disable replacement objects and lazy fetching. Unavailable objects return incomplete instead of accessing the network.
 3. Run the helper from a trusted checkout outside the target repository. Use an absolute path to the trusted checker binary.
 
 ```sh
