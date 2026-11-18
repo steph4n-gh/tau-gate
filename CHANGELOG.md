@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.0
+
+- Ship the bounded npm v3 Git-object PR reviewer, `--preview` mode, `--baseline-from-base` protected-base baseline, and single-file GitHub workflow (`docs/examples/npm-pr-review.yml`) with the Debian 12 x86_64 checker archive.
+- Verify the single-file protected-base workflow on GitHub across blocked, exact maintainer-comment approved, and stale-head re-blocked states (`docs/qualification/evidence/hosted-single-workflow-20261118.json`).
+- Expand read-only lockfile topology parsing to npm v1/v2, pnpm v6/v9, Yarn Classic v1, and Yarn Berry (metadata 6/8/10) with explicit `--project-inputs`, streaming 128 MiB npm archive inspection, verified byte-change observations, and combined spectral/bridge cut diagnostics.
+- Preserve measured scope limits: pnpm/Yarn and legacy npm execution metadata remain unqualified (`incomplete`, exit 2), unselected historical npm v3 PR cohorts remain below the exploratory 80%/95% coverage floors (`docs/qualification/product-release-decision-20261110.md`, `docs/qualification/npm3-next-cohort.md`), and no outside-maintainer study, host-runtime prediction, or general package-safety claim is made.
+
 ## 4.3.0-beta.3
 
 - Preview an npm v3 PR from fetched Git revisions without approval files or an allow decision.
