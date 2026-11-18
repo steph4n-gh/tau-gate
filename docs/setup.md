@@ -7,7 +7,7 @@ The published v4.3.0 archive is qualified for Debian 12 x86_64 and includes the 
 Download the archive, SBOM, checksums, and provenance bundle from the [v4.3.0 release](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.3.0). Verify the checksum and workflow attestation against the exact tagged commit before extracting.
 
 ```sh
-COMMIT=40_lowercase_hex_v4_3_0_commit
+COMMIT=808f5eed4ff5587d6f0ca11f306555d930e0e292
 mkdir tau-gate-v4.3.0
 cd tau-gate-v4.3.0
 gh release download v4.3.0 --repo steph4n-gh/tau-gate \
