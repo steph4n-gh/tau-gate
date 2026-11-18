@@ -4,7 +4,7 @@ Use the caller-trusted Python helpers and checker binary to review two commits. 
 
 ## Preview a PR before setting up approvals
 
-From the npm repository, with the base and head commits fetched locally, run the helper from the verified v4.3.0-beta.3 archive:
+From the npm repository, with the base and head commits fetched locally, run the helper from the verified v4.3.0 archive:
 
 ```sh
 python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch
@@ -14,7 +14,7 @@ The helper uses the current directory as the repository and the checker beside i
 
 ## Add the GitHub check
 
-Install [the single workflow example](examples/npm-pr-review.yml) as `.github/workflows/npm-pr-review.yml` on the protected default branch. Set repository variables `TAU_GATE_ARCHIVE_URL` and `TAU_GATE_ARCHIVE_SHA256` to the HTTPS URL and lowercase SHA-256 of the verified v4.3.0-beta.3 Linux archive. The workflow verifies the archive before running its packaged checker and helpers. It does not copy those helpers into the npm repository or require approval JSON files there.
+Install [the single workflow example](examples/npm-pr-review.yml) as `.github/workflows/npm-pr-review.yml` on the protected default branch. Set repository variables `TAU_GATE_ARCHIVE_URL` and `TAU_GATE_ARCHIVE_SHA256` to the HTTPS URL and lowercase SHA-256 of the verified v4.3.0 Linux archive. The workflow verifies the archive before running its packaged checker and helpers. It does not copy those helpers into the npm repository or require approval JSON files there.
 
 The protected base commit is the baseline: existing *qualified* execution candidates are accepted, while a new or changed candidate, or a changed tracked source tree when a root/workspace lifecycle candidate exists, blocks until a different maintainer with write access posts the exact approval comment below. Missing or unsupported evidence stays incomplete. A PR that changes `.github/workflows/` blocks as a trusted gate change. Head code is read from Git objects and never run. The workflow has separate read-only PR and `actions: write` comment-rerun jobs.
 
@@ -74,7 +74,7 @@ The trusted helper checks the live PR's base and head, comment author ID, reposi
 
 The same workflow has an `issue_comment` job that reruns the completed `pull_request_target` check for the exact current base and head when an approval comment is created, edited, or deleted. Removing or editing away the comment causes the rerun check to reject the approval. Only this job has `actions: write`; the PR check remains read-only. A missing original PR check, unavailable event policy, or unavailable GitHub API prevents automatic authorization.
 
-The earlier [owned hosted pilot](qualification/product-pr-review.md#hosted-approval-pilot) exercised blocked, exact-comment approved, and stale-head blocked states with the two-file workflow and explicit base policies. The single-file protected-base baseline workflow still needs its own hosted check. The external filesystem store remains available for non-GitHub CI, with the administrator-controlled storage requirements above.
+The earlier [owned hosted pilot](qualification/product-pr-review.md#hosted-approval-pilot) exercised blocked, exact-comment approved, and stale-head blocked states with the two-file workflow and explicit base policies. A later [single-file hosted check](qualification/evidence/hosted-single-workflow-20261118.json) verified blocked, exact-comment approved, and stale-head blocked states with `--baseline-from-base` and no repository policy files. The external filesystem store remains available for non-GitHub CI, with the administrator-controlled storage requirements above.
 
 ## Trusted workflow boundary
 
