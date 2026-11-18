@@ -4,7 +4,7 @@ Use the caller-trusted Python helpers and checker binary to review two commits. 
 
 ## Preview a PR before setting up approvals
 
-From the npm repository, with the base and head commits fetched locally, run the helper from a verified Tau-Gate archive containing this preview change (the published beta.2 predates it):
+From the npm repository, with the base and head commits fetched locally, run the helper from the verified v4.3.0-beta.3 archive:
 
 ```sh
 python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch
@@ -14,7 +14,7 @@ The helper uses the current directory as the repository and the checker beside i
 
 ## Add the GitHub check
 
-Install [the single workflow example](examples/npm-pr-review.yml) as `.github/workflows/npm-pr-review.yml` on the protected default branch. Set repository variables `TAU_GATE_ARCHIVE_URL` and `TAU_GATE_ARCHIVE_SHA256` to the HTTPS URL and lowercase SHA-256 of a verified Tau-Gate Linux archive containing `--baseline-from-base`. The published beta.2 predates this mode. The workflow verifies the archive before running its packaged checker and helpers. It does not copy those helpers into the npm repository or require approval JSON files there.
+Install [the single workflow example](examples/npm-pr-review.yml) as `.github/workflows/npm-pr-review.yml` on the protected default branch. Set repository variables `TAU_GATE_ARCHIVE_URL` and `TAU_GATE_ARCHIVE_SHA256` to the HTTPS URL and lowercase SHA-256 of the verified v4.3.0-beta.3 Linux archive. The workflow verifies the archive before running its packaged checker and helpers. It does not copy those helpers into the npm repository or require approval JSON files there.
 
 The protected base commit is the baseline: existing *qualified* execution candidates are accepted, while a new or changed candidate, or a changed tracked source tree when a root/workspace lifecycle candidate exists, blocks until a different maintainer with write access posts the exact approval comment below. Missing or unsupported evidence stays incomplete. A PR that changes `.github/workflows/` blocks as a trusted gate change. Head code is read from Git objects and never run. The workflow has separate read-only PR and `actions: write` comment-rerun jobs.
 

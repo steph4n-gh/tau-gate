@@ -1,12 +1,12 @@
 # Verify a Linux release independently
 
 The declared release platform is Debian 12 x86_64. The commands below show
-v4.2.1 filenames; for v4.3.0-beta.2 substitute the beta filenames and its
+v4.2.1 filenames; for v4.3.0-beta.3 substitute the beta filenames and its
 exact tagged commit. The build uses Rust 1.85.0
 inside the pinned Linux amd64 image
 `rust@sha256:16a7f242108de02f10fe4a392991679bafa7694e59f5b40a54d5af1be9b40d03`.
 The core has no third-party Rust runtime crates. The beta archive contains the
-executable, three Python PR-review helpers, two GitHub workflow examples, a PR
+executable, three Python PR-review helpers, a GitHub workflow example, a PR
 review guide, license, README, CycloneDX 1.5 SBOM, and its direct ELF library
 inventory. The SBOM records the binary SHA256, a commit-derived UUID, and direct
 system library names. It does not inventory an entire Debian installation or

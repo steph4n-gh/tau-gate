@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (4.3.0)
+## 4.3.0-beta.3
 
 - Preview an npm v3 PR from fetched Git revisions without approval files or an allow decision.
 - Derive existing qualified execution approvals from the protected base commit. The single GitHub workflow runs pinned release tools and accepts an exact maintainer comment for new evidence; repository approval JSON and the separate comment workflow are no longer needed for this path.
