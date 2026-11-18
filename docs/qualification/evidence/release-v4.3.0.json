@@ -1,0 +1,65 @@
+{
+  "release": "v4.3.0",
+  "scope": "Bounded npm lockfileVersion 3 Git-object PR reviewer on verified original archives, plus read-only npm/pnpm/Yarn topology parsing; Debian 12 x86_64 release platform",
+  "tag_commit": "808f5eed4ff5587d6f0ca11f306555d930e0e292",
+  "merged_pr": "https://github.com/steph4n-gh/tau-gate/pull/44",
+  "pr_head_commit": "f0f8e106530848364c06a5eb67290cd366f55904",
+  "merged_tree_equals_pr_head_tree": true,
+  "pr_review_limitation": "The owner used the configured ruleset bypass; there was no separate human approving review.",
+  "merged_main_ci": "https://github.com/steph4n-gh/tau-gate/actions/runs/44406311792",
+  "merged_main_codeql": "https://github.com/steph4n-gh/tau-gate/actions/runs/44406310658",
+  "release_candidate_run": "https://github.com/steph4n-gh/tau-gate/actions/runs/44406377198",
+  "release_url": "https://github.com/steph4n-gh/tau-gate/releases/tag/v4.3.0",
+  "published_at_utc": "2026-11-18T22:01:55Z",
+  "prerelease": false,
+  "latest": true,
+  "release_candidate_two_isolated_container_builds_byte_identical": true,
+  "separate_local_clean_rebuild": false,
+  "independent_operator_rebuild": false,
+  "published_assets_match_candidate": true,
+  "anonymous_public_archive_download_matches_candidate": true,
+  "clean_debian_12_x86_64_install_and_git_2_39_controls_passed_in_release_workflow": true,
+  "published_provenance_and_sbom_attestations_verified": true,
+  "attestation_source_digest_and_workflow_pinned": true,
+  "tamper_rejected": true,
+  "hosted_single_workflow_receipt": "docs/qualification/evidence/hosted-single-workflow-20261118.json",
+  "public_package_lifecycle_scripts_executed": false,
+  "assets": {
+    "SHA256SUMS": {
+      "bytes": 206,
+      "sha256": "f0abdaf42f932d56734e392e7370bca607d7cfe9d71cad9463f57240b351b0a0"
+    },
+    "provenance.sigstore.json": {
+      "bytes": 11289,
+      "sha256": "a457e2d100adeca96daede38180cdcb64dc8c71385009321dd5c4de8ed8811d7"
+    },
+    "sbom.sigstore.json": {
+      "bytes": 11375,
+      "sha256": "58308f64a53d145c40c227bb03dcd448c547cab0a54e9e07a24a3db616feac07"
+    },
+    "tau-gate-v4.3.0-linux-x86_64.cdx.json": {
+      "bytes": 1031,
+      "sha256": "407ccd2e27ce03545e433f60e1a304a2ef8806f027fadb5e90e1af6e1dabdc75"
+    },
+    "tau-gate-v4.3.0-linux-x86_64.intoto.jsonl": {
+      "bytes": 11289,
+      "sha256": "a457e2d100adeca96daede38180cdcb64dc8c71385009321dd5c4de8ed8811d7"
+    },
+    "tau-gate-v4.3.0-linux-x86_64.tar.gz": {
+      "bytes": 788994,
+      "sha256": "8b226fa357f4f39bc376b3f5c5c93c6badc2f11a637c5ee9d8838a657ce30743"
+    }
+  },
+  "frozen_broad_coverage_gates": {
+    "third_cohort_completed_all": "17/30 below 80% floor",
+    "third_cohort_completed_label_complete": "17/18 below 95% floor",
+    "fourth_cohort_completed_all": "18/30 below 80% floor",
+    "fourth_cohort_completed_label_complete": "18/21 below 95% floor"
+  },
+  "unmeasured": [
+    "general package safety",
+    "host installation behavior for public updates",
+    "human reviewer time or advantage",
+    "independent external maintainer use"
+  ]
+}
