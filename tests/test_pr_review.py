@@ -146,6 +146,24 @@ class PullRequestReview(unittest.TestCase):
         self.assertFalse(list(self.repo.rglob("CANARY_EXECUTED")))
         return report, output
 
+    def run_base_baseline(self, base, head, expected, extra=()):
+        self.sequence += 1
+        output = self.root / f"base-baseline-{self.sequence}"
+        command = [sys.executable, str(WRAPPER), "--repo", str(self.repo), "--base", base, "--head", head,
+                   "--project", "apps/example", "--baseline-from-base", "--tau-gate", str(BINARY),
+                   "--archive-cache", str(self.cache), "--output", str(output), *extra]
+        result = subprocess.run(command, capture_output=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        response = json.loads(result.stdout)
+        report = json.loads((output / "report.json").read_bytes()) if "--approve-subject" in extra else response
+        self.assertEqual(result.returncode, expected, report)
+        if "--approve-subject" in extra:
+            self.assertTrue(response["approval_recorded"])
+        else:
+            self.assertEqual(report["exit_code"], expected)
+        self.assertEqual(json.loads((output / "report.json").read_bytes()), report)
+        self.assertFalse(list(self.repo.rglob("CANARY_EXECUTED")))
+        return report, output
+
     def test_exact_git_bytes_ignore_dirty_worktree_and_repeat_deterministically(self):
         committed = (self.project / "package.json").read_bytes()
         self.write("package.json", b"dirty third manifest is not JSON\n")
@@ -206,6 +224,67 @@ class PullRequestReview(unittest.TestCase):
         self.assertEqual(incomplete.returncode, 2, gap)
         self.assertEqual(gap["outcome"], "incomplete")
         self.assertIn("Preview incomplete", Path(lines[2].removeprefix("Summary: ")).read_text())
+
+    def test_protected_base_baseline_approves_only_exact_new_evidence(self):
+        self.policy_path.unlink()
+        self.source_policy_path.unlink()
+        base = self.commit("baseline without approval files")
+        store = self.root / "trusted-store"
+        store.mkdir()
+        unchanged, _ = self.run_base_baseline(base, base, 0, ("--approval-store", str(store)))
+        self.assertEqual(unchanged["policy"]["origin"], "protected_base")
+        self.assertEqual(unchanged["source_approval"]["status"], "allowed")
+
+        self.manifest["scripts"]["prepare"] = "echo changed > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        head = self.commit("new lifecycle body")
+        blocked, _ = self.run_base_baseline(base, head, 1, ("--approval-store", str(store)))
+        request = blocked["approval_request"]
+        self.assertEqual([item["path"] for item in request["approvals"]], [""])
+        self.assertEqual(request["source_tree_sha256"], blocked["source_approval"]["head"]["sha256"])
+        recorded, _ = self.run_base_baseline(base, head, 0,
+            ("--approval-store", str(store), "--approve-subject", request["subject_sha256"]))
+        self.assertEqual(recorded["outcome"], "blocked")
+        allowed, _ = self.run_base_baseline(base, head, 0, ("--approval-store", str(store)))
+        self.assertEqual(allowed["outcome"], "allowed")
+        self.assertTrue(allowed["trusted_approval"]["matched"])
+
+        self.manifest["scripts"]["prepare"] = "echo stale > CANARY_EXECUTED"
+        self.write("package.json", json_data(self.manifest))
+        stale, _ = self.run_base_baseline(base, self.commit("stale approval"), 1, ("--approval-store", str(store)))
+        self.assertNotEqual(stale["approval_request"]["subject_sha256"], request["subject_sha256"])
+
+    def test_base_baseline_blocks_workflow_edit_without_execution_candidates(self):
+        base = self.script_free_base()
+        self.policy_path.unlink()
+        self.source_policy_path.unlink()
+        base = self.commit("no policies or execution candidates")
+        note = self.repo / "docs/note.md"
+        note.parent.mkdir()
+        note.write_text("ordinary change\n")
+        allowed, _ = self.run_base_baseline(base, self.commit("ordinary source change"), 0)
+        self.assertEqual(allowed["outcome"], "allowed")
+        workflow = self.repo / ".github/workflows/npm-pr-review.yml"
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text("jobs: {}\n")
+        blocked, _ = self.run_base_baseline(base, self.commit("change gate workflow"), 1)
+        self.assertEqual(blocked["source_approval"]["changed_trusted_paths"],
+                         [".github/workflows/npm-pr-review.yml"])
+        self.assertNotIn("approval_request", blocked)
+
+    def test_base_baseline_requires_qualified_existing_evidence(self):
+        self.policy_path.unlink()
+        self.source_policy_path.unlink()
+        self.manifest["dependencies"]["missing"] = "1.0.0"
+        self.write("package.json", json_data(self.manifest))
+        self.lock["packages"][""]["dependencies"] = self.manifest["dependencies"]
+        self.write("package-lock.json", json_data(self.lock))
+        base = self.commit("baseline with unresolved dependency")
+        incomplete, output = self.run_base_baseline(base, base, 2)
+        self.assertEqual(incomplete["errors"][0]["stage"], "base_policy")
+        self.assertIn("protected base evidence must be complete", incomplete["errors"][0]["message"])
+        self.assertIsNotNone(incomplete["core"])
+        self.assertIn("unresolved dependencies", (output / "summary.md").read_text())
 
     def test_changed_lifecycle_and_forged_head_approval_remain_blocked(self):
         self.manifest["scripts"]["prepare"] = "echo changed-root-canary > CANARY_EXECUTED"

@@ -28,31 +28,31 @@ The checksum file covers both the archive and SBOM, so download both before runn
 
 ## Install the npm PR reviewer beta
 
-The v4.3.0-beta.2 Debian 12 x86_64 archive includes the checker, three standard-library Python helpers, a PR review guide, and two GitHub workflow examples. Download the beta's archive, SBOM, checksums, and provenance bundle from its [release page](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.3.0-beta.2), then verify the expected commit and workflow identity with the [release verification guide](release-verification.md).
+The v4.3.0-beta.3 Debian 12 x86_64 archive includes the checker, three standard-library Python helpers, a PR review guide, and a GitHub workflow example. Download the beta's archive, SBOM, checksums, and provenance bundle from its [release page](https://github.com/steph4n-gh/tau-gate/releases/tag/v4.3.0-beta.3), then verify the expected commit and workflow identity with the [release verification guide](release-verification.md).
 
 ```sh
-mkdir tau-gate-v4.3.0-beta.2
-cd tau-gate-v4.3.0-beta.2
-gh release download v4.3.0-beta.2 --repo steph4n-gh/tau-gate \
-	--pattern 'tau-gate-v4.3.0-beta.2-linux-x86_64.tar.gz' \
-	--pattern 'tau-gate-v4.3.0-beta.2-linux-x86_64.cdx.json' \
+mkdir tau-gate-v4.3.0-beta.3
+cd tau-gate-v4.3.0-beta.3
+gh release download v4.3.0-beta.3 --repo steph4n-gh/tau-gate \
+	--pattern 'tau-gate-v4.3.0-beta.3-linux-x86_64.tar.gz' \
+	--pattern 'tau-gate-v4.3.0-beta.3-linux-x86_64.cdx.json' \
 	--pattern 'SHA256SUMS' \
 	--pattern 'provenance.sigstore.json'
 sha256sum --check SHA256SUMS
-tar -xzf tau-gate-v4.3.0-beta.2-linux-x86_64.tar.gz
+tar -xzf tau-gate-v4.3.0-beta.3-linux-x86_64.tar.gz
 ./tau-gate --verify
 python3 -B tools/pr_review.py --help
 ```
 
 The [PR review guide](pr-review.md) shows the exact-base/head command and approval workflow. The beta supports npm v3 PRs whose original package archives can be verified within the documented bounds. Unsupported or missing evidence stays incomplete; approval cannot waive it. The helper never runs package lifecycle scripts.
 
-The preview command below is in this source tree; the published beta.2 archive predates it. Build this tree or use an archive that includes the preview change, fetch the npm repository's base and head commits, and run the helper from that repository:
+Fetch the npm repository's base and head commits, then run the preview command from that repository:
 
 ```sh
 python3 /path/to/tau-gate/tools/pr_review.py --preview --base main --head my-pr-branch
 ```
 
-It prints the path to a Markdown summary. A complete preview is informational; use the [enforced PR workflow](pr-review.md#enforce-an-approval-decision) for an approval decision. When running directly from this source tree, pass `--tau-gate /path/to/target/release/tau-gate` because the binary is not beside `tools/` until it is packaged.
+It prints the path to a Markdown summary. A complete preview is informational; use the [enforced PR workflow](pr-review.md#add-the-github-check) for an approval decision. When running directly from this source tree, pass `--tau-gate /path/to/target/release/tau-gate` because the binary is not beside `tools/` until it is packaged.
 
 ## Build from source
 

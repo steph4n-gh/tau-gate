@@ -47,7 +47,6 @@ for helper in pr_review.py npm_evidence.py github_pr_approval.py; do
 done
 install -m 0644 docs/pr-review.md "$stage/PR-REVIEW.md"
 install -m 0644 docs/examples/npm-pr-review.yml "$stage/examples/npm-pr-review.yml"
-install -m 0644 docs/examples/npm-pr-approval-rerun.yml "$stage/examples/npm-pr-approval-rerun.yml"
 readelf -dW "$binary" | sed -n 's/.*Shared library: \[\([^]]*\)\].*/\1/p' | sort -u > "$stage/runtime-libraries.txt"
 test -s "$stage/runtime-libraries.txt"
 if grep -Ev '^[A-Za-z0-9_.-]+$' "$stage/runtime-libraries.txt"; then

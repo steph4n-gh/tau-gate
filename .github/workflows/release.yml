@@ -97,7 +97,6 @@ jobs:
           done
           cmp docs/pr-review.md "$installed/PR-REVIEW.md"
           cmp docs/examples/npm-pr-review.yml "$installed/examples/npm-pr-review.yml"
-          cmp docs/examples/npm-pr-approval-rerun.yml "$installed/examples/npm-pr-approval-rerun.yml"
 
       - name: Check packaged PR reviewer with Debian 12 Git
         shell: bash
@@ -123,7 +122,8 @@ jobs:
                 --binary /tmp/tau-gate/tau-gate \
                 --output /tmp/pr-controls
               python3 -B -m unittest \
-                tests.test_pr_review.PullRequestReview.test_missing_promised_blob_does_not_fetch
+                tests.test_pr_review.PullRequestReview.test_missing_promised_blob_does_not_fetch \
+                tests.test_pr_review.PullRequestReview.test_protected_base_baseline_approves_only_exact_new_evidence
             '
 
       - name: Sign build provenance

@@ -500,6 +500,25 @@ def effective_approvals(base_data, additions):
         {"path": path, "fingerprints": sorted(values)} for path, values in sorted(by_path.items())]})
 
 
+def approvals_from_base(core):
+    base = core.get("base") or {}
+    if base.get("status") != "complete":
+        raise EvidenceError("protected base evidence must be complete before it can serve as the approval baseline")
+    approvals = {}
+    for item in base.get("execution_evidence", []):
+        if not item.get("candidate"):
+            continue
+        path, fingerprint = item.get("path"), item.get("approval_fingerprint")
+        if (item.get("state") != "qualified" or not isinstance(path, str)
+                or not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{64}", fingerprint)
+                or path in approvals):
+            raise EvidenceError("protected base has an invalid execution candidate")
+        approvals[path] = fingerprint
+    data = json_bytes({"schema_version": 2, "approvals": [
+        {"path": path, "fingerprints": [fingerprint]} for path, fingerprint in sorted(approvals.items())]})
+    return data, len(approvals)
+
+
 def core_review(binary, output, approvals=None):
     command = [str(binary), "review", "--base", "base/project/package-lock.json",
                "--head", "head/project/package-lock.json", "--base-manifest", "base/project/package.json",
@@ -517,6 +536,8 @@ def core_review(binary, output, approvals=None):
     expected = {"allowed": 0, "blocked": 1, "incomplete": 2}
     if approvals is None:
         expected = {"advisory": 2 if core.get("status") == "incomplete" else 0}
+        if core.get("status") == "incomplete":
+            expected["incomplete"] = 2
     if outcome not in expected or result.returncode != expected[outcome]:
         raise EvidenceError(f"core outcome or exit code is inconsistent: {result.returncode}")
     return core, outcome
@@ -541,7 +562,10 @@ def summary(report):
             lines.append(f"{label.capitalize()} commit `{report[label]['commit']}`.")
     if report["policy"] is not None:
         policy = report["policy"]
-        lines.extend(["", f"Base approvals come from `{policy['commit']}` at `{markdown_text(policy['path'])}`."])
+        if policy["origin"] == "protected_base":
+            lines.extend(["", f"Existing verified execution candidates are baselined from protected commit `{policy['commit']}`. New or changed candidates need exact approval."])
+        else:
+            lines.extend(["", f"Base approvals come from `{policy['commit']}` at `{markdown_text(policy['path'])}`."])
     source = report.get("source_approval")
     if source is not None:
         lines.extend(["", f"Trusted gate and source-tree approval: {source['status']}."])
@@ -712,7 +736,7 @@ def review(args):
             store = approval_store(args.approval_store, git.repository, output, args.archive_cache)
             replacements.append((str(store), "<approval-store>"))
         project = "" if args.project == "." else portable_path(args.project)
-        if not args.preview:
+        if not args.preview and not args.baseline_from_base:
             approval_path = portable_path(args.approvals)
             source_approval_path = portable_path(args.source_approvals)
             if approval_path == source_approval_path:
@@ -749,20 +773,33 @@ def review(args):
             (output / "summary.md").write_text(summary(report), encoding="utf-8")
             return report
         stage = "base_policy"
-        data, metadata = git.blob(snapshots["base"].commit, approval_path)
+        if args.baseline_from_base:
+            advisory, _ = core_review(binary, output)
+            advisory.pop("policy", None)
+            report["core"] = advisory
+            report["review"] = review_view(report, output)
+            data, count = approvals_from_base(advisory)
+            report["policy"] = {"origin": "protected_base", "commit": snapshots["base"].commit,
+                                "sha256": sha256(data), "candidate_count": count}
+        else:
+            data, metadata = git.blob(snapshots["base"].commit, approval_path)
+            report["policy"] = {"origin": "base", "commit": snapshots["base"].commit,
+                                "path": approval_path, **metadata}
         base_policy_data = data
         (output / "base" / "approvals.json").write_bytes(data)
-        report["policy"] = {"origin": "base", "commit": snapshots["base"].commit,
-                            "path": approval_path, **metadata}
         stage = "core_review"
         core, outcome = core_review(binary, output, "base/approvals.json")
+        if args.baseline_from_base and {key: value for key, value in core.items() if key != "policy"} != {key: value for key, value in advisory.items() if key != "policy"}:
+            raise EvidenceError("core evidence changed while applying protected-base approvals")
         report["core"] = core
         source_required = any(
             item.get("candidate") and (item.get("facts") or {}).get("kind") == "source_project"
             for label in ("base", "head")
             for item in core.get(label, {}).get("execution_evidence", []))
-        excluded = {path.encode("utf-8") for path in (approval_path, source_approval_path)}
-        protected_prefixes = (b"tools/", b".github/workflows/")
+        excluded = (set() if args.baseline_from_base else
+                    {path.encode("utf-8") for path in (approval_path, source_approval_path)})
+        protected_prefixes = ((b".github/workflows/",) if args.baseline_from_base else
+                              (b"tools/", b".github/workflows/"))
         stage = "policy_changes"
         base_entries = git.tracked_entries(snapshots["base"].commit, excluded, protected_prefixes)
         head_entries = git.tracked_entries(snapshots["head"].commit, excluded, protected_prefixes)
@@ -770,26 +807,32 @@ def review(args):
                                if base_entries.get(path) != head_entries.get(path))
         if source_required or changed_paths:
             source = {"status": "incomplete", "required": source_required,
-                      "origin": "base", "commit": snapshots["base"].commit,
-                      "path": source_approval_path, "excluded_paths": sorted((approval_path, source_approval_path)),
+                      "origin": "protected_base" if args.baseline_from_base else "base",
+                      "commit": snapshots["base"].commit,
+                      "excluded_paths": [] if args.baseline_from_base else sorted((approval_path, source_approval_path)),
                       "changed_trusted_paths": changed_paths}
+            if not args.baseline_from_base:
+                source["path"] = source_approval_path
             report["source_approval"] = source
         if source_required:
             for label in ("base", "head"):
                 stage = label + "_source_tree"
                 source[label] = git.source_tree(snapshots[label].commit, excluded)
             stage = "source_policy"
-            data, metadata = git.blob(snapshots["base"].commit, source_approval_path, MAX_MANIFEST)
-            source["policy_sha256"] = metadata["sha256"]
-            policy = strict_json(data)
-            if (not isinstance(policy, dict) or set(policy) != {"schema_version", "digests"}
-                    or type(policy["schema_version"]) is not int or policy["schema_version"] != 1
-                    or not isinstance(policy["digests"], list)
-                    or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
-                           for value in policy["digests"])
-                    or len(set(policy["digests"])) != len(policy["digests"])):
-                raise EvidenceError("source approval file must contain schema_version 1 and unique lowercase SHA-256 digests")
-            source["matched"] = source["head"]["sha256"] in policy["digests"]
+            if args.baseline_from_base:
+                source["matched"] = source["head"]["sha256"] == source["base"]["sha256"]
+            else:
+                data, metadata = git.blob(snapshots["base"].commit, source_approval_path, MAX_MANIFEST)
+                source["policy_sha256"] = metadata["sha256"]
+                policy = strict_json(data)
+                if (not isinstance(policy, dict) or set(policy) != {"schema_version", "digests"}
+                        or type(policy["schema_version"]) is not int or policy["schema_version"] != 1
+                        or not isinstance(policy["digests"], list)
+                        or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                               for value in policy["digests"])
+                        or len(set(policy["digests"])) != len(policy["digests"])):
+                    raise EvidenceError("source approval file must contain schema_version 1 and unique lowercase SHA-256 digests")
+                source["matched"] = source["head"]["sha256"] in policy["digests"]
             if changed_paths or not source["matched"]:
                 source["status"] = "blocked"
                 if not source["matched"]:
@@ -845,6 +888,8 @@ def review(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preview", action="store_true", help="show exact PR changes without approval policy or an allow decision")
+    parser.add_argument("--baseline-from-base", action="store_true",
+                        help="treat qualified candidates in the protected base as the approval baseline")
     parser.add_argument("--repo", type=Path, default=Path.cwd(), help="Git repository (default: current directory)")
     parser.add_argument("--base", required=True)
     parser.add_argument("--head", required=True)
@@ -859,15 +904,19 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, help="new or empty directory outside repository and cache")
     args = parser.parse_args(argv)
     if args.preview:
-        if any(value is not None for value in (args.approvals, args.source_approvals, args.approval_store, args.approve_subject)):
+        if args.baseline_from_base or any(value is not None for value in (args.approvals, args.source_approvals, args.approval_store, args.approve_subject)):
             parser.error("--preview cannot use approval options")
         if args.output is None:
             args.output = Path(tempfile.mkdtemp(prefix="tau-gate-preview-"))
     else:
         if args.output is None:
             parser.error("--output is required for an enforced review")
-        args.approvals = args.approvals or "tau-gate.approvals.json"
-        args.source_approvals = args.source_approvals or "tau-gate.source-approvals.json"
+        if args.baseline_from_base:
+            if args.approvals is not None or args.source_approvals is not None:
+                parser.error("--baseline-from-base cannot use repository approval files")
+        else:
+            args.approvals = args.approvals or "tau-gate.approvals.json"
+            args.source_approvals = args.source_approvals or "tau-gate.source-approvals.json"
     report = review(args)
     if args.approve_subject is not None:
         try:
